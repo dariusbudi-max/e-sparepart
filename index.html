@@ -11,7 +11,7 @@
     <script src="https://unpkg.com/html5-qrcode"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <style>
         [v-cloak] { display: none; }
         .fade-enter-active,
@@ -47,28 +47,40 @@
         .fade-scale-enter-active, .fade-scale-leave-active { transition: all 0.3s ease; }
         .fade-scale-enter-from, .fade-scale-leave-to { opacity: 0; transform: scale(0.95); }
 
-        @media screen {
-            .preview-container {
-                background: #0f172a;
-                padding: 40px 20px;
-                max-height: 85vh; 
-                overflow-y: auto;
-            }
+        /* Container Utama untuk UI Web */
+        .preview-container {
+            background: #0f172a;
+            padding: 1rem;
+            height: 75vh !important; /* Batasi tinggi agar muncul scroll */
+            overflow-y: auto !important;
+            display: block !important;
+            border-radius: 1rem;
+            -webkit-overflow-scrolling: touch;
         }
 
-        /* Kunci Ukuran Setengah A4 (A5 Landscape) */
+        /* Area Cetak di Layar */
         .print-page {
             width: 210mm;
-            height: 148.2mm; 
-            padding: 8mm 10mm;
+            height: 148mm;
             background: white;
-            margin: 0 auto; /* Hilangkan margin bottom agar tidak memicu page baru */
+            margin: 0 auto 20px auto;
+            padding: 8mm 10mm;
+            box-sizing: border-box;
             display: flex;
             flex-direction: column;
-            box-sizing: border-box;
-            overflow: hidden;
-            font-family: Arial, Helvetica, sans-serif;
             color: black;
+            font-family: Arial, sans-serif;
+            position: relative;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3);
+        }
+
+        .table-main {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        .table-main th, .table-main td {
+            border: 1px solid black;
+            padding: 4px;
         }
 
         /* Custom Scrollbar agar lebih cantik di UI (Opsional) */
@@ -84,18 +96,6 @@
         .signature-section {
             margin-top: auto; 
             padding-top: 10px;
-        }
-
-        /* Memastikan Border Tabel Tetap Muncul */
-        .table-main {
-            width: 100%;
-            border-collapse: collapse !important;
-            border: 1px solid black !important;
-        }
-
-        .table-main th, .table-main td {
-            border: 1px solid black !important;
-            padding: 4px;
         }
 
         @media print {
@@ -980,7 +980,8 @@
                                             <th v-if="['ADMIN','STAFF'].includes(userData.role)" class="px-5 py-4 w-[10%] text-center">
                                                 Stok
                                             </th>
-                                            <th class="px-5 py-4 w-[12%] text-center">Foto</th>
+                                            <th v-if="userData.role === 'ADMIN' || userData.canPreviewPhoto === true || userData.canPreviewPhoto === 1" 
+                                                class="px-5 py-4 w-[12%] text-center">Foto</th>
                                         </tr>
                                     </thead>
 
@@ -1013,7 +1014,7 @@
                                                     {{ item.nama }}
                                                 </div>
                                                 <div v-if="item.stok <= item.minStok" class="text-[10px] font-semibold text-rose-500 mt-1 italic">
-                                                    Perlu Reorder
+                                                    e-Budget/Reorder
                                                 </div>
                                             </td>
 
@@ -1040,19 +1041,13 @@
                                                 </span>
                                             </td>
 
-                                            <td class="px-5 py-4 text-center">
-                                                <div v-if="item.foto && (userData.role === 'ADMIN' || userData.canPreviewPhoto === true || userData.canPreviewPhoto === 1)"
+                                            <td v-if="userData.role === 'ADMIN' || userData.canPreviewPhoto === true || userData.canPreviewPhoto === 1" 
+                                                class="px-5 py-4 text-center">
+                                                <div v-if="item.foto"
                                                     @click="previewImage = fixDriveUrl(item.foto)"
                                                     class="w-16 h-14 mx-auto rounded-lg overflow-hidden bg-slate-100 cursor-pointer hover:shadow-md transition border border-slate-200">
                                                     <img :src="fixDriveUrl(item.foto)" class="w-full h-full object-cover">
                                                 </div>
-
-                                                <div v-else-if="item.foto" 
-                                                    class="w-16 h-14 mx-auto rounded-lg bg-slate-50 border border-slate-200 flex flex-col items-center justify-center text-slate-300">
-                                                    <i class="fa-solid fa-lock text-[10px]"></i>
-                                                    <span class="text-[8px] font-black mt-1 uppercase tracking-tighter">No Access</span>
-                                                </div>
-
                                                 <div v-else class="text-[10px] text-slate-400 italic">
                                                     No Image
                                                 </div>
@@ -1066,7 +1061,7 @@
                     </div>
                 </main>
 
-                <main v-if="page === 'reservasi'" class="p-4 lg:p-8 animate-in fade-in duration-500 preview-container">
+                <main v-if="page === 'reservasi'" class="p-4 lg:p-8 animate-in fade-in duration-500 min-h-screen bg-[#0f172a]">
                     <div class="max-w-5xl mx-auto flex justify-between items-center mb-6 print:hidden">
                         <h2 class="text-xl font-bold text-white flex items-center gap-2">
                             <i class="fa-solid fa-file-circle-check text-indigo-400"></i>
@@ -1076,101 +1071,108 @@
                             <button @click="reservasiItems = []" class="px-4 py-2 bg-slate-800 text-rose-400 rounded-xl font-bold text-xs hover:bg-rose-500/10 transition-all">
                                 <i class="fa-solid fa-trash-can mr-1"></i> Kosongkan
                             </button>
-                            <button @click="downloadPDF" class="bg-emerald-600 px-4 py-2.5 rounded-xl font-bold flex items-center gap-2 text-xs shadow-lg">
+                            <button @click="downloadPDF" class="bg-emerald-600 px-4 py-2.5 rounded-xl font-bold flex items-center gap-2 text-xs shadow-lg active:scale-95">
                                 <i class="fa-solid fa-file-pdf"></i> Download PDF
                             </button>
-                            <button @click="handlePrint" class="bg-gradient-to-r from-indigo-600 to-blue-600 px-6 py-2.5 rounded-xl font-bold flex items-center gap-2 shadow-lg active:scale-95 transition-all text-xs">
-                                <i class="fa-solid fa-print"></i> Cetak Form A5
+                            <button @click="handlePrint" class="bg-gradient-to-r from-indigo-600 to-blue-600 px-6 py-2.5 rounded-xl font-bold flex items-center gap-2 shadow-lg active:scale-95 text-xs">
+                                <i class="fa-solid fa-print"></i> Cetak A5 (Browser)
                             </button>
                         </div>
                     </div>
 
-                    <div id="printable-area" class="mx-auto max-w-5xl preview-scroll custom-scrollbar">
-                        <div v-for="(pageItems, pageIdx) in paginatedItems" :key="pageIdx" class="print-page">
-                            
-                            <div class="flex justify-between items-center mb-1">
-                                <h4 class="text-[9px] font-bold uppercase italic">PT Bintang Indokarya Gemilang</h4>
-                                <div class="border border-black px-2 py-0.5">
-                                    <p class="text-[8px] font-bold leading-none">No. Doc: #{{ new Date().getTime().toString().substring(7) }}</p>
-                                </div>
-                            </div>
-                            <div class="text-center mb-2 border-b-2 border-black pb-1">
-                                <h3 class="text-base font-bold uppercase italic leading-none">Bukti Permintaan Suku Cadang</h3>
-                            </div>
-
-                            <div class="grid grid-cols-3 gap-4 mb-2">
-                                <div class="flex items-center gap-2 border-b border-black pb-0.5">
-                                    <label class="text-[8px] font-bold uppercase">Dept:</label>
-                                    <input v-model="txDept" list="deptList" class="w-full bg-transparent text-[10px] font-bold outline-none uppercase">
-                                </div>
-                                <div class="flex items-center gap-2 border-b border-black pb-0.5">
-                                    <label class="text-[8px] font-bold uppercase">Tgl:</label>
-                                    <input v-model="txTanggal" type="date" class="w-full bg-transparent text-[10px] font-bold outline-none">
-                                </div>
-                                <div class="flex items-center gap-2 border-b border-black pb-0.5">
-                                    <label class="text-[8px] font-bold uppercase">Resv:</label>
-                                    <input v-model="txReservasi" type="text" placeholder="..." class="w-full bg-transparent text-[10px] font-bold outline-none uppercase">
-                                </div>
-                            </div>
-
-                            <div class="flex-grow">
-                                <table class="w-full border-collapse border border-black text-[10px] table-main">
-                                    <thead class="bg-gray-100 uppercase font-bold">
-                                        <tr class="h-6">
-                                            <th class="w-28 text-center">Kode</th>
-                                            <th class="text-left px-2">Nama Suku Cadang</th>
-                                            <th class="w-10 text-center">Sat</th>
-                                            <th class="w-16 text-center">Qty</th>
-                                            <th class="w-16 text-center bg-gray-200 italic">Real</th>
-                                            <th class="text-left px-2 w-28">No. Mesin</th>
-                                            <th class="text-left px-2">Keterangan</th> </tr>
-                                            <th class="print:hidden w-8 border-none"></th> </tr>
-                                    </thead>
-                                    <tbody>
-                                        <tr v-for="(item, index) in pageItems" :key="index" class="h-6">
-                                            <td class="text-center font-bold font-mono">{{ item.kode }}</td>
-                                            <td class="px-2 font-bold uppercase truncate max-w-[200px]">{{ item.nama }}</td>
-                                            <td class="text-center uppercase">{{ item.satuan }}</td>
-                                            <td class="text-center font-bold italic">{{ item.qty }}</td>
-                                            <td class="bg-gray-50"></td>
-                                            <td class="px-2 text-[9px] uppercase">{{ item.noMesin }}</td>
-                                            <td><input v-model="item.keterangan" type="text" class="px-2 text-[9px]"></td>
-                                            <td class="text-center print:hidden border-none">
-                                                <button @click="reservasiItems.splice((pageIdx * itemsPerPage) + index, 1)" class="text-red-500 font-black hover:scale-125 transition-transform">
-                                                    <i class="fa-solid fa-circle-xmark"></i>
-                                                </button>
-                                            </td>
-                                        </tr>
-                                    </tbody>
-                                </table>
-                            </div>
-
-                            <div class="signature-section">
-                                <div class="grid grid-cols-4 gap-4 text-center">
-                                    <div v-for="role in [
-                                        {l: 'Diminta Oleh,', n: userData.nama || '............', s: 'Staff / Operator'},
-                                        {l: 'Diketahui Oleh,', n: '............', s: 'Kepala Bagian'},
-                                        {l: 'Disetujui Oleh,', n: '............', s: 'Manajer / Leader'},
-                                        {l: 'Diserahkan Oleh,', n: '............', s: 'Warehouse Staff'}
-                                    ]" :key="role.l">
-                                        <p class="text-[8px] font-bold uppercase mb-8">{{ role.l }}</p>
-                                        <div class="border-t border-black pt-1 mx-1">
-                                            <p class="text-[9px] font-bold uppercase truncate">{{ role.n }}</p>
-                                            <p class="text-[6px] italic uppercase text-gray-500 leading-none">{{ role.s }}</p>
-                                        </div>
+                    <div class="preview-container">
+                        <div id="printable-area" class="mx-auto max-w-5xl">
+                            <div v-for="(pageItems, pageIdx) in paginatedItems" :key="pageIdx" class="print-page">
+                                <div class="flex justify-between items-center mb-1">
+                                    <h4 class="text-[9px] font-bold uppercase italic">PT Bintang Indokarya Gemilang</h4>
+                                    <div class="border border-black px-2 py-0.5">
+                                        <p class="text-[8px] font-bold leading-none">No. Doc: #{{ docNumber || + new Date().getTime().toString().substring(7) }}</p>
                                     </div>
                                 </div>
-                                <div class="mt-2 flex justify-between text-[7px] text-gray-400 italic">
-                                    <p>Generated by WMS Lite System</p>
-                                    <p>Hal {{ pageIdx + 1 }} / {{ paginatedItems.length }}</p>
+                                
+                                <div class="text-center mb-2 border-b-2 border-black pb-1">
+                                    <h3 class="text-base font-bold uppercase italic leading-none">Bukti Permintaan Suku Cadang</h3>
+                                </div>
+
+                                <div class="grid grid-cols-3 gap-4 mb-2">
+                                    <div class="flex items-center gap-2 border-b border-black pb-0.5">
+                                        <label class="text-[8px] font-bold uppercase">Dept:</label>
+                                        <input v-model="txDept" list="deptList" class="w-full bg-transparent text-[10px] font-bold outline-none uppercase">
+                                        <datalist id="deptList">
+                                            <option v-for="d in departments" :key="d" :value="d">{{ d }}</option>
+                                        </datalist>
+                                    </div>
+                                    <div class="flex items-center gap-2 border-b border-black pb-0.5">
+                                        <label class="text-[8px] font-bold uppercase">Tgl:</label>
+                                        <input v-model="txTanggal" type="date" class="w-full bg-transparent text-[10px] font-bold outline-none">
+                                    </div>
+                                    <div class="flex items-center gap-2 border-b border-black pb-0.5">
+                                        <label class="text-[8px] font-bold uppercase">Resv:</label>
+                                        <input v-model="txReservasi" type="text" placeholder="..." class="w-full bg-transparent text-[10px] font-bold outline-none uppercase">
+                                    </div>
+                                </div>
+
+                                <div class="flex-grow overflow-hidden">
+                                    <table class="w-full table-main">
+                                        <thead class="bg-gray-100 uppercase font-bold text-[10px]">
+                                            <tr class="h-6 text-center">
+                                                <th class="w-28 border border-black">Kode</th>
+                                                <th class="text-left px-2 border border-black">Nama Suku Cadang</th>
+                                                <th class="w-10 border border-black">Sat</th>
+                                                <th class="w-14 border border-black">Qty</th>
+                                                <th class="w-14 border border-black bg-gray-200 italic">Real</th>
+                                                <th class="w-24 border border-black">No. Mesin</th>
+                                                <th class="border border-black">Keterangan</th>
+                                                <th class="print:hidden w-8 !border-none"></th>
+                                            </tr>
+                                        </thead>
+                                        <tbody class="text-[10px]">
+                                            <tr v-for="(item, index) in pageItems" :key="index" class="h-6">
+                                                <td class="text-center font-mono border border-black">{{ item.kode }}</td>
+                                                <td class="px-2 font-bold uppercase truncate max-w-[180px] border border-black">{{ item.nama }}</td>
+                                                <td class="text-center border border-black uppercase">{{ item.satuan }}</td>
+                                                <td class="text-center font-bold italic border border-black">{{ item.qty }}</td>
+                                                <td class="bg-gray-50 border border-black"></td>
+                                                <td class="px-2 text-[9px] border border-black uppercase text-center">{{ item.noMesin }}</td>
+                                                <td class="px-2 border border-black">
+                                                    <input v-model="item.keterangan" type="text" class="w-full bg-transparent text-[9px] outline-none border-none">
+                                                </td>
+                                                <td class="text-center print:hidden !border-none">
+                                                    <button @click="reservasiItems.splice((pageIdx * 8) + index, 1)" class="text-red-500 hover:scale-110">
+                                                        <i class="fa-solid fa-circle-xmark text-lg"></i>
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                            <tr v-for="i in Math.max(0, 8 - (pageItems ? pageItems.length : 0))" :key="'empty-'+i" class="h-6">
+                                                <td v-for="n in 7" class="border border-black"></td>
+                                                <td class="print:hidden border-none"></td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+
+                                <div class="mt-4">
+                                    <div class="grid grid-cols-4 gap-2 text-center">
+                                        <div v-for="role in [
+                                            {l: 'Diminta Oleh,', n: userData.nama || '............', s: 'Staff / Operator'},
+                                            {l: 'Diketahui Oleh,', n: '............', s: 'Kepala Bagian'},
+                                            {l: 'Disetujui Oleh,', n: '............', s: 'Manajer / Leader'},
+                                            {l: 'Diserahkan Oleh,', n: '............', s: 'Warehouse Staff'}
+                                        ]" :key="role.l">
+                                            <p class="text-[8px] font-bold uppercase mb-8">{{ role.l }}</p>
+                                            <div class="border-t border-black pt-1 mx-1">
+                                                <p class="text-[9px] font-bold uppercase truncate">{{ role.n }}</p>
+                                                <p class="text-[6px] italic uppercase text-gray-500">{{ role.s }}</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="mt-2 flex justify-between text-[7px] text-gray-400 italic">
+                                        <p>Hal {{ pageIdx + 1 }} / {{ paginatedItems.length }}</p>
+                                    </div>
                                 </div>
                             </div>
                         </div>
                     </div>
-
-                    <datalist id="deptList">
-                        <option v-for="d in departments" :key="d" :value="d">{{ d }}</option>
-                    </datalist>
                 </main>
 
                 <main v-if="page === 'master_barang' && ['ADMIN', 'STAFF'].includes(userData.role)"
@@ -1859,42 +1861,67 @@
             </div>
         </div>
 
-        <div v-if="showPopupDetail" class="fixed inset-0 z-[100] flex items-center justify-center p-4">
-            <div @click="showPopupDetail = false" class="absolute inset-0 bg-slate-900/60 backdrop-blur-sm"></div>
+        <div v-if="showPopupDetail" class="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-0 sm:p-4">
+            <div @click="showPopupDetail = false" class="absolute inset-0 bg-slate-900/50 backdrop-blur-sm transition-opacity"></div>
             
-            <div class="relative bg-white w-full max-w-md rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in duration-200">
-                <div class="p-6 bg-slate-900 text-white flex justify-between items-center">
-                    <div>
-                        <h3 class="text-sm font-black uppercase tracking-widest text-indigo-400">Tambah Permintaan</h3>
-                        <p class="text-lg font-bold leading-tight">{{ selectedItem?.nama }}</p>
+            <div class="relative w-full max-w-md bg-slate-50 sm:rounded-3xl rounded-t-3xl shadow-2xl overflow-hidden animate-in slide-in-from-bottom-full sm:zoom-in duration-300">
+                
+                <div class="p-6 bg-gradient-to-r from-indigo-600 to-blue-600 text-white flex justify-between items-start relative overflow-hidden">
+                    <div class="absolute -top-10 -right-10 w-32 h-32 bg-white/10 rounded-full blur-2xl"></div>
+                    
+                    <div class="relative z-10">
+                        <span class="inline-block px-2.5 py-1 bg-white/20 rounded-lg text-[10px] font-black uppercase tracking-widest mb-2 backdrop-blur-md">
+                            Tambah Permintaan
+                        </span>
+                        <h3 class="text-xl font-bold leading-tight drop-shadow-sm">{{ selectedItem?.nama }}</h3>
                     </div>
-                    <button @click="showPopupDetail = false" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark"></i></button>
+                    <button @click="showPopupDetail = false" class="relative z-10 w-8 h-8 flex items-center justify-center bg-white/10 rounded-full hover:bg-white/20 active:scale-90 transition-all text-white">
+                        <i class="fa-solid fa-xmark"></i>
+                    </button>
                 </div>
                 
                 <div class="p-6 space-y-5">
                     <div class="grid grid-cols-2 gap-4">
-                        <div>
-                            <label class="text-[10px] font-black text-slate-400 uppercase">Jumlah (Qty)</label>
-                            <input v-model="formInput.qty" type="number" min="1" 
-                                class="w-full mt-1 px-4 py-3 bg-slate-50 border-2 border-slate-100 rounded-xl focus:border-indigo-500 outline-none font-bold text-slate-700">
+                        <div class="relative">
+                            <label class="text-[10px] font-black text-slate-500 uppercase ml-1">Jumlah (Qty)</label>
+                            <div class="relative mt-1">
+                                <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                    <i class="fa-solid fa-box text-slate-400 text-sm"></i>
+                                </div>
+                                <input v-model="formInput.qty" type="number" min="1" 
+                                    class="w-full pl-9 pr-4 py-3 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 outline-none font-bold text-slate-800 shadow-sm transition-all text-center">
+                            </div>
                         </div>
-                        <div>
-                            <label class="text-[10px] font-black text-slate-400 uppercase">No. Mesin</label>
-                            <input v-model="formInput.noMesin" type="text" placeholder="MC-..."
-                                class="w-full mt-1 px-4 py-3 bg-slate-50 border-2 border-slate-100 rounded-xl focus:border-indigo-500 outline-none font-bold text-slate-700 uppercase">
+                        
+                        <div class="relative">
+                            <label class="text-[10px] font-black text-slate-500 uppercase ml-1">No. Mesin</label>
+                            <div class="relative mt-1">
+                                <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                    <i class="fa-solid fa-gear text-slate-400 text-sm"></i>
+                                </div>
+                                <input v-model="formInput.noMesin" type="text" placeholder="MC-..."
+                                    class="w-full pl-9 pr-4 py-3 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 outline-none font-bold text-slate-800 uppercase shadow-sm transition-all">
+                            </div>
                         </div>
                     </div>
                     
                     <div>
-                        <label class="text-[10px] font-black text-slate-400 uppercase">Keterangan / Tujuan</label>
-                        <textarea v-model="formInput.keterangan" rows="2" placeholder="Contoh: Penggantian rutin atau Urgent"
-                            class="w-full mt-1 px-4 py-3 bg-slate-50 border-2 border-slate-100 rounded-xl focus:border-indigo-500 outline-none font-medium text-slate-700"></textarea>
+                        <label class="text-[10px] font-black text-slate-500 uppercase ml-1">Keterangan / Tujuan</label>
+                        <div class="relative mt-1">
+                            <div class="absolute top-3.5 left-3 pointer-events-none">
+                                <i class="fa-solid fa-clipboard-list text-slate-400 text-sm"></i>
+                            </div>
+                            <textarea v-model="formInput.keterangan" rows="2" placeholder="Contoh: Tukar/Memo"
+                                class="w-full pl-9 pr-4 py-3 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 outline-none font-medium text-slate-800 shadow-sm transition-all resize-none"></textarea>
+                        </div>
                     </div>
                     
-                    <div class="flex gap-3 pt-2">
-                        <button @click="showPopupDetail = false" class="flex-1 px-4 py-3 border-2 border-slate-100 rounded-xl font-bold text-slate-500 hover:bg-slate-50 transition-all">Batal</button>
-                        <button @click="tambahkanKeForm" class="flex-1 px-4 py-3 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 shadow-lg shadow-indigo-200 transition-all">
-                            Masukan Form
+                    <div class="flex gap-3 pt-4 border-t border-slate-200/60">
+                        <button @click="showPopupDetail = false" class="w-1/3 px-4 py-3.5 bg-white border border-slate-200 rounded-xl font-bold text-slate-500 hover:bg-slate-50 active:scale-95 transition-all shadow-sm text-sm">
+                            Batal
+                        </button>
+                        <button @click="tambahkanKeForm" class="w-2/3 px-4 py-3.5 bg-gradient-to-r from-indigo-600 to-blue-600 text-white rounded-xl font-bold shadow-lg shadow-indigo-200 hover:shadow-indigo-300 active:scale-95 transition-all flex justify-center items-center gap-2 text-sm">
+                            <i class="fa-solid fa-plus-circle"></i> Masukkan Form
                         </button>
                     </div>
                 </div>
@@ -2337,8 +2364,9 @@
                     keterangan: ''
                 });
                 const txTanggal = ref(new Date().toISOString().substr(0, 10));
-                const itemsPerPage = 12;
+                const itemsPerPage = 10;
                 const docNumber = ref('');
+                const txReservasi = ref('');
 
                 const qtyInputRef = ref(null);
                 const searchInputRef = ref(null);
@@ -3699,33 +3727,137 @@
                 };
 
                 const downloadPDF = () => {
-                    const element = document.getElementById('printable-area');
-
-                    const noUrut = docNumber.value || new Date().getTime().toString().substring(7);
-                    const dept = (txDept.value || 'DEPT').toUpperCase();
+                    const { jsPDF } = window.jspdf;
+                    const doc = new jsPDF('p', 'mm', 'a4');
                     
-                    const opt = {
-                        margin: 0,
-                        filename: `RESERVASI_${dept}_#${noUrut}.pdf`,
-                        image: { type: 'jpeg', quality: 0.98 },
-                        html2canvas: { scale: 3, useCORS: true, scrollY: 0, 
-                            onclone: (clonedDoc) => {
-                                // Pastikan paksa sembunyikan semua yang ada class print:hidden
-                                clonedDoc.querySelectorAll('.print\\:hidden').forEach(el => el.style.display = 'none');
-                            } },
-                        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
-                    };
+                    const dept = (txDept.value || '-').toUpperCase();
+                    const tgl = txTanggal.value || '-';
+                    const resv = (txReservasi.value || '-').toUpperCase();
+                    const noDoc = docNumber.value || new Date().getTime().toString().substring(7);
+                    const userName = (userData.value?.nama || '............');
 
-                    html2pdf().set(opt).from(element).toPdf().get('pdf').then((pdf) => {
-                        const totalPages = pdf.internal.getNumberOfPages();
-                        const expectedPages = paginatedItems.value.length;
+                    const allPages = paginatedItems.value;
+                    if (allPages.length === 0) return;
 
-                        if (totalPages > expectedPages) {
-                            for (let i = totalPages; i > expectedPages; i--) {
-                                pdf.deletePage(i);
-                            }
+                    // Kita melompat 2 halaman sekaligus (i += 2)
+                    for (let i = 0; i < allPages.length; i += 2) {
+                        // Jika bukan lembar pertama, tambah kertas baru
+                        if (i > 0) doc.addPage();
+
+                        // 1. Gambar Halaman UI ke-i di posisi ATAS (Y: 10)
+                        drawFormToPDF(doc, allPages[i], 10, dept, tgl, resv, noDoc, i + 1, userName, allPages.length);
+
+                        // --- 2. GARIS POTONG TENGAH (Simetris di 148.5mm) ---
+                        doc.setDrawColor(200, 200, 200); 
+                        doc.setLineDashPattern([2, 2], 0); 
+                        doc.line(5, 148.5, 205, 148.5);    
+                        doc.setLineDashPattern([], 0);     
+                        doc.setDrawColor(0, 0, 0);
+
+                        // 2. Gambar Halaman UI ke-(i+1) di posisi BAWAH (Y: 150) jika ada
+                        if (allPages[i + 1]) {
+                            drawFormToPDF(doc, allPages[i + 1], 158, dept, tgl, resv, noDoc, i + 2, userName, allPages.length);
                         }
-                    }).save();
+                    }
+
+                    doc.save(`BON BPSC_${dept}_${noDoc}.pdf`);
+                };
+
+                const drawFormToPDF = (doc, items, startY, dept, tgl, resv, noDoc, pageNum, userName) => {
+                    // --- HEADER ---
+                    doc.setFont("helvetica", "bold");
+                    doc.setFontSize(8);
+                    doc.text("PT BINTANG INDOKARYA GEMILANG", 10, startY);
+                    
+                    doc.rect(170, startY - 4, 30, 6);
+                    doc.text(`No. Doc: #${noDoc}`, 171, startY);
+
+                    doc.setFontSize(14);
+                    doc.text("BUKTI PERMINTAAN SUKU CADANG", 105, startY + 8, { align: "center" });
+                    doc.line(10, startY + 10, 200, startY + 10); // Garis bawah judul
+
+                    // --- INFO DEPT/TGL/RESV ---
+                    doc.setFontSize(9);
+                    doc.text(`DEPT: ${dept}`, 10, startY + 20);
+                    doc.text(`TGL: ${tgl}`, 85, startY + 20);
+                    doc.text(`RESV: ${resv}`, 155, startY + 20);
+
+                    // --- TABLE HEADER (7 Kolom sesuai UI) ---
+                    let currentY = startY + 25;
+                    doc.setFillColor(240, 240, 240); // Warna abu-abu header
+                    doc.rect(10, currentY, 190, 7, 'F');
+                    doc.rect(10, currentY, 190, 7);
+                    
+                    doc.setFontSize(7);
+                    doc.text("Kode", 12, currentY + 5);
+                    doc.text("Nama Suku Cadang", 38, currentY + 5);
+                    doc.text("Sat", 95, currentY + 5);
+                    doc.text("Qty", 108, currentY + 5);
+                    doc.setFillColor(220, 220, 220); // Warna lebih gelap untuk "Real"
+                    doc.rect(120, currentY, 15, 7, 'F'); 
+                    doc.rect(120, currentY, 15, 7);
+                    doc.text("Real", 124, currentY + 5); // Kolom Real
+                    doc.text("No. Mesin", 138, currentY + 5);
+                    doc.text("Keterangan", 168, currentY + 5);
+
+                    // --- TABLE BODY (Loop Data) ---
+                    doc.setFont("helvetica", "normal");
+                    items.forEach((item) => {
+                        currentY += 7;
+                        doc.rect(10, currentY, 190, 7); // Border baris
+                        doc.rect(120, currentY, 15, 7); // Border kolom real
+                        
+                        doc.text(String(item.kode || ''), 11, currentY + 5);
+                        doc.text(String(item.nama || '').substring(0, 35), 39, currentY + 5);
+                        doc.text(String(item.satuan || ''), 96, currentY + 5);
+                        doc.text(String(item.qty || '0'), 109, currentY + 5);
+                        // Kolom Real (dibiarkan kosong untuk diisi manual)
+                        doc.text(String(item.noMesin || ''), 139, currentY + 5);
+                        doc.text(String(item.keterangan || '').substring(0, 20), 169, currentY + 5);
+                    });
+
+                    // Baris Kosong Penyeimbang (agar tabel selalu 8 baris)
+                    const emptyRows = 8 - items.length;
+                    for (let i = 0; i < emptyRows; i++) {
+                        currentY += 7;
+                        doc.rect(10, currentY, 190, 7);
+                        doc.rect(120, currentY, 15, 7);
+                    }
+
+                    // --- SIGNATURE SECTION ---
+                    const sigY = startY + 105;
+                    const roles = [
+                        { l: "Diminta Oleh,", n: (userName || "...............") }, // Pakai nama dari userData
+                        { l: "Diketahui Oleh,", n: "..............." },
+                        { l: "Disetujui Oleh,", n: "..............." },
+                        { l: "Diserahkan Oleh,", n: "..............." }
+                    ];
+
+                    roles.forEach((role, i) => {
+                        const xPos = 15 + (i * 48);
+                        doc.setFont("helvetica", "bold");
+                        doc.setFontSize(8);
+                        doc.text(role.l, xPos + 10, sigY, { align: "center" });
+                        
+                        // Nama User di bawah garis
+                        doc.text(role.n.toUpperCase(), xPos + 10, sigY + 22, { align: "center" });
+                        doc.line(xPos, sigY + 18, xPos + 25, sigY + 18); // Garis tanda tangan
+                    });
+                    
+                    // Footer Kecil
+                    doc.setFontSize(6);
+                    doc.setFont("helvetica", "italic");
+                    doc.setTextColor(150, 150, 150);
+
+                    const footerY = startY + 132;
+
+                    doc.text(`Generated by WMS - Hal ${pageNum} / ${paginatedItems.value.length}`, 10, footerY);
+                    
+                    const now = new Date();
+                    const dateStr = now.toLocaleDateString('id-ID'); // Format: DD/MM/YYYY
+                    const timeStr = now.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+                    doc.text(`Dicetak pada: ${dateStr} ${timeStr}`, 200, footerY, { align: "right" });
+                    doc.setTextColor(0, 0, 0);
                 };
 
                 const filteredHistory = computed(() => {
@@ -3945,7 +4077,7 @@
                     fixDriveUrl, handleCancelTx, getJenisClass, exportToExcel, focusSearch, addToCartWithQty, isVoided, cancellingId, toast, showPass, filterLocation, uniqueLocations, resetAllFilters,
                     filteredHistory, searchResults, filteredInventory, isUploading, removePhoto, startScanner, showScanner, stopScanner, selectedItem, handlePrint, formInput, bukaPopUpReservasi, tambahkanKeForm,
                     isCameraActive, videoFeed, fileInput, showPhotoModal, openUpdateFoto, closePhotoModal, savePhotoOnly, reservasiItems, showPopupDetail, reservasiMeta, txTanggal, itemsPerPage, paginatedItems,
-                    startLiveCamera, stopCamera, takeSnapshot, closeModal, launchGallery, handleFileUpload, openScanner, closeScanner, downloadPDF, docNumber
+                    startLiveCamera, stopCamera, takeSnapshot, closeModal, launchGallery, handleFileUpload, openScanner, closeScanner, downloadPDF, docNumber, txReservasi
                 };
             }
         }).mount('#app');
