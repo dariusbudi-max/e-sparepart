@@ -73,16 +73,6 @@
             position: relative;
             box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3);
         }
-
-        .table-main {
-            width: 100%;
-            border-collapse: collapse;
-        }
-        .table-main th, .table-main td {
-            border: 1px solid black;
-            padding: 4px;
-        }
-
         /* Custom Scrollbar agar lebih cantik di UI (Opsional) */
         .preview-container::-webkit-scrollbar {
             width: 8px;
@@ -90,33 +80,6 @@
         .preview-container::-webkit-scrollbar-thumb {
             background: #334155;
             border-radius: 10px;
-        }
-
-        /* Memaksa Tanda Tangan ke batas bawah form */
-        .signature-section {
-            margin-top: auto; 
-            padding-top: 10px;
-        }
-
-        @media print {
-            @page {
-                size: A4 portrait;
-                margin: 0;
-            }
-            body * { visibility: hidden; }
-            #printable-area, #printable-area * { visibility: visible; }
-            #printable-area {
-                position: absolute;
-                left: 0;
-                top: 0;
-                width: 100%;
-            }
-            .print-page {
-                margin: 0 !important;
-                border: none !important;
-                border-bottom: 1px dashed #ccc !important; /* Garis bantu potong */
-                break-after: auto;
-            }
         }
     </style>
 </head>
@@ -237,7 +200,7 @@
                         <div class="flex items-start gap-3 bg-blue-50/50 p-4 rounded-[1.5rem] border border-blue-100/50">
                             <i class="fa-solid fa-circle-info text-blue-500 mt-0.5"></i>
                             <p class="text-[11px] text-blue-700 leading-relaxed font-medium">
-                                Pendaftaran Anda akan masuk ke antrean persetujuan <span class="font-bold">VicKey</span> sebelum dapat digunakan login.
+                                Pendaftaran Anda menunggu persetujuan <span class="font-bold">VicKey</span> sebelum dapat digunakan login.
                             </p>
                         </div>
 
@@ -368,7 +331,7 @@
                         :class="page === 'reservasi' ? 'bg-gradient-to-r from-indigo-600/20 to-transparent text-indigo-400 border-indigo-500/30 shadow-[inset_2px_0_0_0_#6366f1]' : 'text-slate-400 hover:bg-slate-800/40 hover:text-indigo-300 border-transparent'" 
                         class="group w-full flex items-center gap-4 px-4 py-3 rounded-xl font-semibold transition-all duration-300 text-sm text-left border outline-none">
                         <i class="fa-solid fa-file-invoice text-lg w-6 transition-transform group-hover:scale-110" :class="page === 'reservasi' ? 'text-indigo-500' : 'text-slate-500 group-hover:text-indigo-400'"></i> 
-                        <span>Reservasi Suku Cadang</span>
+                        <span>Bon Suku Cadang</span>
                     </button>
 
                     <div class="my-2 border-t border-slate-700/50 mx-2 flex items-center justify-center">
@@ -448,7 +411,7 @@
                         </div>
                         <button @click="fetchDashboard" class="group flex items-center gap-2 bg-white px-6 py-3 rounded-2xl shadow-sm border border-slate-200 hover:border-indigo-400 hover:text-indigo-600 transition-all active:scale-95">
                             <i class="fa-solid fa-sync text-slate-400 group-hover:rotate-180 transition-transform duration-700"></i>
-                            <span class="text-xs font-black uppercase tracking-widest">Refresh Data</span>
+                            <span class="text-xs font-black uppercase tracking-widest">Refresh</span>
                         </button>
                     </div>
 
