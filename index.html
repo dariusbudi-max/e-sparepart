@@ -81,6 +81,27 @@
             background: #334155;
             border-radius: 10px;
         }
+
+        @media print {
+            @page {
+                size: A4 portrait;
+                margin: 0;
+            }
+            body * { visibility: hidden; }
+            #printable-area, #printable-area * { visibility: visible; }
+            #printable-area {
+                position: absolute;
+                left: 0;
+                top: 0;
+                width: 100%;
+            }
+            .print-page {
+                margin: 0 !important;
+                border: none !important;
+                border-bottom: 1px dashed #ccc !important; /* Garis bantu potong */
+                break-after: auto;
+            }
+        }
     </style>
 </head>
 <body class="bg-slate-50 text-slate-900 overflow-hidden font-sans">
@@ -645,7 +666,7 @@
                                         ref="searchInputRef"
                                         @keydown.enter.prevent="handleScan" 
                                         type="text" 
-                                        placeholder="Ketik nama atau tembak barcode..." 
+                                        placeholder="Ketik nama atau Scan barcode..." 
                                         class="w-full pl-12 md:pl-14 pr-4 py-3 md:py-4 rounded-2xl border-2 border-transparent bg-slate-50 focus:bg-white focus:border-indigo-500 shadow-inner outline-none font-bold text-slate-700 transition-all"
                                     >
                                     <div class="absolute right-4 top-1/2 -translate-y-1/2 hidden md:block">
@@ -1028,7 +1049,7 @@
                     <div class="max-w-5xl mx-auto flex justify-between items-center mb-6 print:hidden">
                         <h2 class="text-xl font-bold text-white flex items-center gap-2">
                             <i class="fa-solid fa-file-circle-check text-indigo-400"></i>
-                            Konfirmasi Reservasi
+                            Konfirmasi BON BPSC
                         </h2>
                         <div class="flex gap-3 text-white">
                             <button @click="reservasiItems = []" class="px-4 py-2 bg-slate-800 text-rose-400 rounded-xl font-bold text-xs hover:bg-rose-500/10 transition-all">
@@ -1080,7 +1101,7 @@
                                         <thead class="bg-gray-100 uppercase font-bold text-[10px]">
                                             <tr class="h-6 text-center">
                                                 <th class="w-28 border border-black">Kode</th>
-                                                <th class="text-left px-2 border border-black">Nama Suku Cadang</th>
+                                                <th class="text-left px-2 border border-black">Nama Barang</th>
                                                 <th class="w-10 border border-black">Sat</th>
                                                 <th class="w-14 border border-black">Qty</th>
                                                 <th class="w-14 border border-black bg-gray-200 italic">Real</th>
@@ -1117,10 +1138,10 @@
                                 <div class="mt-4">
                                     <div class="grid grid-cols-4 gap-2 text-center">
                                         <div v-for="role in [
-                                            {l: 'Diminta Oleh,', n: userData.nama || '............', s: 'Staff / Operator'},
-                                            {l: 'Diketahui Oleh,', n: '............', s: 'Kepala Bagian'},
-                                            {l: 'Disetujui Oleh,', n: '............', s: 'Manajer / Leader'},
-                                            {l: 'Diserahkan Oleh,', n: '............', s: 'Warehouse Staff'}
+                                            {l: 'Diminta Oleh,', n: userData.nama || '............', s: 'UH/SH'},
+                                            {l: 'Diketahui Oleh,', n: '............', s: 'Manager'},
+                                            {l: 'Disetujui Oleh,', n: '............', s: 'Senior Manager'},
+                                            {l: 'Diserahkan Oleh,', n: '............', s: 'Admin Sparepart'}
                                         ]" :key="role.l">
                                             <p class="text-[8px] font-bold uppercase mb-8">{{ role.l }}</p>
                                             <div class="border-t border-black pt-1 mx-1">
@@ -1145,10 +1166,10 @@
                         class="p-4 md:p-6 bg-white border-b border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-4 z-20 shadow-sm relative">
                         <div class="flex-shrink-0">
                             <h2 class="text-xl md:text-2xl font-black text-slate-800 tracking-tight flex items-center gap-2">
-                                <i class="fa-solid fa-boxes-stacked text-indigo-600"></i> Master Data Barang
+                                <i class="fa-solid fa-boxes-stacked text-indigo-600"></i> Master Code Sparepart
                             </h2>
                             <p class="text-xs text-slate-400 font-bold uppercase tracking-wider mt-1">
-                                {{ userData.role === 'ADMIN' ? 'Kelola produk & stok utama' : 'Lihat stok & perbarui lokasi/foto' }}
+                                {{ userData.role === 'ADMIN' ? 'Kelola Kode Barang' : 'Lihat stok & perbarui lokasi/foto' }}
                             </p>
                         </div>
 
