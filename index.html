@@ -12,6 +12,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
     <style>
         [v-cloak] { display: none; }
         .fade-enter-active,
@@ -107,20 +108,9 @@
 <body class="bg-slate-50 text-slate-900 overflow-hidden font-sans">
     <div id="app" v-cloak class="h-screen w-screen flex">
 
-        <div v-if="loading" class="fixed inset-0 bg-black/20 backdrop-blur-md z-[100] flex items-center justify-center">
-            <div class="bg-white/90 shadow-[0_8px_30px_rgb(0,0,0,0.12)] backdrop-blur-xl border border-white/40 px-8 py-6 rounded-[28px] flex flex-col items-center gap-4">
-                
-                <div class="relative w-12 h-12">
-                    <svg class="animate-spin w-full h-full text-blue-600" viewBox="0 0 100 100">
-                        <circle cx="50" cy="50" r="40" stroke="currentColor" stroke-width="8" fill="none" class="opacity-20"></circle>
-                        <circle cx="50" cy="50" r="40" stroke="currentColor" stroke-width="8" fill="none" stroke-dasharray="200" stroke-dashoffset="120" stroke-linecap="round"></circle>
-                    </svg>
-                </div>
-
-                <div class="text-sm font-semibold text-slate-700 tracking-wide">
-                    Memuat ...
-                </div>
-            </div>
+        <div v-if="loading" class="fixed inset-0 bg-white/60 z-[99] flex flex-col justify-center items-center">
+            <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+            <p class="mt-2 font-bold text-slate-600">Process...</p>
         </div>
 
         <div v-if="!isLoggedIn" class="relative flex-1 flex items-center justify-center p-6 bg-slate-900 overflow-hidden min-h-screen">
@@ -159,7 +149,7 @@
                             <div class="absolute inset-y-0 left-0 pl-5 flex items-center pointer-events-none text-slate-300 group-focus-within:text-indigo-500 transition-colors">
                                 <i class="fa-solid fa-user-circle text-lg"></i>
                             </div>
-                            <input v-model="loginData.username" type="text" placeholder="Masukkan ID Anda" 
+                            <input v-model="loginData.username" type="text" placeholder="Masukkan NIK / ID Anda" @keyup.enter="$refs.inputpassword.focus()"
                                 class="w-full pl-12 pr-6 py-4 bg-[#F4F7FB] border border-transparent focus:border-indigo-100 rounded-2xl outline-none focus:ring-4 ring-indigo-500/5 focus:bg-white transition-all text-sm font-medium text-slate-700 placeholder-slate-300">
                         </div>
                     </div>
@@ -170,7 +160,7 @@
                             <div class="absolute inset-y-0 left-0 pl-5 flex items-center pointer-events-none text-slate-300 group-focus-within:text-indigo-500 transition-colors">
                                 <i class="fa-solid fa-lock"></i>
                             </div>
-                            <input :type="showPass ? 'text' : 'password'" 
+                            <input ref="inputpassword" :type="showPass ? 'text' : 'password'" 
                                 v-model="loginData.password" @keyup.enter="handleLogin"
                                 class="w-full pl-12 pr-14 py-4 bg-[#F4F7FB] border border-transparent focus:border-indigo-100 rounded-2xl outline-none focus:ring-4 ring-indigo-500/5 focus:bg-white transition-all text-sm font-medium text-slate-700 placeholder-slate-300" 
                                 placeholder="••••••••">
@@ -192,7 +182,7 @@
                     <div class="mt-8 pt-6 border-t border-slate-50 flex flex-col items-center gap-4">
                         <div class="flex items-center gap-2">
                             <span class="h-px w-8 bg-slate-100"></span>
-                            <p class="text-[11px] text-slate-400 font-medium">Belum terdaftar?</p>
+                            <p class="text-[11px] text-slate-400 font-medium">Belum Punya Akun?</p>
                             <span class="h-px w-8 bg-slate-100"></span>
                         </div>
                         
@@ -214,7 +204,7 @@
                             <i class="fa-solid fa-user-plus text-white text-xl"></i>
                         </div>
                         <h3 class="text-2xl font-bold text-slate-800 tracking-tight">Buat Akun Baru</h3>
-                        <p class="text-sm text-slate-500 mt-1">Lengkapi data untuk akses inventori</p>
+                        <p class="text-sm text-slate-500 mt-1">Lengkapi data untuk akses inventory</p>
                     </div>
 
                     <div class="p-8 space-y-5">
@@ -303,7 +293,7 @@
             ></div>
 
             <aside :class="sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'" 
-                class="fixed lg:static inset-y-0 left-0 z-50 w-72 h-[100dvh] bg-gradient-to-b from-[#0B1120] via-[#0D1425] to-[#0A0F1C] text-slate-300 transition-transform duration-300 flex flex-col border-r border-slate-800/50 shadow-[4px_0_24px_rgba(0,0,0,0.2)] select-none">
+                    class="fixed lg:static inset-y-0 left-0 z-50 w-72 h-[100dvh] bg-gradient-to-b from-[#0B1120] via-[#0D1425] to-[#0A0F1C] text-slate-300 transition-transform duration-300 flex flex-col border-r border-slate-800/50 shadow-[4px_0_24px_rgba(0,0,0,0.2)] select-none">
 
                 <div class="h-20 flex items-center justify-between px-6 border-b border-slate-800/60 shrink-0 relative overflow-hidden">
                     <div class="absolute top-0 left-10 w-32 h-32 bg-blue-500/10 rounded-full blur-3xl pointer-events-none"></div>
@@ -353,6 +343,14 @@
                         class="group w-full flex items-center gap-4 px-4 py-3 rounded-xl font-semibold transition-all duration-300 text-sm text-left border outline-none">
                         <i class="fa-solid fa-file-invoice text-lg w-6 transition-transform group-hover:scale-110" :class="page === 'reservasi' ? 'text-indigo-500' : 'text-slate-500 group-hover:text-indigo-400'"></i> 
                         <span>Bon Suku Cadang</span>
+                    </button>
+
+                    <button @click="page = 'spp'; sidebarOpen = false" 
+                        :class="page === 'spp' ? 'bg-gradient-to-r from-fuchsia-600/20 to-transparent text-fuchsia-400 border-fuchsia-500/30 shadow-[inset_2px_0_0_0_#d946ef]' : 'text-slate-400 hover:bg-slate-800/40 hover:text-fuchsia-300 border-transparent'" 
+                        class="group w-full flex items-center gap-4 px-4 py-3 rounded-xl font-semibold transition-all duration-300 text-sm text-left border outline-none relative">
+                        <i class="fa-solid fa-file-signature text-lg w-6 transition-transform group-hover:scale-110" :class="page === 'spp' ? 'text-fuchsia-500' : 'text-slate-500 group-hover:text-fuchsia-400'"></i> 
+                        <span>SPP</span>
+                        <span :class="page === 'spp' ? 'bg-fuchsia-500 text-white' : 'bg-fuchsia-500/20 text-fuchsia-400 border-fuchsia-500/20'" class="ml-auto text-[9px] px-2 py-0.5 rounded-md font-black border group-hover:bg-fuchsia-500/30 transition-colors">NEW</span>
                     </button>
 
                     <div class="my-2 border-t border-slate-700/50 mx-2 flex items-center justify-center">
@@ -635,7 +633,7 @@
                         </div>
                         
                         <div class="p-6 bg-slate-50 border-t border-slate-100 text-right">
-                            <span class="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">End of Records • Data System v3.0</span>
+                            <span class="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">End of Records • 200 Data System</span>
                         </div>
                     </div>
                 </main>
@@ -658,7 +656,7 @@
                             </div>
 
                             <div class="w-full md:flex-1">
-                                <label class="block text-[10px] font-black text-slate-400 uppercase mb-2 ml-1 tracking-widest">Cari Produk / Scan Barcode</label>
+                                <label class="block text-[10px] font-black text-slate-400 uppercase mb-2 ml-1 tracking-widest">Input Kode / Scan Barcode</label>
                                 <div class="relative group">
                                     <i class="fa-solid fa-barcode absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-indigo-500 transition-colors text-base md:text-xl"></i>
                                     <input 
@@ -846,7 +844,7 @@
                                             <textarea 
                                                 v-model="txNote"
                                                 rows="2"
-                                                placeholder="Catatan..."
+                                                placeholder="Wajib isi Reservasi / Doc BC...."
                                                 class="w-full pl-8 pr-3 py-2.5 bg-slate-100 rounded-lg text-[11px] font-medium border-none focus:ring-2 focus:ring-indigo-500 outline-none resize-none"
                                             ></textarea>
                                         </div>
@@ -1159,6 +1157,192 @@
                     </div>
                 </main>
 
+                <main v-if="page === 'spp'" class="p-4 md:p-6 bg-slate-300 min-h-screen flex flex-col items-center animate-in fade-in duration-500">
+    
+                    <div class="w-full max-w-[297mm] mx-auto bg-white/90 backdrop-blur-md p-3 rounded-2xl shadow-xl border border-white sticky top-4 z-30 transition-all flex flex-wrap md:flex-nowrap items-center justify-between gap-4 md:gap-6">
+    
+                        <div class="flex items-center gap-3 shrink-0">
+                            <div class="h-10 w-10 rounded-xl bg-orange-600 flex items-center justify-center text-white shadow-lg shrink-0">
+                                <i class="fa-solid fa-file-lines text-lg"></i>
+                            </div>
+                            <div class="hidden sm:block"> <h2 class="text-sm font-black text-slate-800 uppercase leading-none text-nowrap">Draft SPP</h2>
+                                <p class="text-[9px] font-bold text-slate-500 uppercase tracking-tighter mt-1 italic font-mono">{{ noSPP }}</p>
+                            </div>
+                        </div>
+
+                        <div class="flex-1 min-w-[200px] group relative order-3 md:order-2 w-full md:w-auto">
+                            <i class="fa-solid fa-barcode absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-orange-500 transition-colors"></i>
+                            <input type="text" v-model="inputKodeManual" @keyup.enter="tambahItemManualByKode"
+                                placeholder="Scan / Ketik Kode..."
+                                class="w-full pl-11 pr-4 py-2.5 bg-slate-100 border border-slate-200 rounded-xl text-xs font-bold focus:border-orange-500 focus:bg-white focus:ring-4 focus:ring-orange-500/10 outline-none transition-all">
+                        </div>
+
+                        <div class="flex items-center gap-2 md:gap-3 shrink-0 order-2 md:order-3">
+                            <div class="text-right border-r pr-3 md:pr-4 border-slate-200">
+                                <p class="text-[8px] font-black text-slate-400 uppercase tracking-widest leading-none">Total</p>
+                                <p class="text-lg font-black leading-none text-orange-600">{{ summarySppItems.length }}</p>
+                            </div>
+                            
+                            <button @click="kosongkanSpp" class="px-2 md:px-3 py-2 text-[10px] font-bold text-rose-500 hover:bg-rose-50 rounded-lg transition-all uppercase text-nowrap">
+                                Reset
+                            </button>
+                            
+                            <button @click="downloadSPPPDF" class="flex items-center gap-2 bg-rose-600 text-white px-4 md:px-5 py-2.5 rounded-xl text-[10px] font-black hover:bg-rose-700 transition-all uppercase shadow-lg shadow-rose-900/20 text-nowrap">
+                                <i class="fa-solid fa-file-pdf"></i> <span class="hidden sm:inline">PDF</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="w-full flex flex-col items-center gap-8 pb-20 mt-6 overflow-y-auto overflow-x-auto max-h-[82vh] custom-scrollbar rounded-xl px-4">
+                        
+                        <div v-for="(pageItems, pageIdx) in chunkedSppItems" :key="pageIdx" 
+                            class="relative w-[297mm] min-h-[210mm] bg-white shadow-[0_10px_30px_rgba(0,0,0,0.15)] rounded-sm flex flex-col shrink-0 p-8 transform transition-transform hover:scale-[1.005]">
+                            
+                            <div class="border-b-2 border-slate-900 pb-4 mb-4 shrink-0 relative">
+                                <div class="flex justify-between items-center">
+                                    
+                                    <div class="text-left leading-tight w-1/3">
+                                        <h1 class="text-lg font-black text-slate-900 uppercase tracking-tighter leading-none border-l-4 border-orange-600 pl-3">
+                                            PT BINTANG INDOKARYA GEMILANG
+                                        </h1>
+                                        <p class="text-[8px] text-slate-500 font-bold uppercase tracking-tight italic mt-2 ml-4 leading-relaxed">
+                                            Jl. Raya Cendrawasih No. 6 KM.20 Tengguli, Kec. Tanjung<br> 
+                                             Brebes - Jawa Tengah
+                                        </p>
+                                    </div>
+
+                                    <div class="flex-1 text-center px-4">
+                                        <h2 class="text-xl font-black underline decoration-2 underline-offset-8 text-slate-900 uppercase tracking-[0.2em]">
+                                            Surat Permohonan Pembelian
+                                        </h2>
+                                    </div>
+
+                                    <div class="w-1/3 flex justify-end">
+                                        <div class="text-[9px] font-bold text-slate-800 bg-slate-50 p-2 rounded-lg border border-slate-200 min-w-[200px] shadow-sm">
+                                            <div class="flex justify-between border-b border-slate-200 pb-1 mb-1">
+                                                <span class="text-slate-400 uppercase tracking-tighter">No SPP </span> 
+                                                <span class="font-mono text-slate-900">{{ noSPP }}</span>
+                                            </div>
+                                            <div class="flex justify-between border-b border-slate-200 pb-1 mb-1">
+                                                <span class="text-slate-400 uppercase tracking-tighter">Tanggal</span> 
+                                                <span class="text-slate-900">{{ new Date().toLocaleDateString('id-ID') }}</span>
+                                            </div>
+                                            <div class="flex justify-between font-black">
+                                                <span class="text-slate-400 uppercase tracking-tighter font-bold">Department</span> 
+                                                <span class="text-orange-700">SPAREPART</span>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                </div>
+                            </div>
+
+                            <div class="flex-1">
+                                <table class="w-full text-[9px] border-collapse table-fixed">
+                                    <thead>
+                                        <tr class="bg-slate-100 font-bold text-slate-800 uppercase tracking-tighter">
+                                            <th class="border border-slate-900 p-1 w-7 text-center">No</th>
+                                            <th class="border border-slate-900 p-1 w-24 text-center">Kode</th>
+                                            <th class="border border-slate-900 p-1 text-left">Nama & Spesifikasi Barang</th>
+                                            <th class="border border-slate-900 p-1 w-12 text-center">Unit</th>
+                                            <th class="border border-slate-900 p-1 w-16 text-center bg-orange-50 text-orange-700">Jumlah Diminta</th>
+                                            <th class="border border-slate-900 p-1 w-14 text-center">Stock</th>
+                                            <th class="border border-slate-900 p-1 w-20 text-center">Tgl Dibutuhkan</th>
+                                            <th class="border border-slate-900 p-1 w-16 text-center bg-indigo-50 text-indigo-700">Jumlah Pakai</th>
+                                            <th class="border border-slate-900 p-1 w-32 text-left">Keterangan</th>
+                                            <th class="border-0 w-6 print:hidden"></th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr v-for="(item, index) in pageItems" :key="index" class="h-[28px] group hover:bg-slate-50 border-b border-slate-200">
+                                            <td class="border border-slate-900 text-center text-slate-400 font-mono">{{ (pageIdx * 17) + index + 1 }}</td>
+                                            <td class="border border-slate-900 px-1 font-bold text-slate-700 truncate text-[8px]">{{ item.kode }}</td>
+                                            <td class="border border-slate-900 px-1">
+                                                <div class="font-black text-slate-900 leading-none truncate uppercase">{{ item.nama }}</div>
+                                            </td>
+                                            <td class="border border-slate-900 text-center font-bold text-slate-600 uppercase">{{ item.satuan }}</td>
+                                            <td class="border border-slate-900 bg-orange-50/50">
+                                                <input type="number" v-model="item.qtyDiminta" min="0" oninput="validity.valid||(value='0');" 
+                                                    class="w-full text-center font-black bg-transparent border-none p-0 focus:ring-0 text-orange-600">
+                                            </td>
+                                            <td class="border border-slate-900 text-center font-bold text-slate-400">{{ item.stok }}</td>
+                                            <td class="border border-slate-900 text-center px-1">
+                                                <input type="date" v-model="txTanggal" class="w-full text-[8px] bg-transparent border-none p-0 focus:ring-0 font-bold cursor-pointer text-center">
+                                            </td>
+                                            <td class="border border-slate-900 bg-indigo-50/50">
+                                                <input type="number" v-model="item.jmlPakai" min="0" oninput="validity.valid||(value='0');" 
+                                                    class="w-full text-center font-black bg-transparent border-none p-0 focus:ring-0 text-indigo-600">
+                                            </td>
+                                            <td class="border border-slate-900 px-1 italic text-slate-500">
+                                                <input type="text" v-model="item.keterangan" placeholder="..." class="w-full bg-transparent border-none p-0 focus:ring-0 text-[8px]">
+                                            </td>
+                                            <td class="text-center p-0 print:hidden border-0">
+                                                <button @click="removeItemSpp((pageIdx * 15) + index)" class="text-slate-300 hover:text-rose-500 transition-all opacity-0 group-hover:opacity-100">
+                                                    <i class="fa-solid fa-circle-xmark text-[11px]"></i>
+                                                </button>
+                                            </td>
+                                        </tr>
+                                        <tr v-for="n in (17 - pageItems.length)" :key="'empty-'+n" class="h-[28px] border-b border-slate-100">
+                                            <td class="border border-slate-900" v-for="c in 9"></td>
+                                            <td class="border-0"></td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            <div class="mt-3 grid grid-cols-2 gap-4 shrink-0">
+                                <div class="border border-slate-900 p-2 min-h-[50px]">
+                                    <p class="text-[8px] font-black uppercase text-slate-400 mb-1 leading-none">Catatan Pendukung:</p>
+                                    <textarea v-model="catatanSpp" class="w-full text-[9px] border-none p-0 focus:ring-0 resize-none bg-transparent h-8 italic" placeholder="Tambahkan catatan jika ada..."></textarea>
+                                </div>
+                                <div class="border border-slate-900 p-2 min-h-[50px]">
+                                    <p class="text-[8px] font-black uppercase text-slate-400 mb-1 leading-none">Rekomendasi / Evaluasi :</p>
+                                    <div class="text-[9px] text-slate-300 italic">Diisi oleh bagian terkait...</div>
+                                </div>
+                            </div>
+
+                            <div class="mt-4 shrink-0">
+                                <div class="grid grid-cols-4 gap-2 text-center text-[8px] font-bold uppercase tracking-wider text-slate-900">
+                                    <div class="flex flex-col justify-between h-20 group">
+                                        <p>Dibuat Oleh,</p>
+                                        <input type="text" v-model="sppSign.pembuat" 
+                                            class="border-t border-slate-900 pt-1 mx-2 bg-transparent text-center focus:ring-0 focus:border-orange-500 outline-none font-black uppercase">
+                                    </div>
+                                    <div class="flex flex-col justify-between h-20 group">
+                                        <p>Diperiksa,</p>
+                                        <input type="text" v-model="sppSign.pemeriksa" 
+                                            class="border-t border-slate-900 pt-1 mx-2 bg-transparent text-center focus:ring-0 focus:border-orange-500 outline-none font-black uppercase">
+                                    </div>
+                                    <div class="flex flex-col justify-between h-20 group">
+                                        <p>Diketahui,</p>
+                                        <input type="text" v-model="sppSign.diketahui" 
+                                            class="border-t border-slate-900 pt-1 mx-2 bg-transparent text-center focus:ring-0 focus:border-orange-500 outline-none font-black uppercase">
+                                    </div>
+                                    <div class="flex flex-col justify-between h-20 group">
+                                        <p>Disetujui,</p>
+                                        <input type="text" v-model="sppSign.disetujui" 
+                                            class="border-t border-slate-900 pt-1 mx-2 bg-transparent text-center focus:ring-0 focus:border-orange-500 outline-none font-black uppercase">
+                                    </div>
+                                </div>
+
+                                <div class="mt-3 flex justify-between items-center text-[7px] text-slate-400 border-t border-slate-100 pt-2 font-mono uppercase">
+                                    <div class="flex gap-4 italic font-bold">
+                                        <span>Dicetak: {{ new Date().toLocaleString('id-ID') }}</span>
+                                    </div>
+                                    <div class="flex gap-4 font-black">
+                                        <span class="bg-slate-900 text-white px-2 py-0.5 rounded">Hal: {{ pageIdx + 1 }} / {{ chunkedSppItems.length }}</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div v-if="summarySppItems.length === 0" class="w-[297mm] h-[210mm] bg-white rounded-sm border-2 border-dashed border-slate-300 flex flex-col items-center justify-center opacity-50 shadow-inner">
+                            <i class="fa-solid fa-folder-open text-6xl text-slate-200 mb-4"></i>
+                            <p class="font-black text-slate-300 uppercase tracking-[0.5em]">SPP Belum Tersedia</p>
+                        </div>
+                    </div>
+                </main>
+
                 <main v-if="page === 'master_barang' && ['ADMIN', 'STAFF'].includes(userData.role)"
                     class="flex-1 flex flex-col h-screen overflow-hidden bg-slate-50">
 
@@ -1463,11 +1647,10 @@
                         <div class="flex flex-row items-center gap-2 md:gap-3 w-full md:w-auto md:max-w-md justify-end">
                             <div class="relative flex-1 group">
                                 <i class="fa-solid fa-magnifying-glass absolute left-3 md:left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-blue-500 transition-colors text-xs md:text-sm"></i>
-                                <input v-model="userSearchQuery" type="text" 
-                                    placeholder="Cari user..." 
-                                    class="w-full pl-9 md:pl-10 pr-3 md:pr-4 py-2 md:py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs md:text-sm font-medium text-slate-700 focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 outline-none transition-all placeholder:font-normal placeholder:text-slate-400">
+                                <input v-model="userSearchQuery" type="text" placeholder="Cari user..." 
+                                    class="w-full pl-9 md:pl-10 pr-3 md:pr-4 py-2 md:py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs md:text-sm font-medium text-slate-700 focus:bg-white focus:border-blue-500 outline-none transition-all">
                             </div>
-                            <button @click="showUserModal = true" class="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white px-4 md:px-5 py-2 md:py-2.5 rounded-xl text-xs md:text-sm font-bold shadow-lg shadow-blue-500/30 transition-all active:scale-95 flex items-center gap-2 shrink-0">
+                            <button @click="showUserModal = true" class="bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-4 md:px-5 py-2 md:py-2.5 rounded-xl text-xs md:text-sm font-bold shadow-lg shadow-blue-500/30 transition-all active:scale-95 flex items-center gap-2 shrink-0">
                                 <i class="fa-solid fa-user-plus"></i> <span class="hidden sm:inline">Tambah User</span>
                             </button>
                         </div>
@@ -1477,20 +1660,19 @@
                         
                         <div v-if="filteredAdminUsers.filter(u => u.status === 'PENDING').length > 0" class="mb-10 animate-fade-in">
                             <h3 class="text-sm font-bold text-slate-800 mb-4 flex items-center gap-2 uppercase tracking-wide">
-                                <i class="fa-solid fa-bell text-amber-500 animate-bounce"></i> Menunggu Persetujuan
-                                <span class="bg-amber-100 text-amber-700 py-0.5 px-2.5 rounded-full text-[10px] font-black">{{ filteredAdminUsers.filter(u => u.status === 'PENDING').length }} Baru</span>
+                                <i class="fa-solid fa-user-clock text-amber-500 animate-pulse"></i> Approval User Baru
+                                <span class="bg-amber-100 text-amber-700 py-0.5 px-2.5 rounded-full text-[10px] font-black">{{ filteredAdminUsers.filter(u => u.status === 'PENDING').length }}</span>
                             </h3>
                             
                             <div class="bg-white rounded-3xl border border-amber-200 shadow-[0_8px_30px_rgba(245,158,11,0.06)] overflow-hidden">
                                 <div class="overflow-auto w-full max-h-[400px] custom-scrollbar">
-                                    <table class="w-full text-left border-collapse min-w-[900px]">
+                                    <table class="w-full text-left border-collapse min-w-[950px]">
                                         <thead class="bg-amber-50/50 border-b border-amber-100 sticky top-0 z-20">
                                             <tr class="text-[11px] uppercase tracking-wider font-bold text-amber-700/70">
-                                                <th class="px-6 py-4">User Name</th>
-                                                <th class="px-6 py-4">Level Akses</th>
-                                                <th class="px-6 py-4">Status Akun</th>
+                                                <th class="px-6 py-4">Informasi Akun</th>
                                                 <th class="px-6 py-4">Sesi Perangkat</th>
-                                                <th class="px-6 py-4 text-right">Aksi Persetujuan</th>
+                                                <th class="px-6 py-4 text-center">Pilih Role & Approve Langsung</th>
+                                                <th class="px-6 py-4 text-right">Aksi</th>
                                             </tr>
                                         </thead>
                                         <tbody class="divide-y divide-amber-50">
@@ -1502,41 +1684,28 @@
                                                         </div>
                                                         <div>
                                                             <div class="font-bold text-slate-800 text-sm">{{ u.nama || 'Tanpa Nama' }}</div>
-                                                            <div class="text-[11px] font-mono text-slate-400 mt-0.5">@{{ u.username }}</div>
+                                                            <div class="text-[11px] font-mono text-slate-400">@{{ u.username }}</div>
                                                         </div>
                                                     </div>
                                                 </td>
                                                 <td class="px-6 py-4">
-                                                    <div class="relative inline-block w-32">
-                                                        <select v-model="u.role" @change="updateUserRole(u)" class="w-full bg-slate-50 border border-slate-200 rounded-lg py-2 pl-3 pr-8 text-xs font-bold text-slate-700 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 cursor-pointer appearance-none">
-                                                            <option value="VIEWER">VIEWER</option>
-                                                            <option value="STAFF">STAFF</option>
-                                                            <option value="MANAGER">MANAGER</option>
-                                                            <option value="ADMIN">ADMIN</option>
-                                                        </select>
-                                                        <i class="fa-solid fa-chevron-down absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-slate-400 pointer-events-none"></i>
-                                                    </div>
-                                                </td>
-                                                <td class="px-6 py-4">
-                                                    <div class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-amber-50 text-amber-600 text-xs font-bold border border-amber-100 animate-pulse">
-                                                        <i class="fa-solid fa-clock-rotate-left"></i> PENDING
-                                                    </div>
-                                                </td>
-                                                <td class="px-6 py-4 text-sm text-slate-600">
-                                                    <div class="flex items-center gap-2">
+                                                    <div class="flex items-center gap-2 text-slate-600">
                                                         <i :class="u.deviceInfo?.includes('Android') || u.deviceInfo?.includes('iOS') ? 'fa-mobile-alt' : 'fa-laptop'" class="fa-solid text-slate-400"></i>
                                                         <span class="text-xs">{{ u.deviceInfo || 'Belum Login' }}</span>
                                                     </div>
                                                 </td>
-                                                <td class="px-6 py-4 text-right">
-                                                    <div class="flex justify-end items-center gap-2">
-                                                        <button @click="approveUser(u)" class="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-emerald-500 text-white font-bold text-xs hover:bg-emerald-600 shadow-md shadow-emerald-200 transition-all active:scale-95" title="Setujui">
-                                                            <i class="fa-solid fa-check"></i> Terima
-                                                        </button>
-                                                        <button @click="deleteUser(u)" class="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white border border-rose-200 text-rose-500 font-bold text-xs hover:bg-rose-50 transition-all active:scale-95" title="Tolak">
-                                                            <i class="fa-solid fa-xmark"></i> Tolak
-                                                        </button>
+                                                <td class="px-6 py-4 text-center">
+                                                    <div class="flex items-center justify-center gap-1.5">
+                                                        <button @click="approveWithRole(u, 'VIEWER')" class="px-3 py-1.5 rounded-lg border border-slate-200 text-slate-600 text-[10px] font-black hover:bg-slate-800 hover:text-white transition-all">VIEWER</button>
+                                                        <button @click="approveWithRole(u, 'STAFF')" class="px-3 py-1.5 rounded-lg bg-blue-50 text-blue-600 border border-blue-100 text-[10px] font-black hover:bg-blue-600 hover:text-white transition-all shadow-sm">STAFF</button>
+                                                        <button @click="approveWithRole(u, 'MANAGER')" class="px-3 py-1.5 rounded-lg bg-indigo-50 text-indigo-600 border border-indigo-100 text-[10px] font-black hover:bg-indigo-600 hover:text-white transition-all shadow-sm">MANAGER</button>
+                                                        <button @click="approveWithRole(u, 'ADMIN')" class="px-3 py-1.5 rounded-lg bg-rose-50 text-rose-600 border border-rose-100 text-[10px] font-black hover:bg-rose-600 hover:text-white transition-all shadow-sm">ADMIN</button>
                                                     </div>
+                                                </td>
+                                                <td class="px-6 py-4 text-right">
+                                                    <button @click="deleteUser(u)" class="w-8 h-8 rounded-lg text-rose-400 hover:bg-rose-50 hover:text-rose-600 transition-all" title="Tolak Pendaftaran">
+                                                        <i class="fa-solid fa-trash-can"></i>
+                                                    </button>
                                                 </td>
                                             </tr>
                                         </tbody>
@@ -1547,17 +1716,17 @@
 
                         <div>
                             <h3 class="text-sm font-bold text-slate-800 mb-4 flex items-center gap-2 uppercase tracking-wide">
-                                <i class="fa-solid fa-users text-blue-500"></i> Daftar Pengguna
+                                <i class="fa-solid fa-users text-blue-500"></i> Pengguna Terdaftar
                             </h3>
                             
                             <div class="bg-white rounded-3xl border border-slate-100 shadow-[0_8px_30px_rgba(0,0,0,0.03)] overflow-hidden">
                                 <div class="overflow-auto w-full max-h-[700px] custom-scrollbar">
                                     <table class="w-full text-left border-collapse min-w-[900px]">
-                                        <thead class="bg-slate-50 border-b border-slate-100 sticky top-0 z-20 shadow-sm">
+                                        <thead class="bg-slate-50 border-b border-slate-100 sticky top-0 z-20">
                                             <tr class="text-[11px] uppercase tracking-wider font-semibold text-slate-500">
                                                 <th class="px-6 py-4">User Name</th>
                                                 <th class="px-6 py-4">Level Akses</th>
-                                                <th class="px-6 py-4 text-center">Access Photo</th>
+                                                <th class="px-6 py-4 text-center">Photo Access</th>
                                                 <th class="px-6 py-4">Status Akun</th>
                                                 <th class="px-6 py-4">Sesi Perangkat</th>
                                                 <th class="px-6 py-4 text-right">Aksi</th>
@@ -1567,18 +1736,18 @@
                                             <tr v-for="u in filteredAdminUsers.filter(u => u.status !== 'PENDING')" :key="'active-'+u.username" class="hover:bg-slate-50/80 transition-colors group">
                                                 <td class="px-6 py-4">
                                                     <div class="flex items-center gap-3">
-                                                        <div class="w-10 h-10 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center font-bold text-sm border border-blue-100">
+                                                        <div class="w-10 h-10 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center font-bold text-sm border border-blue-100 group-hover:scale-110 transition-transform">
                                                             {{ (u.nama || u.username || '?').charAt(0).toUpperCase() }}
                                                         </div>
                                                         <div>
                                                             <div class="font-bold text-slate-800 text-sm">{{ u.nama || 'Tanpa Nama' }}</div>
-                                                            <div class="text-[11px] font-mono text-slate-400 mt-0.5">@{{ u.username }}</div>
+                                                            <div class="text-[11px] font-mono text-slate-400">@{{ u.username }}</div>
                                                         </div>
                                                     </div>
                                                 </td>
                                                 <td class="px-6 py-4">
                                                     <div class="relative inline-block w-32">
-                                                        <select v-model="u.role" @change="updateUserRole(u)" class="w-full bg-slate-50 border border-slate-200 rounded-lg py-2 pl-3 pr-8 text-xs font-bold text-slate-700 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 cursor-pointer appearance-none transition-all">
+                                                        <select v-model="u.role" @change="updateUserRole(u)" class="w-full bg-slate-50 border border-slate-200 rounded-lg py-2 pl-3 pr-8 text-[11px] font-black text-slate-700 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 cursor-pointer appearance-none transition-all">
                                                             <option value="VIEWER">VIEWER</option>
                                                             <option value="STAFF">STAFF</option>
                                                             <option value="MANAGER">MANAGER</option>
@@ -1590,7 +1759,7 @@
                                                 <td class="px-6 py-4 text-center">
                                                     <label class="relative inline-flex items-center cursor-pointer justify-center">
                                                         <input type="checkbox" class="sr-only peer" :checked="u.canPreviewPhoto === true || u.canPreviewPhoto === 1" @change="togglePhotoAccess(u, $event.target.checked)">
-                                                        <div class="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-500"></div>
+                                                        <div class="w-10 h-5 bg-slate-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-500"></div>
                                                     </label>
                                                 </td>
                                                 <td class="px-6 py-4">
@@ -1602,31 +1771,21 @@
                                                 <td class="px-6 py-4 text-sm text-slate-600">
                                                     <div class="flex items-center gap-2">
                                                         <i :class="u.deviceInfo?.includes('Android') || u.deviceInfo?.includes('iOS') ? 'fa-mobile-alt' : 'fa-laptop'" class="fa-solid text-slate-400"></i>
-                                                        <span class="text-xs">{{ u.deviceInfo || 'Belum Login' }}</span>
+                                                        <span class="text-[11px]">{{ u.deviceInfo || 'Belum Login' }}</span>
                                                     </div>
                                                 </td>
                                                 <td class="px-6 py-4 text-right">
-                                                    <div class="flex justify-end items-center gap-2">
+                                                    <div class="flex justify-end items-center gap-1">
                                                         <button @click="toggleUser(u)" 
                                                             :class="u.status==='AKTIF' ? 'text-amber-500 hover:bg-amber-50' : 'text-emerald-500 hover:bg-emerald-50'" 
                                                             class="w-8 h-8 flex items-center justify-center rounded-lg transition-colors"
-                                                            :title="u.status==='AKTIF' ? 'Suspend User' : 'Aktifkan User'">
+                                                            :title="u.status==='AKTIF' ? 'Suspend' : 'Aktifkan'">
                                                             <i :class="u.status==='AKTIF' ? 'fa-solid fa-ban' : 'fa-solid fa-power-off'"></i>
                                                         </button>
-                                                        <button @click="deleteUser(u)" class="w-8 h-8 flex items-center justify-center rounded-lg text-slate-400 hover:bg-rose-50 hover:text-rose-600 transition-colors" title="Hapus User">
+                                                        <button @click="deleteUser(u)" class="w-8 h-8 flex items-center justify-center rounded-lg text-slate-400 hover:bg-rose-50 hover:text-rose-600 transition-colors" title="Hapus">
                                                             <i class="fa-solid fa-trash-can"></i>
                                                         </button>
                                                     </div>
-                                                </td>
-                                            </tr>
-                                            
-                                            <tr v-if="filteredAdminUsers.filter(u => u.status !== 'PENDING').length === 0">
-                                                <td colspan="6" class="py-20 text-center">
-                                                    <div class="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-4">
-                                                        <i class="fa-solid fa-user-slash text-3xl text-slate-300"></i>
-                                                    </div>
-                                                    <h4 class="text-slate-800 font-bold text-sm">User tidak ditemukan</h4>
-                                                    <p class="text-slate-400 text-xs mt-1">Coba sesuaikan kata kunci pencarian Anda.</p>
                                                 </td>
                                             </tr>
                                         </tbody>
@@ -2196,13 +2355,20 @@
                             </span>
                         </div>
                         
-                        <button @click="exportToExcel" :disabled="lowStockItems.length === 0" 
-                            class="px-6 py-3 rounded-xl font-bold text-sm text-white shadow-md transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-                            :class="lowStockItems.length > 0 ? 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 shadow-blue-500/20' : 'bg-slate-300 shadow-none'"
-                        >
-                            <i class="fa-solid fa-file-excel"></i> 
-                            <span>Download List PR</span>
-                        </button>
+                        <div class="flex gap-3"> <button @click="tambahSemuaKeSpp" :disabled="lowStockItems.length === 0"
+                                class="px-6 py-3 rounded-xl font-bold text-sm text-white shadow-md transition-all active:scale-95 disabled:opacity-50 bg-indigo-600 hover:bg-indigo-700 flex items-center gap-2">
+                                <i class="fa-solid fa-layer-group"></i>
+                                <span>Tambah Semua ke SPP</span>
+                            </button>
+
+                            <button @click="exportToExcel" :disabled="lowStockItems.length === 0" 
+                                class="px-6 py-3 rounded-xl font-bold text-sm text-white shadow-md transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                                :class="lowStockItems.length > 0 ? 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 shadow-blue-500/20' : 'bg-slate-300 shadow-none'"
+                            >
+                                <i class="fa-solid fa-file-excel"></i> 
+                                <span>Download List PR</span>
+                            </button>
+                        </div>
                     </div>
 
                 </div>
@@ -2329,6 +2495,15 @@
 
                 const lowStockItems = ref([]);
                 const showLowStock = ref(false);
+                const summarySppItems = ref([]);
+                const inputKodeManual = ref('');
+                const noSPP = ref("SPT-" + new Date().getTime());
+                const sppSign = ref({
+                    pembuat: 'Viky',
+                    pemeriksa: 'Yohanes',
+                    diketahui: 'Sudaryanto',
+                    disetujui: 'Asyiriah'
+                });
 
                 const previewImage = ref(null);
                 const scannerActive = ref(false);
@@ -2614,7 +2789,8 @@
                     return `${device} - ${browser}`;
                 };
 
-                const fetchAllData = async () => {
+                const fetchAllData = async (silent = false) => {
+                    if (!silent) loading.value = true;
                     try {
                         const [resBase, resInventory, resDash, resLow] = await Promise.all([
                             callAPI('GET_INITIAL_DATA'),
@@ -3090,12 +3266,7 @@
                             showToast("Transaksi Berhasil!", "success");
                             resetTransactionForm(); // Menutup modal keranjang
                             
-                            // 4. Background Sync (Update data tanpa memblokir user)
-                            // Menggunakan Promise.all agar berjalan berbarengan (lebih cepat)
-                            Promise.all([
-                                fetchDashboard(),
-                                fetchInventory()
-                            ]).catch(e => console.error("Sync Error:", e));
+                            await fetchAllData(true);
 
                         } else {
                             showToast(res.message, "error");
@@ -3317,6 +3488,280 @@
                     }
                 };
 
+                const tambahItemManualByKode = () => {
+                    const kodeCari = inputKodeManual.value.trim().toUpperCase();
+                    if (!kodeCari) return;
+
+                    // 1. Cari di data master inventory (VLOOKUP)
+                    const masterItem = inventory.value.find(i => i.kode.toUpperCase() === kodeCari);
+
+                    if (masterItem) {
+                        // 2. Cek Duplikasi (Jangan sampai barang yang sama masuk 2x)
+                        const exists = summarySppItems.value.find(s => s.kode === masterItem.kode);
+                        
+                        if (exists) {
+                            showToast("Barang ini sudah ada di dalam list SPP!");
+                            inputKodeManual.value = '';
+                            return;
+                        }
+
+                        // 3. Logika Perhitungan Qty (Sama dengan logika stok kritis)
+                        const stokSekarang = Number(masterItem.stok || 0);
+                        const batasMinimal = Number(masterItem.minStok || 0);
+                        let saranQty = (batasMinimal * 2) - stokSekarang;
+                        if (saranQty <= 0) saranQty = 1;
+
+                        // 4. Masukkan ke list SPP
+                        summarySppItems.value.push({
+                            kode: masterItem.kode || '-',
+                            nama: masterItem.nama || '-',
+                            satuan: masterItem.satuan || 'Pcs',
+                            stok: stokSekarang,
+                            qtyDiminta: saranQty,
+                            jmlPakai: 0, 
+                            keterangan: '' 
+                        });
+
+                        // 5. Bersihkan Input
+                        inputKodeManual.value = '';
+                                                
+                    } else {
+                        showToast("Kode Barang [" + kodeCari + "] tidak ditemukan di database!");
+                    }
+                };
+
+                const tambahSemuaKeSpp = () => {
+                    if (lowStockItems.value.length === 0) {
+                        showToast("Tidak ada item untuk ditambahkan", "warning");
+                        return;
+                    }
+
+                    let count = 0;
+                    let duplicateCount = 0;
+
+                    lowStockItems.value.forEach(item => {
+                        // 1. Cek Duplikasi
+                        const exists = summarySppItems.value.find(s => s.kode === item.kode);
+                        
+                        if (!exists) {
+                            const stokSekarang = Number(item.stok || 0);
+                            const batasMinimal = Number(item.minStok || 0);
+                            
+                            // 2. Hitung Saran Qty
+                            let saranQty = (batasMinimal * 2) - stokSekarang;
+                            if (saranQty <= 0) saranQty = 1;
+
+                            // 3. Push ke Summary
+                            summarySppItems.value.push({
+                                kode: item.kode || '-',
+                                nama: item.nama || '-',
+                                satuan: item.satuan || 'Pcs',
+                                stok: stokSekarang,
+                                qtyDiminta: saranQty,
+                                jmlPakai: 0, 
+                                keterangan: ''
+                            });
+                            count++;
+                        } else {
+                            duplicateCount++;
+                        }
+                    });
+
+                    // 4. Feedback & Navigasi menggunakan Toast
+                    if (count > 0) {
+                        showToast(`Berhasil menambah ${count} item ke SPP`, "success");
+                        showLowStock.value = false; 
+                        page.value = 'spp'; 
+                    } else if (duplicateCount > 0) {
+                        showToast("Semua item sudah ada di dalam list SPP", "info");
+                    }
+                };
+
+                const chunkedSppItems = computed(() => {
+                    const chunks = [];
+                    const items = [...summarySppItems.value];
+                    while (items.length > 0) {
+                        chunks.push(items.splice(0, 17));
+                    }
+                    // Jika benar-benar kosong, kasih array kosong agar minimal 1 kertas muncul
+                    return chunks.length > 0 ? chunks : [[]]; 
+                });
+
+                const removeItemSpp = (actualIndex) => {
+                    summarySppItems.value.splice(actualIndex, 1);
+                };
+
+                const kosongkanSpp = () => {
+                    const konfirmasi = confirm("Apakah Anda yakin ingin menghapus semua daftar item di SPP ini?");
+                    if (konfirmasi) {
+                        summarySppItems.value = [];
+                        inputKodeManual.value = "";
+
+                        if (typeof catatanSpp !== 'undefined') {
+                            catatanSpp.value = "";
+                        }
+                    }
+                };
+
+                const downloadSPPPDF = () => {
+                    const { jsPDF } = window.jspdf;
+                    // Inisialisasi A4 Landscape (297mm x 210mm)
+                    const doc = new jsPDF('l', 'mm', 'a4');
+                    const totalPages = chunkedSppItems.value.length;
+
+                    chunkedSppItems.value.forEach((pageItems, index) => {
+                        if (index > 0) doc.addPage();
+
+                        // --- 1. HEADER SECTION ---
+                        doc.setFontSize(11);
+                        doc.setFont("helvetica", "bold");
+                        doc.text("PT BINTANG INDOKARYA GEMILANG", 15, 15);
+                        
+                        doc.setFontSize(7);
+                        doc.setFont("helvetica", "normal");
+                        doc.text("Jl. Raya Cendrawasih No. 6 KM.20 Tengguli, Kec. Tanjung", 15, 20);
+                        doc.text("Brebes - Jawa Tengah", 15, 23);
+
+                        // Judul Tengah
+                        doc.setFontSize(14);
+                        doc.setFont("helvetica", "bold");
+                        const title = "SURAT PERMOHONAN PEMBELIAN";
+                        const titleWidth = doc.getTextWidth(title);
+                        const centerX = 148.5; 
+
+                        doc.text(title, centerX, 25, { align: 'center' }); 
+                        doc.setLineWidth(0.5);
+                        doc.line(centerX - (titleWidth / 2), 26.5, centerX + (titleWidth / 2), 26.5);
+
+                        const boxX = 220;
+                        const boxY = 10;
+                        const labelX = 223;
+                        const valueX = 245; 
+
+                        doc.setFontSize(8);
+                        doc.setLineWidth(0.2);
+                        doc.rect(boxX, boxY, 65, 18);
+
+                        doc.setFont("helvetica", "bold");
+
+                        // Baris 1: No SPP
+                        doc.text("No. Internal", labelX, 15);
+                        doc.text(":", valueX, 15);
+                        doc.text(noSPP.value, valueX + 2, 15);
+
+                        // Baris 2: Tanggal
+                        doc.text("Tanggal", labelX, 20);
+                        doc.text(":", valueX, 20);
+                        doc.text(`${new Date().toLocaleDateString('id-ID')}`, valueX + 2, 20);
+
+                        // Baris 3: Dept
+                        doc.text("Department", labelX, 25);
+                        doc.text(":", valueX, 25);
+                        doc.text("SPAREPART", valueX + 2, 25);
+
+                        // --- 2. TABLE SECTION ---
+                        const tableData = pageItems.map((item, i) => [
+                            (index * 17) + i + 1,
+                            item.kode,
+                            item.nama,
+                            item.satuan,
+                            item.qtyDiminta,
+                            item.stok,
+                            txTanggal.value || '-',
+                            item.jmlPakai,
+                            item.keterangan || '-'
+                        ]);
+
+                        // Tambah baris kosong jika data < 15 agar layout konsisten
+                        while (tableData.length < 17) {
+                            tableData.push(["", "", "", "", "", "", "", "", ""]);
+                        }
+
+                        doc.autoTable({
+                            startY: 34,
+                            head: [['No', 'Kode', 'Nama & Spesifikasi Barang', 'UoM', 'Qty', 'Stock', 'Tgl Dibutuhkan', 'Jumlah Pakai', 'Keterangan']],
+                            body: tableData,
+                            theme: 'grid',
+                            headStyles: { 
+                                fillColor: [30, 41, 59], 
+                                fontSize: 8, 
+                                halign: 'center',
+                                cellPadding: 1.5 
+                            },
+                            styles: { 
+                                fontSize: 7, 
+                                cellPadding: 1.2, 
+                                valign: 'middle',
+                                overflow: 'linebreak' 
+                            },
+                            columnStyles: {
+                                0: { cellWidth: 8, halign: 'center' },
+                                1: { cellWidth: 23 },
+                                2: { cellWidth: 'auto' }, // Nama barang fleksibel
+                                3: { cellWidth: 12, halign: 'center' },
+                                4: { cellWidth: 15, halign: 'center', fontStyle: 'bold' },
+                                5: { cellWidth: 12, halign: 'center' },
+                                6: { cellWidth: 25, halign: 'center' },
+                                7: { cellWidth: 22, halign: 'center' },
+                                8: { cellWidth: 32 }
+                            },
+                            
+                            didDrawPage: (data) => {
+                                let finalY = data.cursor.y + 5;
+                            }
+                        });
+
+                        const finalY = doc.lastAutoTable.finalY + 5;
+
+                        // --- 3. CATATAN SECTION ---
+                        doc.setFontSize(7);
+                        doc.setFont("helvetica", "bold");
+                        doc.text("CATATAN PENDUKUNG:", 15, finalY);
+                        doc.rect(15, finalY + 2, 130, 25);
+                        doc.setFont("helvetica", "italic");
+                        doc.text("-", 17, finalY + 6);
+
+                        doc.setFont("helvetica", "bold");
+                        doc.text("REKOMENDASI :", 152, finalY);
+                        doc.rect(152, finalY + 2, 130, 25);
+
+                        // --- 4. SIGNATURE SECTION ---
+                        const signY = finalY + 34;
+                        const colWidth = 297 / 4;
+                        const signLabels = ["Dibuat Oleh,", "Diperiksa,", "Diketahui,", "Disetujui,"];
+                        const signNames = [
+                            sppSign.value.pembuat, 
+                            sppSign.value.pemeriksa, 
+                            sppSign.value.diketahui, 
+                            sppSign.value.disetujui
+                        ];
+
+                        signLabels.forEach((label, i) => {
+                            const xPos = (colWidth * i) + (colWidth / 2);
+
+                            doc.setFontSize(8);
+                            doc.setFont("helvetica", "bold");
+                            doc.text(label, xPos, signY, { align: 'center' });
+
+                            doc.setFontSize(8);
+                            doc.text(signNames[i], xPos, signY + 22, { align: 'center' });
+
+                            const textWidth = doc.getTextWidth(signNames[i]) + 10;
+                            doc.line(xPos - (textWidth / 2), signY + 18, xPos + (textWidth / 2), signY + 18);
+                        });
+
+                        // --- 5. FOOTER SECTION ---
+                        doc.setFontSize(6);
+                        doc.setFont("helvetica", "italic");
+                        doc.text(`Dicetak: ${new Date().toLocaleString('id-ID')}`, 15, 205 );
+                        doc.setFont("helvetica", "bold");
+                        doc.text(`Hal: ${index + 1} / ${totalPages}`, 282, 202, { align: 'right' });
+                    });
+
+                    // Simpan PDF
+                    doc.save(`${noSPP.value}.pdf`);
+                };
+
                 const reservasiMeta = reactive({
                     department: userData.value?.department || '',
                     tanggal: new Date().toISOString().substr(0, 10) // Default tanggal hari ini (YYYY-MM-DD)
@@ -3393,17 +3838,16 @@
 
                         if (res.status === 'success') {
                         tx.ket = "[DIBATALKAN] " + (tx.ket || "");
-                        alert("✅ Transaksi berhasil dibatalkan!");
+                        showToast("✅ Transaksi berhasil dibatalkan!");
 
-                        await fetchDashboard();
                         await fetchAllData();
                         
                         } else {
-                        alert("❌ " + res.message);
+                        showToast("❌ " + res.message);
                         }
 
                     } catch (e) {
-                        alert("🚨 Gangguan server");
+                        showToast("🚨 Gangguan server");
                     } finally {
                         cancellingId.value = null;
                     }
@@ -3573,17 +4017,27 @@
                     }
                 };
 
-                const approveUser = async (u) => {
-                    // payload: { targetUser, manageAction, payload }
-                    const res = await callAPI('ADMIN_MANAGE_USER', { 
-                        targetUser: u.username, 
-                        manageAction: 'APPROVE', 
-                        payload: u.role // Mengirim role pilihan admin (misal STAFF)
-                    });
-                    if (res.status === 'success') {
-                        alert("User berhasil disetujui!");
-                        fetchUsers(); // Refresh tabel
-                    } else { alert(res.message); }
+                const approveWithRole = async (user, selectedRole) => {
+                    user.role = selectedRole;
+                    user.status = 'AKTIF';
+
+                    try {
+                        const res = await callAPI('ADMIN_MANAGE_USER', {
+                            targetUser: user.username,
+                            manageAction: 'APPROVE',
+                            payload: selectedRole
+                        });
+
+                        if (res.status === 'success') {
+                            showToast(`User ${user.username} berhasil disetujui sebagai ${selectedRole}!`);
+                            if (typeof fetchUsers === 'function') fetchUsers();
+                        } else {
+                            showToast("Gagal menyetujui user: " + res.message);
+                        }
+                    } catch (error) {
+                        console.error("Error Approval:", error);
+                        showToast("Terjadi kesalahan koneksi saat menyetujui user.");
+                    }
                 };
 
                 const deleteUser = async (u) => {
@@ -4052,16 +4506,50 @@
                 });
                 
                 return {
-                    isLoggedIn, loading, page, sidebarOpen, scannerActive, showCart, showLowStock, saveNewLocation, removeFromCart, navigate, stockFilter, categoryOptions, categoryFilter, showPassword,
-                    searchQuery, inventorySearch, showRegisterModal, regData, handleRegister, userRole, showLocationModal, locationForm, openUpdateLocation, showUserModal, isSubmitting, submitNewUser,
-                    loginData, userData, adminUsers, fetchUsers, approveUser, toggleUser, updateUserRole, deleteUser, userSearchQuery, previewImage, showProfileModal, newUser, openUserModal, 
-                    filteredAdminUsers, inventory, recentTx, showItemModal, isEditMode, formItem, openAddModal, editItem, saveItem, toggleStatus, openEditProfile, loadingProfile, profileForm, handleUpdateProfile,
-                    cart, dashData, dashFilter, lowStockItems, inputQty, qtyInputRef, searchInputRef, departments, txType, txDept, txNote, searchInMaster, togglePhotoAccess, closeUserModal,
-                    handleLogin, handleLogout, fetchDashboard, addToCart, handleScan, processTx, resetTransactionForm, isStockInsufficient, getMasterStock, sortKey, sortOrder, sortBy, sortedMaster,
-                    fixDriveUrl, handleCancelTx, getJenisClass, exportToExcel, focusSearch, addToCartWithQty, isVoided, cancellingId, toast, showPass, filterLocation, uniqueLocations, resetAllFilters,
-                    filteredHistory, searchResults, filteredInventory, isUploading, removePhoto, startScanner, showScanner, stopScanner, selectedItem, handlePrint, formInput, bukaPopUpReservasi, tambahkanKeForm,
-                    isCameraActive, videoFeed, fileInput, showPhotoModal, openUpdateFoto, closePhotoModal, savePhotoOnly, reservasiItems, showPopupDetail, reservasiMeta, txTanggal, itemsPerPage, paginatedItems,
-                    startLiveCamera, stopCamera, takeSnapshot, closeModal, launchGallery, handleFileUpload, openScanner, closeScanner, downloadPDF, docNumber, txReservasi
+                    // 1. CORE APP & AUTH STATE
+                    isLoggedIn, loading, isSubmitting, page, userRole, userData, loginData,
+                    handleLogin, handleLogout, navigate, toast, 
+
+                    // 2. UI & NAVIGATION STATE
+                    sidebarOpen, showPassword, showPass, showCart, showLowStock, showRegisterModal,
+                    showLocationModal, showUserModal, showProfileModal, showItemModal, showPhotoModal,
+                    showScanner, showPopupDetail, closeModal, closeUserModal, closePhotoModal,
+
+                    // 3. INVENTORY & MASTER DATA
+                    inventory, inventorySearch, searchQuery, stockFilter, categoryOptions, categoryFilter,
+                    filterLocation, uniqueLocations, resetAllFilters, sortedMaster, sortKey, sortOrder,
+                    sortBy, filteredInventory, getMasterStock, searchInMaster, focusSearch,
+                    searchInputRef, departments, fixDriveUrl, searchResults,
+
+                    // 4. ITEM CRUD & MODALS
+                    formItem, isEditMode, openAddModal, editItem, saveItem, toggleStatus,
+                    selectedItem, formInput, saveNewLocation, openUpdateLocation,
+
+                    // 5. TRANSACTION & CART (WMS)
+                    cart, inputQty, qtyInputRef, addToCart, addToCartWithQty, removeFromCart,
+                    isStockInsufficient, lowStockItems, txType, txDept, txNote, txTanggal,
+                    processTx, resetTransactionForm, handleCancelTx, isVoided, cancellingId,
+                    filteredHistory, getJenisClass, recentTx,
+
+                    // 6. CAMERA, SCANNER & MEDIA
+                    scannerActive, isCameraActive, videoFeed, fileInput, startScanner, stopScanner,
+                    handleScan, openScanner, closeScanner, startLiveCamera, stopCamera, takeSnapshot,
+                    launchGallery, handleFileUpload, previewImage, openUpdateFoto, savePhotoOnly,
+                    removePhoto, isUploading, togglePhotoAccess, toggleUser,
+
+                    // 7. SPP (SURAT PERMOHONAN PEMBELIAN) & RESERVASI
+                    summarySppItems, inputKodeManual, tambahSemuaKeSpp, tambahItemManualByKode, kosongkanSpp,
+                    chunkedSppItems, removeItemSpp, sppSign, noSPP, txReservasi, reservasiItems, locationForm,
+                    reservasiMeta, bukaPopUpReservasi, tambahkanKeForm, itemsPerPage, paginatedItems,
+
+                    // 8. USER MANAGEMENT & PROFILE
+                    adminUsers, filteredAdminUsers, userSearchQuery, fetchUsers, updateUserRole,
+                    deleteUser, newUser, openUserModal, submitNewUser, regData, handleRegister,
+                    profileForm, loadingProfile, openEditProfile, handleUpdateProfile, approveWithRole,
+
+                    // 9. DASHBOARD & REPORTING
+                    dashData, dashFilter, fetchDashboard, handlePrint, downloadPDF,
+                    downloadSPPPDF, exportToExcel, docNumber
                 };
             }
         }).mount('#app');
