@@ -66,7 +66,7 @@ createApp({
         });
         const txTanggal = ref(new Date().toISOString().substr(0, 10));
         const itemsPerPage = 10;
-        const docNumber = ref(new Date().getTime());
+        const docNumber = ref('');
         const txReservasi = ref('');
 
         const qtyInputRef = ref(null);
@@ -1318,6 +1318,7 @@ createApp({
             showPopupDetail.value = true;
         };
 
+        // Fungsi Konfirmasi Masuk ke Form Reservasi
         const tambahkanKeForm = () => {
             const item = selectedItem.value;
             const exist = reservasiItems.value.find(i => i.kode === item.kode);
@@ -1352,6 +1353,7 @@ createApp({
             return pages;
         });
 
+        // Fungsi Cetak (Memicu dialog print browser)
         const handlePrint = () => {
             if (reservasiItems.value.length === 0) {
                 alert("Daftar permintaan masih kosong!");
@@ -1752,7 +1754,7 @@ createApp({
 
             doc.setFontSize(14);
             doc.text("BUKTI PERMINTAAN SUKU CADANG", 105, startY + 8, { align: "center" });
-            doc.line(10, startY + 10, 200, startY + 10); // Garis bawah judul
+            doc.line(10, startY + 10, 200, startY + 10);
 
             // --- INFO DEPT/TGL/RESV ---
             doc.setFontSize(9);
@@ -1760,50 +1762,53 @@ createApp({
             doc.text(`TGL: ${tgl}`, 85, startY + 20);
             doc.text(`RESV: ${resv}`, 155, startY + 20);
 
-            // --- TABLE HEADER (7 Kolom sesuai UI) ---
+            // --- TABLE HEADER ---
             let currentY = startY + 25;
-            const colX = [10, 35, 93, 105, 120, 135, 165, 200];
-            doc.setFillColor(240, 240, 240); // Warna abu-abu header
-            doc.rect(10, currentY, 190, 7, 'F');
-            doc.rect(10, currentY, 190, 7);
+            const colX = [10, 35, 93, 105, 120, 135, 165, 200]; // Koordinat X tiap garis vertikal
 
+            doc.setFillColor(240, 240, 240);
+            doc.rect(10, currentY, 190, 7, 'F'); // Background Header
+            doc.rect(10, currentY, 190, 7);     // Outline Header
+
+            // Garis Vertikal Header
             colX.forEach(x => doc.line(x, currentY, x, currentY + 7));
 
             doc.setFontSize(7);
             doc.text("Kode", 12, currentY + 5);
-            doc.text("Nama Suku Cadang", 38, currentY + 5);
+            doc.text("Nama Suku Cadang", 37, currentY + 5);
             doc.text("Sat", 95, currentY + 5);
             doc.text("Qty", 108, currentY + 5);
-            doc.setFillColor(220, 220, 220); // Warna lebih gelap untuk "Real"
-            doc.rect(120, currentY, 15, 7, 'F');
-            doc.rect(120, currentY, 15, 7);
-            doc.text("Real", 124, currentY + 5); // Kolom Real
-            doc.text("No. Mesin", 138, currentY + 5);
-            doc.text("Keterangan", 168, currentY + 5);
+            doc.text("Real", 124, currentY + 5);
+            doc.text("No. Mesin", 137, currentY + 5);
+            doc.text("Keterangan", 167, currentY + 5);
 
-            // --- TABLE BODY (Loop Data) ---
+            // --- TABLE BODY ---
             doc.setFont("helvetica", "normal");
-            items.forEach((item) => {
+
+            // Gabungkan data asli + baris kosong (total 8 baris)
+            const displayItems = [...items];
+            while (displayItems.length < 8) {
+                displayItems.push({}); // Tambah objek kosong untuk filler
+            }
+
+            displayItems.forEach((item) => {
                 currentY += 7;
-                doc.rect(10, currentY, 190, 7); // Border baris
+
+                // Draw Baris & Garis Vertikal (All Border)
+                doc.rect(10, currentY, 190, 7);
                 colX.forEach(x => doc.line(x, currentY, x, currentY + 7));
 
-                doc.text(String(item.kode || ''), 11, currentY + 5);
-                doc.text(String(item.nama || '').substring(0, 35), 39, currentY + 5);
-                doc.text(String(item.satuan || ''), 96, currentY + 5);
-                doc.text(String(item.qty || '0'), 109, currentY + 5);
-                // Kolom Real (dibiarkan kosong untuk diisi manual)
-                doc.text(String(item.noMesin || ''), 139, currentY + 5);
-                doc.text(String(item.keterangan || '').substring(0, 20), 169, currentY + 5);
+                // Isi Data (jika ada)
+                if (item.kode) {
+                    doc.text(String(item.kode), 11, currentY + 5);
+                    doc.text(String(item.nama || '').substring(0, 32), 36, currentY + 5);
+                    doc.text(String(item.satuan || ''), 94, currentY + 5);
+                    doc.text(String(item.qty || '0'), 108, currentY + 5, { align: "center" });
+                    // Kolom Real kosong (untuk tulis tangan)
+                    doc.text(String(item.noMesin || ''), 136, currentY + 5);
+                    doc.text(String(item.keterangan || '').substring(0, 20), 166, currentY + 5);
+                }
             });
-
-            // Baris Kosong Penyeimbang (agar tabel selalu 8 baris)
-            const emptyRows = 8 - items.length;
-            for (let i = 0; i < emptyRows; i++) {
-                currentY += 7;
-                doc.rect(10, currentY, 190, 7);
-                doc.rect(120, currentY, 15, 7);
-            }
 
             // --- SIGNATURE SECTION ---
             const sigY = startY + 105;
@@ -1832,7 +1837,7 @@ createApp({
 
             const footerY = startY + 132;
 
-            doc.text(`Hal ${pageNum} / ${paginatedItems.value.length}`, 10, footerY);
+            doc.text(`Generated by WMS - Hal ${pageNum} / ${paginatedItems.value.length}`, 10, footerY);
 
             const now = new Date();
             const dateStr = now.toLocaleDateString('id-ID'); // Format: DD/MM/YYYY
