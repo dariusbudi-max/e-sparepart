@@ -7,6 +7,9 @@
     <link href="src/output.css" rel="stylesheet">
     <title>WMS SPAREPART</title>
     
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdn.jsdelivr.net/npm/ua-parser-js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
     <script src="https://unpkg.com/html5-qrcode"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -165,7 +168,7 @@
                                 <i class="fa-solid fa-lock"></i>
                             </div>
                             <input ref="inputpassword" :type="showPass ? 'text' : 'password'" 
-                                v-model="loginData.password" @keyup.enter="handleLogin"
+                                v-model="loginData.password" @keydown.enter.prevent="handleLogin(loginData)"
                                 class="w-full pl-12 pr-14 py-4 bg-[#F4F7FB] border border-transparent focus:border-indigo-100 rounded-2xl outline-none focus:ring-4 ring-indigo-500/5 focus:bg-white transition-all text-sm font-medium text-slate-700 placeholder-slate-300" 
                                 placeholder="••••••••">
                             
@@ -177,7 +180,7 @@
                         </div>
                     </div>
 
-                    <button @click="handleLogin" 
+                    <button @click="handleLogin(loginData)" 
                         class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-4 rounded-2xl shadow-xl shadow-indigo-100 transition-all active:scale-[0.98] mt-4 flex items-center justify-center gap-3">
                         <span class="text-sm">Masuk ke Sistem</span>
                         <i class="fa-solid fa-arrow-right-to-bracket group-hover:translate-x-1 transition-transform"></i>
@@ -270,7 +273,7 @@
                                 class="flex-1 py-4 bg-white border border-slate-200 hover:bg-slate-50 text-slate-600 rounded-[1.25rem] font-bold text-sm transition-all active:scale-95">
                                 Batal
                             </button>
-                            <button @click="handleRegister" 
+                            <button @click="handleRegister(regData)"
                                 class="flex-[1.5] py-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-[1.25rem] font-bold text-sm shadow-xl shadow-indigo-100 transition-all active:scale-95 disabled:opacity-50 disabled:active:scale-100"
                                 :disabled="regData.password.length < 6 || loading">
                                 <span v-if="!loading">Kirim Request</span>
@@ -321,6 +324,17 @@
                         <span>Dashboard</span>
                     </button>
 
+                    <button v-if="['ADMIN', 'MANAGER'].includes(userData.role)"
+                        @click="page = 'analytics'; sidebarOpen = false" 
+                        :class="page === 'analytics' ? 'bg-gradient-to-r from-purple-600/20 to-transparent text-purple-400 border-purple-500/30 shadow-[inset_2px_0_0_0_#a855f7]' : 'text-slate-400 hover:bg-slate-800/40 hover:text-purple-300 border-transparent'" 
+                        class="group w-full flex items-center gap-4 px-4 py-3 rounded-xl font-semibold transition-all duration-300 text-sm text-left border outline-none">
+
+                        <i class="fa-solid fa-chart-line text-lg w-6 transition-transform group-hover:scale-110"
+                        :class="page === 'analytics' ? 'text-purple-500' : 'text-slate-500 group-hover:text-purple-400'"></i> 
+
+                        <span>Analytics</span>
+                    </button>
+
                     <button v-if="['ADMIN', 'STAFF'].includes(userData.role)"
                         @click="page = 'transaksi'; sidebarOpen = false" 
                         :class="page === 'transaksi' ? 'bg-gradient-to-r from-emerald-600/20 to-transparent text-emerald-400 border-emerald-500/30 shadow-[inset_2px_0_0_0_#10b981]' : 'text-slate-400 hover:bg-slate-800/40 hover:text-emerald-300 border-transparent'" 
@@ -341,6 +355,14 @@
                         class="group w-full flex items-center gap-4 px-4 py-3 rounded-xl font-semibold transition-all duration-300 text-sm text-left border outline-none">
                         <i class="fa-solid fa-file-invoice text-lg w-6 transition-transform group-hover:scale-110" :class="page === 'reservasi' ? 'text-indigo-500' : 'text-slate-500 group-hover:text-indigo-400'"></i> 
                         <span>Bon Suku Cadang</span>
+                    </button>
+
+                    <button @click="page = 'scrap_monitoring'; loadScrapData(); sidebarOpen = false" 
+                        :class="page === 'scrap_monitoring' ? 'bg-gradient-to-r from-teal-600/20 to-transparent text-teal-400 border-teal-500/30 shadow-[inset_2px_0_0_0_#14b8a6]' : 'text-slate-400 hover:bg-slate-800/40 hover:text-teal-300 border-transparent'" 
+                        class="group w-full flex items-center gap-4 px-4 py-3 rounded-xl font-semibold transition-all duration-300 text-sm text-left border outline-none relative">
+                        <i class="fa-solid fa-recycle text-lg w-6 transition-transform group-hover:scale-110" :class="page === 'scrap_monitoring' ? 'text-teal-500' : 'text-slate-500 group-hover:text-teal-400'"></i> 
+                        <span>Barang Bekas / Scrap</span>
+                        <span :class="page === 'scrap_monitoring' ? 'bg-teal-500 text-white' : 'bg-teal-500/20 text-teal-400 border-teal-500/20'" class="ml-auto text-[9px] px-2 py-0.5 rounded-md font-black border group-hover:bg-teal-500/30 transition-colors">MONITOR</span>
                     </button>
 
                     <button v-if="['ADMIN', 'STAFF', 'MANAGER'].includes(userData.role)"
@@ -373,7 +395,7 @@
                     </button>
 
                     <button v-if="userData.role === 'ADMIN'"
-                        @click="page = 'user_management'; fetchUsers(); sidebarOpen = false" 
+                        @click="page = 'user_management'; loadUsers(); sidebarOpen = false" 
                         :class="page === 'user_management' ? 'bg-gradient-to-r from-violet-600/20 to-transparent text-violet-400 border-violet-500/30 shadow-[inset_2px_0_0_0_#8b5cf6]' : 'text-slate-400 hover:bg-slate-800/40 hover:text-violet-300 border-transparent'" 
                         class="group w-full flex items-center gap-4 px-4 py-3 rounded-xl font-semibold transition-all duration-300 text-sm text-left border outline-none">
                         <i class="fa-solid fa-users-gear text-lg w-6 transition-transform group-hover:scale-110" :class="page === 'user_management' ? 'text-violet-500' : 'text-slate-500 group-hover:text-violet-400'"></i> 
@@ -445,9 +467,20 @@
                             </div>
                             <p class="text-sm text-slate-500 font-medium ml-4">Monitoring Real-time Stock & Log Aktivitas Sparepart</p>
                         </div>
-                        <button @click="fetchDashboard" class="group flex items-center gap-2 bg-white px-6 py-3 rounded-2xl shadow-sm border border-slate-200 hover:border-indigo-400 hover:text-indigo-600 transition-all active:scale-95">
-                            <i class="fa-solid fa-sync text-slate-400 group-hover:rotate-180 transition-transform duration-700"></i>
-                            <span class="text-xs font-black uppercase tracking-widest">Refresh</span>
+                        <button 
+                            @click="refreshAllData"
+                            :disabled="isRefreshing"
+                            class="group flex items-center gap-2 bg-white px-6 py-3 rounded-2xl shadow-sm border border-slate-200 hover:border-indigo-400 hover:text-indigo-600 transition-all active:scale-95 disabled:opacity-50">
+
+                            <i class="fa-solid"
+                            :class="isRefreshing 
+                                    ? 'fa-spinner fa-spin text-indigo-500' 
+                                    : 'fa-sync text-slate-400 group-hover:rotate-180'">
+                            </i>
+
+                            <span class="text-xs font-black uppercase tracking-widest">
+                                {{ isRefreshing ? 'Loading...' : 'Refresh' }}
+                            </span>
                         </button>
                     </div>
 
@@ -482,21 +515,46 @@
                             </div>
                         </div>
 
-                        <div class="relative bg-white p-6 rounded-[2rem] shadow-[0_10px_40px_-15px_rgba(0,0,0,0.05)] border border-slate-100 group hover:border-orange-400 transition-all duration-300 overflow-hidden">
-                            <div class="absolute -right-4 -top-4 opacity-[0.05] group-hover:opacity-10 transition-opacity transform group-hover:scale-110">
-                                <i class="fa-solid fa-scale-unbalanced text-9xl text-orange-500"></i>
+                        <div 
+                            @click="dashData.selisihOpname > 0 && loadOpnameDetail()"
+                            :class="[
+                                dashData.selisihOpname > 0 
+                                    ? 'border-orange-200 shadow-orange-100 cursor-pointer hover:shadow-orange-200 hover:scale-[1.02] active:scale-[0.98]' 
+                                    : 'border-slate-100 shadow-sm opacity-80',
+                                loadingOpname ? 'ring-4 ring-orange-200' : ''
+                            ]"
+                            class="relative bg-white p-6 rounded-[2rem] border transition-all duration-300 overflow-hidden shadow-[0_10px_40px_-15px_rgba(0,0,0,0.05)]"
+                        >
+                            <div v-if="loadingOpname" class="absolute inset-0 bg-white/80 z-10 flex items-center justify-center">
+                                <i class="fa-solid fa-spinner fa-spin text-orange-500 text-2xl"></i>
                             </div>
+                            
+                            <div class="absolute -right-4 -top-4 opacity-[0.03] transition-opacity transform group-hover:opacity-10 group-hover:scale-110">
+                                <i class="fa-solid fa-scale-unbalanced text-9xl" :class="dashData.selisihOpname > 0 ? 'text-orange-500' : 'text-slate-400'"></i>
+                            </div>
+
                             <div class="flex items-center gap-3 mb-4">
-                                <div class="p-3 rounded-2xl shadow-inner" :class="dashData.selisihOpname > 0 ? 'bg-orange-50 text-orange-500' : 'bg-slate-50 text-slate-400'">
+                                <div class="p-3 rounded-2xl shadow-inner transition-colors duration-300" 
+                                    :class="dashData.selisihOpname > 0 ? 'bg-orange-50 text-orange-500' : 'bg-slate-50 text-slate-400'">
                                     <i class="fa-solid fa-clipboard-check text-lg"></i>
                                 </div>
                                 <span class="text-[10px] font-black text-slate-400 uppercase tracking-[0.15em]">Selisih Opname</span>
                             </div>
-                            <div class="flex items-baseline gap-2">
-                                <div class="text-4xl font-black tracking-tighter" :class="dashData.selisihOpname > 0 ? 'text-orange-500' : 'text-slate-800'">
+
+                            <div class="flex items-baseline gap-3">
+                                <div class="text-4xl font-black tracking-tighter transition-colors duration-300" 
+                                    :class="dashData.selisihOpname > 0 ? 'text-orange-600' : 'text-slate-800'">
                                     {{ dashData.selisihOpname || 0 }}
                                 </div>
-                                <span v-if="dashData.selisihOpname > 0" class="text-[10px] font-black bg-orange-500 text-white px-2 py-0.5 rounded-full animate-bounce">PERIKSA</span>
+                                
+                                <div v-if="dashData.selisihOpname > 0" 
+                                    class="flex items-center gap-1.5 px-3 py-1 rounded-full bg-orange-100 text-orange-600 animate-pulse">
+                                    <span class="relative flex h-2 w-2">
+                                        <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-orange-400 opacity-75"></span>
+                                        <span class="relative inline-flex rounded-full h-2 w-2 bg-orange-500"></span>
+                                    </span>
+                                    <span class="text-[9px] font-black uppercase tracking-widest">Periksa</span>
+                                </div>
                             </div>
                         </div>
 
@@ -521,7 +579,7 @@
 
                             <div class="relative z-10 mt-6">
                                 <div class="relative">
-                                    <select v-model="dashFilter.type" @change="fetchDashboard" 
+                                    <select v-model="dashFilter.type" @change="loadHistory"
                                         class="w-full bg-white/5 border border-white/10 text-white text-[11px] font-black uppercase tracking-widest rounded-xl px-4 py-2.5 outline-none focus:bg-white/10 focus:border-indigo-500 transition cursor-pointer appearance-none">
                                         <option class="text-slate-800" value="ALL">Semua Aktivitas</option>
                                         <option class="text-slate-800" value="MASUK">Barang Masuk</option>
@@ -536,22 +594,68 @@
                         </div>
                     </div>
 
-                    <div class="bg-white rounded-[2.5rem] border border-slate-200 shadow-sm overflow-hidden">
-                        <div class="p-8 border-b border-slate-100 flex flex-col md:flex-row justify-between items-center gap-6 bg-gradient-to-b from-slate-50/50 to-white">
-                            <div class="flex items-center gap-4 w-full md:w-auto">
-                                <div class="h-12 w-12 bg-slate-900 text-white rounded-2xl flex items-center justify-center shadow-lg shadow-slate-200">
-                                    <i class="fa-solid fa-terminal text-xl"></i>
+                    <div class="bg-white rounded-3xl border border-slate-200/60 shadow-sm overflow-hidden">
+                        <div class="px-5 py-4 bg-slate-50/50 flex flex-col sm:flex-row justify-between items-center gap-4">
+                            <div class="flex items-center gap-3 w-full sm:w-auto">
+                                <div class="h-10 w-10 bg-emerald-500 text-white rounded-xl flex items-center justify-center shadow-md shadow-emerald-100">
+                                    <i class="fa-solid fa-clock-rotate-left text-lg"></i>
                                 </div>
-                                <div class="text-left">
-                                    <h3 class="font-black text-slate-800 text-lg leading-tight uppercase tracking-tight">Log Aktivitas</h3>
-                                    <p class="text-[10px] font-black text-indigo-500 uppercase tracking-[0.2em] mt-0.5">{{ filteredHistory.length }} Transaksi Terdeteksi</p>
+                                <div>
+                                    <h3 class="font-bold text-slate-800 text-base leading-tight">Log Aktivitas</h3>
+                                    <p class="text-[10px] font-bold text-emerald-600 uppercase tracking-wider">{{ filteredHistory.length }} Transaksi</p>
                                 </div>
                             </div>
-                            
-                            <div class="relative w-full md:w-96 group">
-                                <i class="fa-solid fa-search absolute left-5 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-indigo-500 transition-colors"></i>
-                                <input v-model="searchQuery" type="text" placeholder="Cari Kode, Nama, Dept, atau Admin..." 
-                                    class="w-full pl-14 pr-6 py-4 bg-slate-50 rounded-2xl border-2 border-transparent outline-none focus:bg-white focus:ring-4 focus:ring-indigo-500/5 focus:border-indigo-500 transition-all font-bold text-sm text-slate-700 placeholder-slate-400 shadow-inner">
+
+                            <div class="relative w-full sm:w-72 group">
+                                <i class="fa-solid fa-magnifying-glass absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-emerald-500 text-xs transition-colors"></i>
+                                <input v-model="searchQuery" type="text" placeholder="Cari Kode, Dept ..." 
+                                    class="w-full pl-10 pr-4 py-2 bg-white rounded-xl border border-slate-200 outline-none focus:border-emerald-500 transition-all font-bold text-xs text-slate-700 shadow-sm">
+                            </div>
+                        </div>
+
+                        <div class="px-5 py-3 bg-white border-y border-slate-100 flex flex-wrap lg:flex-nowrap items-center gap-3">
+                            <div class="flex items-center gap-2 bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-100 flex-1 min-w-[140px]">
+                                <i class="fa-solid fa-calendar-day text-emerald-500 text-[10px]"></i>
+                                <input type="date" v-model="dashFilter.startDate" 
+                                    class="bg-transparent border-none text-[11px] font-bold text-slate-700 outline-none w-full cursor-pointer">
+                            </div>
+
+                            <i class="fa-solid fa-arrow-right text-slate-300 text-[10px] hidden lg:block"></i>
+
+                            <div class="flex items-center gap-2 bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-100 flex-1 min-w-[140px]">
+                                <i class="fa-solid fa-calendar-check text-indigo-500 text-[10px]"></i>
+                                <input type="date" v-model="dashFilter.endDate" 
+                                    class="bg-transparent border-none text-[11px] font-bold text-slate-700 outline-none w-full cursor-pointer">
+                            </div>
+
+                            <div class="flex items-center gap-2 bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-100 flex-1 min-w-[140px] relative">
+                                <i class="fa-solid fa-building text-blue-500 text-[10px]"></i>
+                                <select v-model="dashFilter.dept" 
+                                    class="bg-transparent border-none text-[11px] font-bold text-slate-700 outline-none w-full cursor-pointer appearance-none pr-4">
+                                    <option value="">Semua Department</option>
+                                    <option v-for="d in departments" :key="d" :value="d">{{ d }}</option>
+                                </select>
+                                <i class="fa-solid fa-chevron-down absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 text-[8px] pointer-events-none"></i>
+                            </div>
+
+                            <div class="flex items-center gap-2">
+                                <button @click="exportExcel" :disabled="isExporting" class="h-10 px-6 bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-400 disabled:cursor-not-allowed text-white rounded-xl transition-all active:scale-95 shadow-lg shadow-indigo-500/20 flex items-center justify-center gap-2">
+                                    <i :class="isExporting ? 'fa-solid fa-spinner fa-spin text-[10px]' : 'fa-solid fa-file-excel text-[10px]'"></i>
+                                    <span class="text-[10px] font-black uppercase tracking-widest">{{ isExporting ? 'Processing...' : 'Export' }}</span>
+                                </button>
+
+                                <button @click="resetFilter"
+                                    class="h-10 px-4 bg-white border border-slate-200 text-slate-500 hover:bg-rose-50 hover:text-rose-600 hover:border-rose-200 rounded-xl transition-all active:scale-95 flex items-center justify-center gap-2 shadow-sm"
+                                    title="Reset Filter">
+                                    <i class="fa-solid fa-rotate-left text-[10px]"></i>
+                                    <span class="hidden lg:block text-[10px] font-black uppercase tracking-widest">Reset</span>
+                                </button>
+
+                                <button @click="loadHistory"
+                                    class="h-10 px-6 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl transition-all active:scale-95 shadow-lg shadow-emerald-500/20 flex items-center justify-center gap-2">
+                                    <i class="fa-solid fa-filter text-[10px]"></i>
+                                    <span class="text-[10px] font-black uppercase tracking-widest">Terapkan</span>
+                                </button>
                             </div>
                         </div>
 
@@ -569,8 +673,12 @@
                                     </tr>
                                 </thead>
                                 <tbody class="divide-y divide-slate-100">
-                                    <tr v-for="tx in filteredHistory.slice(0, 200)" :key="tx.rowId" 
-                                        :class="tx.isVoided ? 'bg-rose-50/30' : 'hover:bg-slate-50/80 transition-colors cursor-default'">
+                                    <tr v-for="tx in filteredHistory.slice(0, 300)" :key="tx.rowId"
+                                        @click="selectedRow = tx.rowId"
+                                        :class="[
+                                            tx.isVoided ? 'bg-rose-50/30' : 'hover:bg-slate-50/80 transition-colors cursor-pointer',
+                                            selectedRow === tx.rowId ? 'bg-emerald-100/60 border-l-4 border-emerald-500' : ''
+                                        ]">
                                         
                                         <td class="px-6 py-5">
                                             <div class="flex items-center gap-3">
@@ -616,7 +724,7 @@
                                         <td class="px-6 py-5 text-right">
                                             <span class="text-lg font-mono font-black"
                                                 :class="tx.isVoided ? 'text-slate-200 line-through' : (tx.qty > 0 ? 'text-emerald-600' : 'text-rose-600')">
-                                                {{ tx.qty > 0 && tx.jenis !== 'KELUAR' ? '+' : '' }}{{ tx.qty }}
+                                                {{ tx.qty > 0 && tx.jenis !== 'KELUAR' ? '' : '-' }}{{ tx.qty }}
                                             </span>
                                         </td>
 
@@ -628,7 +736,7 @@
                                         </td>
 
                                         <td class="px-6 py-5 border-r border-slate-50">
-                                            <button @click="dashFilter.dept = tx.dept; fetchDashboard();"
+                                            <button @click="dashFilter.dept = tx.dept; loadHistory()"
                                                     :disabled="isVoided(tx)"
                                                     class="text-[11px] font-black px-3 py-1.5 rounded-xl uppercase tracking-tighter transition-all border"
                                                     :class="isVoided(tx)
@@ -645,117 +753,527 @@
                                             </div>
                                         </td>
                                     </tr>
+                                    <tr v-if="recentTx.length === 0">
+                                        <td colspan="7" class="text-center py-10 text-slate-400 text-sm font-bold">
+                                            Tidak ada data pada range tanggal ini
+                                        </td>
+                                    </tr>
                                 </tbody>
                             </table>
                         </div>
                         
                         <div class="p-6 bg-slate-50 border-t border-slate-100 text-right">
-                            <span class="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">End of Records • 200 Data System</span>
+                            <span class="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">End of Records • 300 Data System</span>
                         </div>
                     </div>
                 </main>
 
-                <main v-if="page === 'transaksi' && ['ADMIN', 'STAFF'].includes(userData.role)" class="flex-1 flex flex-col overflow-hidden bg-slate-50">
-                    <div class="p-4 md:p-6 border-b bg-white shadow-sm z-10">
-                        <div class="max-w-7xl mx-auto flex flex-col md:flex-row gap-3 md:gap-4 md:items-end">
-                            <div class="w-full md:w-32">
-                                <label class="block text-[10px] font-black text-slate-400 uppercase mb-2 ml-1 tracking-widest">Jumlah</label>
-                                <div class="relative group">
-                                    <input 
-                                        v-model.number="inputQty" 
-                                        ref="qtyInputRef"
-                                        @keyup.enter="focusSearch"
-                                        type="number" 
-                                        min=""
-                                        class="w-full py-4 bg-slate-50 border-2 border-transparent rounded-2xl font-black text-center text-indigo-600 focus:border-indigo-500 focus:bg-white transition-all outline-none text-lg shadow-inner"
-                                    >
-                                </div>
-                            </div>
+                <main v-if="page === 'analytics' && ['ADMIN', 'MANAGER'].includes(userData.role)"
+                    class="flex-1 overflow-y-auto p-6 lg:p-10 space-y-8 animate-fade-in custom-scrollbar bg-gradient-to-br from-slate-50 via-white to-slate-100/80">
 
-                            <div class="w-full md:flex-1">
-                                <label class="block text-[10px] font-black text-slate-400 uppercase mb-2 ml-1 tracking-widest">Input Kode / Scan Barcode</label>
-                                <div class="relative group">
-                                    <i class="fa-solid fa-barcode absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-indigo-500 transition-colors text-base md:text-xl"></i>
-                                    <input 
-                                        v-model="searchQuery" 
-                                        ref="searchInputRef"
-                                        @keydown.enter.prevent="handleScan" 
-                                        type="text" 
-                                        placeholder="Ketik nama atau Scan barcode..." 
-                                        class="w-full pl-12 md:pl-14 pr-4 py-3 md:py-4 rounded-2xl border-2 border-transparent bg-slate-50 focus:bg-white focus:border-indigo-500 shadow-inner outline-none font-bold text-slate-700 transition-all"
-                                    >
-                                    <div class="absolute right-4 top-1/2 -translate-y-1/2 hidden md:block">
-                                        <kbd class="px-2 py-1 bg-white border shadow-sm rounded-lg text-[10px] text-slate-400 font-black">ENTER</kbd>
+                    <!-- Header -->
+                    <div class="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
+                        <div>
+                            <div class="flex items-center gap-3 mb-2">
+                                <div class="relative">
+                                    <div class="h-9 w-1.5 bg-gradient-to-b from-indigo-500 to-indigo-700 rounded-full"></div>
+                                    <div class="absolute -inset-1 h-9 w-1.5 bg-indigo-400/30 rounded-full blur-sm"></div>
+                                </div>
+                                <h2 class="text-3xl font-black text-slate-800 tracking-tight">Analytics</h2>
+                            </div>
+                            <p class="text-sm text-slate-500 font-medium ml-[18px]">
+                                Analisis pergerakan stok & intensitas penggunaan sparepart
+                            </p>
+                        </div>
+                        <div v-if="isPivotLoaded && pivotData.length" class="flex items-center gap-2 bg-white border border-slate-200 rounded-2xl px-4 py-2 shadow-sm">
+                            <div class="h-2 w-2 rounded-full bg-emerald-500 animate-pulse"></div>
+                            <span class="text-xs font-bold text-slate-500">{{ pivotData.length }} item ditampilkan</span>
+                        </div>
+                    </div>
+
+                    <!-- Filter Card -->
+                    <div class="bg-white rounded-3xl border border-slate-200/80 shadow-[0_1px_3px_rgba(0,0,0,0.04)] p-6">
+                        <div class="flex items-center gap-2 mb-5">
+                            <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"/>
+                            </svg>
+                            <span class="text-[11px] font-black text-slate-400 uppercase tracking-widest">Filter Data</span>
+                        </div>
+
+                        <div class="flex flex-wrap items-end gap-4">
+                            <!-- Date Range -->
+                            <div class="flex flex-col gap-1.5 flex-1 min-w-[200px]">
+                                <label class="text-[10px] font-bold text-slate-400 uppercase tracking-wider ml-1">Rentang Waktu</label>
+                                <div class="flex items-center gap-2">
+                                    <div class="relative flex-1">
+                                        <input type="date" v-model="analyticsFilter.startDate"
+                                            class="w-full bg-slate-50/80 border border-slate-200 rounded-xl px-3 py-2.5 pr-8 text-xs font-semibold text-slate-700 focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-400 focus:bg-white outline-none transition-all duration-200">
+                                        <svg class="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-300 pointer-events-none" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                                        </svg>
+                                    </div>
+                                    <svg class="w-4 h-4 text-slate-300 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M14 5l7 7m0 0l-7 7m7-7H3"/>
+                                    </svg>
+                                    <div class="relative flex-1">
+                                        <input type="date" v-model="analyticsFilter.endDate"
+                                            class="w-full bg-slate-50/80 border border-slate-200 rounded-xl px-3 py-2.5 pr-8 text-xs font-semibold text-slate-700 focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-400 focus:bg-white outline-none transition-all duration-200">
+                                        <svg class="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-300 pointer-events-none" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                                        </svg>
                                     </div>
                                 </div>
                             </div>
 
-                            <div class="flex gap-2 md:gap-3 w-full md:w-auto justify-end">
-                                <button @click="openScanner" class="w-12 h-12 md:w-14 md:h-14 bg-slate-800 text-white rounded-2xl flex items-center justify-center shadow-lg hover:bg-black hover:-translate-y-1 active:scale-95 transition-all">
-                                    <i class="fa-solid fa-qrcode text-lg md:text-xl"></i>
+                            <!-- Department -->
+                            <div class="flex flex-col gap-1.5 min-w-[170px]">
+                                <label class="text-[10px] font-bold text-slate-400 uppercase tracking-wider ml-1">Department</label>
+                                <div class="relative">
+                                    <select v-model="analyticsFilter.dept"
+                                        class="w-full bg-slate-50/80 border border-slate-200 rounded-xl px-4 py-2.5 pr-8 text-xs font-semibold text-slate-700 outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-400 focus:bg-white transition-all duration-200 appearance-none cursor-pointer">
+                                        <option value="">Semua Department</option>
+                                        <option v-for="d in departments" :key="d" :value="d">{{ d }}</option>
+                                    </select>
+                                    <svg class="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-300 pointer-events-none" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/>
+                                    </svg>
+                                </div>
+                            </div>
+
+                            <!-- Kode Barang -->
+                            <div class="flex flex-col gap-1.5 min-w-[170px]">
+                                <label class="text-[10px] font-bold text-slate-400 uppercase tracking-wider ml-1">Kode Barang</label>
+                                <div class="relative">
+                                    <input type="text" v-model="analyticsFilter.kode" placeholder="Cari kode..."
+                                        class="w-full bg-slate-50/80 border border-slate-200 rounded-xl px-4 py-2.5 pr-8 text-xs font-semibold text-slate-700 outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-400 focus:bg-white transition-all duration-200 placeholder:text-slate-300">
+                                    <svg class="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-300 pointer-events-none" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                                    </svg>
+                                </div>
+                            </div>
+
+                            <!-- Apply Button -->
+                            <button @click="loadPivot"
+                                class="group relative bg-indigo-600 text-white px-7 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-indigo-700 active:scale-[0.97] transition-all duration-200 shadow-[0_2px_8px_rgba(79,70,229,0.3)] hover:shadow-[0_4px_16px_rgba(79,70,229,0.4)] shrink-0">
+                                <span class="relative z-10 flex items-center gap-2">
+                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"/>
+                                    </svg>
+                                    Apply
+                                </span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Table Card -->
+                    <div class="bg-white rounded-3xl border border-slate-200/80 shadow-[0_1px_3px_rgba(0,0,0,0.04)] overflow-hidden">
+
+                        <!-- Table Header -->
+                        <div class="flex justify-between items-center px-8 py-5 border-b border-slate-100">
+                            <div class="flex items-center gap-3">
+                                <div class="h-8 w-8 rounded-xl bg-gradient-to-br from-indigo-50 to-indigo-100 flex items-center justify-center">
+                                    <svg class="w-4 h-4 text-indigo-600" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z"/>
+                                    </svg>
+                                </div>
+                                <div>
+                                    <h3 class="font-black text-slate-800 text-[15px]">Stock Movement</h3>
+                                    <p class="text-[10px] text-slate-400 font-semibold uppercase tracking-wider mt-0.5">
+                                        Opening → Movement → Closing
+                                    </p>
+                                </div>
+                            </div>
+
+                            <!-- Selected info -->
+                            <div v-if="selectedRow" class="flex items-center gap-3">
+                                <div class="flex items-center gap-2 bg-indigo-50 border border-indigo-100 rounded-xl px-3.5 py-1.5">
+                                    <svg class="w-3.5 h-3.5 text-indigo-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M15.042 21.672L13.684 16.6m0 0l-2.51 2.225.569-9.47 5.227 7.917-3.286-.672zM12 2.25V4.5m5.834.166l-1.591 1.591M20.25 10.5H18M7.757 14.743l-1.59 1.59M6 10.5H3.75m4.007-4.243l-1.59-1.59"/>
+                                    </svg>
+                                    <span class="text-[11px] font-bold text-indigo-600">{{ selectedRow.kode }}</span>
+                                    <span class="text-[10px] text-indigo-400 font-medium">·</span>
+                                    <span class="text-[11px] text-indigo-500 font-medium max-w-[180px] truncate">{{ selectedRow.nama }}</span>
+                                </div>
+                                <button @click="selectedRow = null"
+                                    class="h-7 w-7 rounded-lg bg-slate-100 hover:bg-slate-200 flex items-center justify-center transition-colors">
+                                    <svg class="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
+                                    </svg>
+                                </button>
+                            </div>
+
+                            <div v-else-if="isPivotLoading" class="flex items-center gap-2">
+                                <svg class="w-4 h-4 text-indigo-500 animate-spin" fill="none" viewBox="0 0 24 24">
+                                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+                                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+                                </svg>
+                                <span class="text-xs text-indigo-500 font-semibold">Memuat data...</span>
+                            </div>
+                        </div>
+
+                        <!-- Empty State -->
+                        <div v-if="!isPivotLoaded" class="py-20 px-8">
+                            <div class="flex flex-col items-center text-center max-w-xs mx-auto">
+                                <div class="h-16 w-16 rounded-2xl bg-slate-50 border border-slate-100 flex items-center justify-center mb-5">
+                                    <svg class="w-7 h-7 text-slate-300" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 3v11.25A2.25 2.25 0 006 16.5h2.25M3.75 3h-1.5m1.5 0h16.5m0 0h1.5m-1.5 0v11.25A2.25 2.25 0 0118 16.5h-2.25m-7.5 0h7.5m-7.5 0l-1 3m8.5-3l1 3m0 0l.5 1.5m-.5-1.5h-9.5m0 0l-.5 1.5M9 11.25v1.5M12 9v3.75m3-6v6"/>
+                                    </svg>
+                                </div>
+                                <p class="text-sm font-bold text-slate-400 mb-1">Belum ada data ditampilkan</p>
+                                <p class="text-xs text-slate-300 leading-relaxed">
+                                    Atur filter di atas sesuai kebutuhan, lalu klik <span class="font-bold text-indigo-400">Apply</span> untuk memuat data
+                                </p>
+                            </div>
+                        </div>
+
+                        <!-- Table -->
+                        <div v-else class="overflow-auto max-h-[460px] custom-scrollbar">
+                            <table class="w-full text-xs">
+                                <thead class="bg-slate-50/80 sticky top-0 z-10 backdrop-blur-sm">
+                                    <tr class="text-[10px] uppercase text-slate-400 font-black tracking-wider">
+                                        <th class="px-6 py-3.5 text-left">Kode</th>
+                                        <th class="px-6 py-3.5 text-left">Nama Barang</th>
+                                        <th class="px-6 py-3.5 text-right">Opening</th>
+                                        <th class="px-6 py-3.5 text-right">Masuk</th>
+                                        <th class="px-6 py-3.5 text-right">Keluar</th>
+                                        <th class="px-6 py-3.5 text-right">Closing</th>
+                                    </tr>
+                                </thead>
+
+                                <tbody class="divide-y divide-slate-100">
+                                    <tr v-for="item in pivotData" :key="item.kode"
+                                        @click="selectedRow = selectedRow?.kode === item.kode ? null : item"
+                                        class="cursor-pointer transition-all duration-150 group"
+                                        :class="selectedRow?.kode === item.kode
+                                            ? 'bg-indigo-50/70 border-l-[3px] border-l-indigo-500'
+                                            : 'hover:bg-slate-50/80 border-l-[3px] border-l-transparent'">
+
+                                        <td class="px-6 py-3.5">
+                                            <span class="inline-flex items-center px-2.5 py-1 rounded-lg font-bold text-[11px] tracking-wide transition-colors duration-150"
+                                                :class="selectedRow?.kode === item.kode
+                                                    ? 'bg-indigo-100 text-indigo-700'
+                                                    : 'bg-slate-100 text-slate-600 group-hover:bg-slate-200'">
+                                                {{ item.kode }}
+                                            </span>
+                                        </td>
+
+                                        <td class="px-6 py-3.5">
+                                            <span class="font-semibold transition-colors duration-150"
+                                                :class="selectedRow?.kode === item.kode
+                                                    ? 'text-indigo-800'
+                                                    : 'text-slate-700 group-hover:text-slate-900'">
+                                                {{ item.nama }}
+                                            </span>
+                                        </td>
+
+                                        <td class="px-6 py-3.5 text-right">
+                                            <span class="font-bold tabular-nums transition-colors duration-150"
+                                                :class="selectedRow?.kode === item.kode ? 'text-slate-500' : 'text-slate-400'">
+                                                {{ item.opening }}
+                                            </span>
+                                        </td>
+
+                                        <td class="px-6 py-3.5 text-right">
+                                            <span v-if="item.masuk > 0" class="inline-flex items-center gap-1 font-bold text-emerald-600 tabular-nums">
+                                                <svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" d="M5 15l7-7 7 7"/>
+                                                </svg>
+                                                {{ item.masuk }}
+                                            </span>
+                                            <span v-else class="font-bold text-slate-300 tabular-nums">0</span>
+                                        </td>
+
+                                        <td class="px-6 py-3.5 text-right">
+                                            <span v-if="item.keluar > 0" class="inline-flex items-center gap-1 font-bold text-rose-500 tabular-nums">
+                                                <svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/>
+                                                </svg>
+                                                {{ item.keluar }}
+                                            </span>
+                                            <span v-else class="font-bold text-slate-300 tabular-nums">0</span>
+                                        </td>
+
+                                        <td class="px-6 py-3.5 text-right">
+                                            <span class="inline-flex items-center justify-center min-w-[40px] py-1 rounded-lg text-[11px] font-black tabular-nums transition-all duration-150"
+                                                :class="item.closing < 0
+                                                    ? (selectedRow?.kode === item.kode
+                                                        ? 'bg-red-100 text-red-700 ring-1 ring-red-200'
+                                                        : 'bg-red-50 text-red-600 ring-1 ring-red-100')
+                                                    : (selectedRow?.kode === item.kode
+                                                        ? 'bg-indigo-100 text-indigo-700 ring-1 ring-indigo-200'
+                                                        : 'bg-indigo-50 text-indigo-600 ring-1 ring-indigo-100')">
+                                                {{ item.closing }}
+                                            </span>
+                                        </td>
+                                    </tr>
+
+                                    <!-- No Data -->
+                                    <tr v-if="!pivotData.length">
+                                        <td colspan="6" class="py-16">
+                                            <div class="flex flex-col items-center">
+                                                <svg class="w-10 h-10 text-slate-200 mb-3" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" d="M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5m6 4.125l2.25 2.25m0 0l2.25 2.25M12 13.875l2.25-2.25M12 13.875l-2.25 2.25M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z"/>
+                                                </svg>
+                                                <p class="text-sm font-bold text-slate-300">Tidak ada data ditemukan</p>
+                                                <p class="text-[11px] text-slate-200 mt-1">Coba ubah parameter filter</p>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </main>
+
+                <main v-if="page === 'transaksi' && ['ADMIN', 'STAFF'].includes(userData.role)" class="flex-1 flex flex-col overflow-hidden bg-slate-50/50">
+                    <div class="p-4 md:p-6 border-b bg-white shadow-sm z-10">
+                        <div class="max-w-7xl mx-auto flex flex-col md:flex-row gap-4 md:items-end">
+                            <div class="w-full md:w-32">
+                                <label class="block text-[10px] font-black text-slate-400 uppercase mb-2 ml-1 tracking-widest">Qty</label>
+                                <input v-model="inputQty" ref="qtyInputRef" @keyup.enter="$refs.searchInputRef.focus()" type="number" min="1"
+                                    class="w-full py-4 bg-slate-50 border-2 border-transparent rounded-2xl font-black text-center text-indigo-600 focus:border-indigo-500 focus:bg-white transition-all outline-none text-xl shadow-inner">
+                            </div>
+
+                            <div class="w-full md:flex-1">
+                                <label class="block text-[10px] font-black text-slate-400 uppercase mb-2 ml-1 tracking-widest">Pencarian / Scan Barcode</label>
+                                <div class="relative group">
+                                    <i v-if="!isSearchingServer" class="fa-solid fa-barcode absolute left-5 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-indigo-500 transition-colors text-xl"></i>
+                                    <!-- Icon Loading saat cari ke database -->
+                                    <i v-else class="fa-solid fa-circle-notch animate-spin absolute left-5 top-1/2 -translate-y-1/2 text-indigo-500 text-xl"></i>
+                                    
+                                    <input v-model="searchQuery" ref="searchInputRef" @keydown.enter.prevent="handleScan" type="text" placeholder="Ketik kode/nama atau scan..." 
+                                        class="w-full pl-14 pr-4 py-4 rounded-2xl border-2 border-transparent bg-slate-50 focus:bg-white focus:border-indigo-500 shadow-inner outline-none font-bold text-slate-700 transition-all">
+                                </div>
+                            </div>
+
+                            <div class="flex gap-3 w-full md:w-auto justify-end">
+                                <!-- Tombol Scanner Kamera -->
+                                <button @click="scannerActive ? closeScanner() : openScanner()" 
+                                    class="w-14 h-14 rounded-2xl flex items-center justify-center shadow-lg transition-all active:scale-95 border-2"
+                                    :class="scannerActive ? 'bg-rose-600 border-rose-600 text-white' : 'bg-slate-800 border-slate-800 text-white hover:bg-black'">
+                                    <i class="fa-solid" :class="scannerActive ? 'fa-xmark' : 'fa-qrcode'"></i>
                                 </button>
 
-                                <button @click="showCart = !showCart" class="relative w-12 h-12 md:w-14 md:h-14 bg-indigo-600 text-white rounded-2xl flex items-center justify-center shadow-xl shadow-indigo-200 hover:bg-indigo-700 hover:-translate-y-1 active:scale-95 transition-all">
-                                    <i class="fa-solid fa-cart-shopping text-lg md:text-xl"></i>
-                                    <span v-if="cart.length" class="absolute -top-2 -right-2 bg-rose-500 text-white text-[10px] font-black w-5 h-5 md:w-6 md:h-6 rounded-full border-2 md:border-4 border-white flex items-center justify-center animate-bounce">
+                                <button @click="showCart = !showCart" class="relative w-14 h-14 bg-indigo-600 text-white rounded-2xl flex items-center justify-center shadow-xl shadow-indigo-200">
+                                    <i class="fa-solid fa-cart-shopping text-lg"></i>
+                                    <span v-if="cart.length" class="absolute -top-2 -right-2 bg-rose-500 text-white text-[10px] font-black w-6 h-6 rounded-full border-2 border-white flex items-center justify-center animate-bounce">
                                         {{ cart.length }}
                                     </span>
+                                </button>
+
+                                <button @click="showImportMode = !showImportMode" 
+                                    class="w-14 h-14 rounded-2xl flex items-center justify-center shadow-lg transition-all active:scale-95 border-2"
+                                    :class="showImportMode ? 'bg-indigo-600 border-indigo-600 text-white' : 'bg-white border-slate-100 text-slate-400 hover:border-indigo-500 hover:text-indigo-600'">
+                                    <i class="fa-solid" :class="showImportMode ? 'fa-xmark' : 'fa-file-import'"></i>
                                 </button>
                             </div>
                         </div>
                     </div>
 
-                    <div class="flex-1 flex overflow-hidden">
-                        <div class="flex-1 overflow-y-auto p-4 md:p-8 custom-scrollbar">
-                            <div v-if="searchResults.length === 0" class="h-full flex flex-col items-center justify-center text-slate-300 animate-fade-in">
-                                <i class="fa-solid fa-box-open text-8xl mb-4 opacity-20"></i>
-                                <p class="font-black uppercase tracking-widest text-sm">Siap melayani transaksi...</p>
-                                <p class="text-xs font-medium">Cari barang untuk menambah ke keranjang</p>
+                    <div class="flex-1 overflow-y-auto p-4 md:p-8 custom-scrollbar relative">
+                        
+                        <!-- AREA MONITOR UTAMA (GABUNGAN IMPORT & SCANNER KAMERA) -->
+                        <div v-if="showImportMode || scannerActive" class="space-y-8 animate-fade-in max-w-6xl mx-auto mb-8">
+                            
+                            <!-- SEKSI MODAL SCANNER BARCODE (TERINTEGRASI DI ATAS DATA IMPORT) -->
+                            <div v-if="scannerActive" class="bg-white rounded-[2.5rem] border border-slate-200 shadow-sm overflow-hidden animate-in fade-in duration-300">
+                                <div class="p-6 flex justify-between items-center border-b border-slate-100 bg-slate-50/50">
+                                    <div>
+                                        <h3 class="font-black text-sm uppercase text-slate-700 tracking-tighter">Live Kamera Scanner</h3>
+                                        <p class="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-0.5">Arahkan kamera ke barcode barang</p>
+                                    </div>
+                                    <button @click="closeScanner" class="w-8 h-8 rounded-xl bg-rose-50 text-rose-500 hover:bg-rose-500 hover:text-white transition-all flex items-center justify-center shadow-sm">
+                                        <i class="fa-solid fa-xmark text-sm"></i>
+                                    </button>
+                                </div>
+                                <div class="p-6 flex flex-col items-center justify-center bg-slate-900/5">
+                                    <div class="relative bg-black aspect-video w-full max-w-xl rounded-3xl overflow-hidden shadow-2xl border-4 border-white">
+                                        <!-- Target container ID untuk html5-qrcode library -->
+                                        <div id="reader" class="w-full h-full"></div>
+                                        <div class="absolute inset-0 pointer-events-none border-[3px] border-indigo-500/30 m-8 rounded-2xl animate-pulse flex items-center justify-center">
+                                            <div class="w-full h-0.5 bg-rose-500 shadow-lg shadow-rose-500/50 absolute top-1/2 left-0 animate-bounce"></div>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
 
-                            <div v-else class="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4 md:gap-6">
-                                <div 
-                                    v-for="item in searchResults" 
-                                    :key="item.kode" 
-                                    @click="addToCartWithQty(item)" 
-                                    class="group bg-white rounded-[2rem] border border-slate-100 shadow-sm hover:shadow-2xl hover:border-indigo-200 hover:-translate-y-2 transition-all cursor-pointer p-3 relative overflow-hidden"
-                                >
-                                    <div class="aspect-square bg-slate-50 rounded-[1.5rem] mb-4 overflow-hidden relative">
-                                        <img v-if="item.foto" :src="fixDriveUrl(item.foto)" class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500">
-                                        <div v-else class="w-full h-full flex items-center justify-center">
-                                            <i class="fa-solid fa-image text-slate-200 text-4xl"></i>
+                            <!-- SEKSI IMPORT DATA (PASTE & FILE CSV) -->
+                            <div v-if="showImportMode" class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                                <div class="bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm">
+                                    <div class="flex items-center gap-4 mb-6">
+                                        <div class="h-12 w-12 bg-indigo-50 text-indigo-600 rounded-2xl flex items-center justify-center">
+                                            <i class="fa-solid fa-paste"></i>
                                         </div>
+                                        <h3 class="font-black text-sm uppercase text-slate-700 tracking-tighter">Paste Excel Data</h3>
+                                    </div>
+                                    <textarea v-model="pasteData" rows="4" placeholder="KODE [Tab] QTY [Tab] JENIS [Tab] DEPT [Tab] KET"
+                                        class="w-full p-5 bg-slate-50 rounded-2xl border-2 border-transparent focus:border-indigo-400 focus:bg-white outline-none transition-all font-mono text-xs"></textarea>
+                                    <button @click="parsePaste" class="w-full mt-4 py-4 bg-slate-900 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-indigo-600 transition-all">
+                                        Proses Data Paste
+                                    </button>
+                                </div>
+
+                                <div class="bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm flex flex-col justify-between">
+                                    <div class="flex items-center justify-between mb-6">
+                                        <div class="flex items-center gap-4">
+                                            <div class="h-12 w-12 bg-emerald-50 text-emerald-600 rounded-2xl flex items-center justify-center">
+                                                <i class="fa-solid fa-file-csv"></i>
+                                            </div>
+                                            <h3 class="font-black text-sm uppercase text-slate-700 tracking-tighter">Upload CSV</h3>
+                                        </div>
+                                        <span class="text-[9px] font-black bg-amber-100 text-amber-700 px-3 py-1 rounded-full uppercase">kode, qty, jenis, dept</span>
+                                    </div>
+                                    <label class="cursor-pointer group">
+                                        <input type="file" accept=".csv" @change="handleCSVUpload" class="hidden" />
+                                        <div class="py-10 border-2 border-dashed border-slate-200 rounded-3xl bg-slate-50 group-hover:bg-emerald-50 group-hover:border-emerald-300 transition-all flex flex-col items-center">
+                                            <i class="fa-solid fa-cloud-arrow-up text-2xl text-slate-300 group-hover:text-emerald-500 mb-2"></i>
+                                            <span class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Pilih File CSV</span>
+                                        </div>
+                                    </label>
+                                </div>
+                            </div>
+
+                            <transition name="fade">
+                                <div v-if="importLoading"
+                                    class="absolute inset-0 z-50 bg-white/70 backdrop-blur-sm flex flex-col items-center justify-center rounded-2xl">
+                                    <div class="w-10 h-10 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin"></div>
+                                    <p class="mt-3 text-xs font-bold text-indigo-700 uppercase tracking-wider">Memvalidasi Data...</p>
+                                </div>
+                            </transition>
+
+                            <!-- PRATINJAU DATA IMPORT -->
+                            <div v-if="showImportMode && previewData.length" class="bg-white rounded-[3rem] border border-slate-200 shadow-2xl overflow-hidden animate-slide-up">
+                                <div class="p-6 border-b border-slate-100 bg-slate-50/50 flex flex-col md:flex-row justify-between items-center gap-4">
+                                    <div class="flex items-center gap-4">
+                                        <div class="h-10 w-10 bg-indigo-600 text-white rounded-xl flex items-center justify-center shadow-lg shadow-indigo-200">
+                                            <i class="fa-solid fa-list-check"></i>
+                                        </div>
+                                        <div class="text-left">
+                                            <h3 class="font-black text-slate-800 uppercase text-sm">Pratinjau Import</h3>
+                                            <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{{ previewData.length }} Baris Siap Proses</p>
+                                        </div>
+                                    </div>
+                                    <div class="flex gap-2">
+                                        <button @click="resetImport" class="px-6 py-3 bg-rose-50 text-rose-600 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-rose-500 hover:text-white transition-all">
+                                            <i class="fa-solid fa-trash-can mr-2"></i>Reset
+                                        </button>
+                                        <button @click="submitImport"  :disabled="loading || !previewData.some(p => p.valid)"
+                                            class="px-8 py-3 bg-emerald-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-emerald-700 shadow-lg shadow-emerald-200 disabled:opacity-50 transition-all">
+                                            <span v-if="loading">Processing...</span>
+                                            <span v-else>Proses Transaksi</span>
+                                        </button>
+                                    </div>
+                                </div>
+                                
+                                <div class="overflow-x-auto max-h-[500px] custom-scrollbar">
+                                    <table class="w-full text-left border-separate border-spacing-0">
+                                        <thead class="sticky top-0 z-10 bg-slate-900 text-white">
+                                            <tr>
+                                                <th class="px-8 py-5 text-[10px] font-black uppercase tracking-[0.2em]">Item Info</th>
+                                                <th class="px-6 py-5 text-[10px] font-black uppercase tracking-[0.2em] text-center">Mvt Type</th>
+                                                <th class="px-6 py-5 text-[10px] font-black uppercase tracking-[0.2em] text-center">Qty</th>
+                                                <th class="px-6 py-5 text-[10px] font-black uppercase tracking-[0.2em]">Department</th>
+                                                <th class="px-8 py-5 text-[10px] font-black uppercase tracking-[0.2em]">Status Verifikasi</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody class="divide-y divide-slate-100">
+                                            <tr v-for="(row, idx) in previewData" :key="idx"
+                                                :class="!row.valid ? 'bg-rose-50/50' : 'hover:bg-slate-50 transition-colors'">
+
+                                                <td class="px-8 py-5">
+                                                    <span class="font-black text-slate-800 block text-xs uppercase">{{ row.kode }}</span>
+                                                    <input v-model="row.keterangan"
+                                                        class="text-[10px] w-full bg-transparent border-b border-dashed border-slate-200 focus:border-indigo-500 outline-none font-bold text-slate-500 uppercase"
+                                                        placeholder="Tambah keterangan...">
+                                                </td>
+
+                                                <td class="px-6 py-5 text-center">
+                                                    <select v-model="row.jenis" @change="revalidatePreview"
+                                                        class="bg-white border border-slate-200 rounded-lg px-2 py-1 text-[9px] font-black">
+                                                        <option value="MASUK">MASUK</option>
+                                                        <option value="KELUAR">KELUAR</option>
+                                                        <option value="OPNAME">OPNAME</option>
+                                                    </select>
+                                                </td>
+
+                                                <td class="px-6 py-5">
+                                                    <input v-model.number="row.qty" type="number" @input="revalidatePreview"
+                                                        class="w-16 text-center font-black text-indigo-600 bg-slate-50 rounded-lg py-1">
+                                                </td>
+
+                                                <td class="px-6 py-5">
+                                                    <input v-model="row.dept" :list="'depts-' + idx"
+                                                        class="w-full bg-transparent border-b border-dashed border-slate-200 focus:border-indigo-500 outline-none text-[10px] font-black text-slate-600 uppercase"
+                                                        placeholder="PILIH DEPT">
+                                                    <datalist :id="'depts-' + idx">
+                                                        <option v-for="d in departments" :value="d">{{ d }}</option>
+                                                    </datalist>
+                                                </td>
+
+                                                <td class="px-8 py-5">
+                                                    <div class="flex items-center gap-2">
+                                                        <i class="fa-solid"
+                                                            :class="row.valid ? 'fa-check text-emerald-500' : 'fa-xmark text-rose-500'"></i>
+                                                        <span class="text-[9px] font-black uppercase"
+                                                            :class="row.valid ? 'text-emerald-600' : 'text-rose-600'">
+                                                            {{ row.valid ? 'Ready' : row.error }}
+                                                        </span>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- SEKSI PENCERIAN / SEARCH RESULTS (TETAP TERLIHAT DI BAWAH KARENA v-else DIHAPUS) -->
+                        <div class="mt-4">
+                            <div v-if="searchResults.length === 0" class="h-[40vh] flex flex-col items-center justify-center text-slate-300">
+                                <i class="fa-solid fa-magnifying-glass text-6xl mb-4 opacity-10"></i>
+                                <p class="font-black uppercase tracking-widest text-slate-400 text-xs">Cari atau Scan Barang untuk Memulai</p>
+                            </div>
+
+                            <div v-else class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6 animate-slide-up">
+                                <div v-for="item in searchResults" :key="item.kode" @click="addToCartWithQty(item)" 
+                                    class="group bg-white rounded-[2.5rem] border border-slate-200 p-4 hover:shadow-2xl hover:border-indigo-400 hover:-translate-y-2 transition-all duration-500 cursor-pointer relative overflow-hidden">
+                                    
+                                    <div class="aspect-square bg-slate-50 rounded-[2rem] mb-4 overflow-hidden shadow-inner relative">
+                                        <img v-if="item.foto" :src="fixDriveUrl(item.foto)" class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700">
+                                        <div v-else class="w-full h-full flex items-center justify-center"><i class="fa-solid fa-box text-slate-200 text-5xl"></i></div>
                                         
-                                        <div class="absolute bottom-2 left-2 right-2 flex justify-between items-center">
-                                            <span class="px-2 py-1 bg-white/90 backdrop-blur rounded-lg text-[9px] font-black text-slate-600 shadow-sm">
-                                                {{ item.lokasi || 'GUDANG' }}
+                                        <div class="absolute bottom-3 left-3 right-3 flex justify-between">
+                                            <span class="px-3 py-1.5 bg-white/90 backdrop-blur rounded-xl text-[9px] font-black text-slate-800 shadow-sm border border-white">
+                                                {{ item.lokasi || 'N/A' }}
                                             </span>
-                                            <span :class="item.stok <= (item.minStok || 1) ? 'bg-rose-500' : 'bg-emerald-500'" class="px-2 py-1 rounded-lg text-[9px] font-black text-white shadow-sm">
-                                                 {{ item.stok }} {{ item.satuan}}
+                                            <span :class="item.stok <= (item.min_stok || 0) ? 'bg-rose-500' : 'bg-slate-900'" 
+                                                class="px-3 py-1.5 rounded-xl text-[9px] font-black text-white">
+                                                {{ item.stok }} {{ item.satuan }}
                                             </span>
                                         </div>
                                     </div>
 
-                                    <div class="px-2">
-                                        <p class="text-[9px] font-black text-indigo-500 mb-1 uppercase tracking-tighter">{{ item.kode }}</p>
-                                        <h4 class="font-bold text-slate-800 text-xs md:text-sm line-clamp-2 uppercase h-10 group-hover:text-indigo-600 transition-colors">{{ item.nama }}</h4>
+                                    <div class="px-1 text-left">
+                                        <p class="text-[9px] font-black text-indigo-500 uppercase tracking-widest mb-1">{{ item.kode }}</p>
+                                        <h4 class="font-black text-slate-800 text-xs line-clamp-2 uppercase leading-tight h-8 group-hover:text-indigo-600 transition-colors">
+                                            {{ item.nama }}
+                                        </h4>
                                     </div>
-                                    
-                                    <div class="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity">
-                                        <div class="w-8 h-8 bg-indigo-600 text-white rounded-full flex items-center justify-center shadow-lg">
-                                            <i class="fa-solid fa-plus text-xs"></i>
-                                        </div>
+
+                                    <div class="absolute top-6 right-6 opacity-0 group-hover:opacity-100 transition-all">
+                                        <div class="w-10 h-10 bg-indigo-600 text-white rounded-xl flex items-center justify-center shadow-lg"><i class="fa-solid fa-plus"></i></div>
                                     </div>
                                 </div>
                             </div>
                         </div>
 
+                        <!-- SIDE CART DRAWER MODAL -->
                         <transition name="fade">
                             <div v-if="showCart"
                                 @click.self="showCart = false" 
                                 class="fixed inset-0 z-[60] flex items-start justify-center pt-0 lg:pt-10 bg-slate-900/30 backdrop-blur-sm">
                                 
-                                <div class="w-full h-full lg:h-auto lg:w-[750px] lg:max-h-[85vh] bg-white lg:rounded-2xl shadow-2xl flex flex-col overflow-hidden border border-slate-100">
+                                <div class="relative w-full h-full lg:h-auto lg:w-[750px] lg:max-h-[85vh] bg-white lg:rounded-2xl shadow-2xl flex flex-col overflow-hidden border border-slate-100">
                                     
                                     <div class="p-4 border-b border-slate-100 flex items-center justify-between bg-white shadow-sm z-10">
                                         <div class="relative flex items-center">
@@ -783,14 +1301,14 @@
 
                                     <div class="flex-1 overflow-y-auto p-2 md:p-4 space-y-2 md:space-y-3 bg-slate-50/50 custom-scrollbar">
                                         <div v-for="(item, idx) in cart" :key="item.kode" 
-                                            :class="isStockInsufficient(item) ? 'border-rose-200 bg-rose-50' : 'bg-white border-slate-100 shadow-sm'"
+                                            :class="isStockInsufficientUI(item) ? 'border-rose-200 bg-rose-50' : 'bg-white border-slate-100 shadow-sm'"
                                             class="p-2.5 md:p-3 rounded-xl border flex flex-col gap-1.5 transition-all hover:shadow-md relative">
                                             
                                             <div class="flex justify-between items-start gap-2">
                                                 <div class="flex-1 min-w-0">
-                                                    <div v-if="isStockInsufficient(item)" class="flex items-center gap-1 text-[9px] font-bold text-rose-600 uppercase mb-0.5">
+                                                    <div v-if="isStockInsufficientUI(item)" class="flex items-center gap-1 text-[9px] font-bold text-rose-600 uppercase mb-0.5">
                                                         <i class="fa-solid fa-circle-exclamation"></i> 
-                                                        <span>Stok sisa {{ getMasterStock(item.kode) }}</span>
+                                                        <span>Stok sisa {{ getMasterStockUI(item.kode) }}</span>
                                                     </div>
                                                     <h4 class="font-bold text-[13px] md:text-sm text-slate-800 leading-snug break-words uppercase tracking-tight">
                                                         {{ item.kode }}
@@ -854,6 +1372,9 @@
                                                 <datalist id="deptList">
                                                     <option v-for="d in departments" :key="d" :value="d">{{ d }}</option>
                                                 </datalist>
+                                                <p v-if="txDept && !isDeptValid" class="text-[10px] text-rose-500 font-bold mt-1 ml-1 uppercase tracking-wide">
+                                                    Department tidak valid
+                                                </p>
                                             </div>
                                         </div>
                                         <div class="relative">
@@ -867,14 +1388,13 @@
                                         </div>
                                         <button 
                                             @click="processTx"
-                                            :disabled="cart.length === 0 || (!txDept && txType !== 'OPNAME')"
+                                            :disabled="processing || cart.length === 0 || !isDeptValid"
                                             class="w-full py-3 rounded-xl font-bold text-[11px] uppercase tracking-wider text-white transition-all flex items-center justify-center gap-2"
-                                            :class="(cart.length > 0 && (txDept || txType === 'OPNAME')) 
-                                                ? 'bg-indigo-600 hover:bg-indigo-700 shadow-lg shadow-indigo-200' 
-                                                : 'bg-slate-300'"
+                                            :class="(cart.length > 0) ? 'bg-indigo-600 hover:bg-indigo-700' : 'bg-slate-300'"
                                         >
-                                            <i class="fa-solid fa-paper-plane"></i>
-                                            <span>Proses</span>
+                                            <i v-if="processing" class="fa-solid fa-spinner fa-spin"></i>
+                                            <i v-else class="fa-solid fa-paper-plane"></i>
+                                            <span>{{ processing ? 'Processing...' : 'Proses' }}</span>
                                         </button>
                                     </div>
                                     
@@ -886,175 +1406,124 @@
 
                 <main v-if="page === 'inventory'" class="flex-1 overflow-y-auto p-6 lg:p-10 space-y-6 animate-fade-in custom-scrollbar">
                     <div class="flex flex-col lg:flex-row lg:items-start justify-between gap-6 w-full">
-    
+                        <!-- HEADER & FILTER (Tetap Sama) -->
                         <div class="flex flex-col gap-4">
                             <h2 class="text-3xl font-black text-slate-800 tracking-tight">Cek Stock Sparepart</h2>
-                            
                             <div class="flex flex-wrap items-center gap-2">
-                                <button 
-                                    @click="stockFilter = 'available'"
-                                    :class="stockFilter === 'available'
-                                        ? 'bg-emerald-600 text-white shadow-md shadow-emerald-200'
-                                        : 'bg-slate-100 text-slate-600 hover:bg-slate-200'"
+                                <button @click="stockFilter = 'available'"
+                                    :class="stockFilter === 'available' ? 'bg-emerald-600 text-white shadow-md shadow-emerald-200' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'"
                                     class="px-5 h-10 rounded-xl text-xs font-bold uppercase tracking-wider transition-all">
                                     <i class="fa-solid fa-check-circle mr-1"></i> Ready
                                 </button>
-
-                                <button v-if="['ADMIN', 'STAFF', 'MANAGER'].includes(userData.role)" 
-                                    @click="stockFilter = 'empty'"
-                                    :class="stockFilter === 'empty'
-                                        ? 'bg-rose-600 text-white shadow-md shadow-rose-200'
-                                        : 'bg-slate-100 text-slate-600 hover:bg-slate-200'"
+                                <button v-if="['ADMIN', 'STAFF', 'MANAGER'].includes(userData.role)" @click="stockFilter = 'empty'"
+                                    :class="stockFilter === 'empty' ? 'bg-rose-600 text-white shadow-md shadow-rose-200' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'"
                                     class="px-5 h-10 rounded-xl text-xs font-bold uppercase tracking-wider transition-all">
                                     <i class="fa-solid fa-times-circle mr-1"></i> Kosong
                                 </button>
-
-                                <button 
-                                    @click="stockFilter = 'all'"
-                                    :class="stockFilter === 'all'
-                                        ? 'bg-indigo-600 text-white shadow-md shadow-indigo-200'
-                                        : 'bg-slate-100 text-slate-600 hover:bg-slate-200'"
+                                <button @click="stockFilter = 'all'"
+                                    :class="stockFilter === 'all' ? 'bg-indigo-600 text-white shadow-md shadow-indigo-200' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'"
                                     class="px-5 h-10 rounded-xl text-xs font-bold uppercase tracking-wider transition-all">
                                     <i class="fa-solid fa-layer-group mr-1"></i> Semua
                                 </button>
                             </div>
                         </div>
-                        
+
+                        <!-- SEARCH & CATEGORY (Tetap Sama) -->
                         <div class="flex flex-col sm:flex-row items-center gap-3 w-full lg:w-auto lg:max-w-3xl flex-1 lg:justify-end">
-                            
                             <div class="relative w-full sm:w-auto flex-1 group">
                                 <i class="fa-solid fa-search absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-indigo-500 transition-colors"></i>
-                                
-                                <input v-model="inventorySearch" 
-                                    type="text" 
-                                    placeholder="Cari Kode atau Nama Barang..." 
+                                <input v-model="inventorySearch" type="text" placeholder="Cari Kode atau Nama Barang..." 
                                     class="w-full pl-11 pr-24 py-3 rounded-xl bg-white border border-slate-200 shadow-sm outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 font-medium transition-all text-slate-700 text-sm">
                                 
                                 <div class="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
-                                    <button v-if="inventorySearch" 
-                                        @click="inventorySearch = ''" 
-                                        class="text-slate-300 hover:text-slate-500 p-1.5 rounded-full hover:bg-slate-100 transition-colors">
+                                    <button v-if="inventorySearch" @click="inventorySearch = ''" class="text-slate-300 hover:text-slate-500 p-1.5 rounded-full hover:bg-slate-100 transition-colors">
                                         <i class="fa-solid fa-xmark text-lg"></i>
                                     </button>
-
-                                    <button @click="startScanner" 
-                                        class="flex items-center justify-center bg-indigo-50 text-indigo-600 p-2 rounded-lg hover:bg-indigo-100 transition-all border border-indigo-100"
-                                        title="Scan Barcode">
+                                    <button @click="startScanner" class="flex items-center justify-center bg-indigo-50 text-indigo-600 p-2 rounded-lg hover:bg-indigo-100 transition-all border border-indigo-100" title="Scan Barcode">
                                         <i class="fa-solid fa-barcode text-lg"></i>
                                     </button>
                                 </div>
                             </div>
 
                             <div class="w-full sm:w-auto relative">
-                                <select v-model="categoryFilter"
-                                    class="w-full sm:w-48 pl-4 pr-10 py-3 appearance-none rounded-xl bg-white border border-slate-200 shadow-sm outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 font-semibold text-slate-600 text-sm cursor-pointer transition-all">
+                                <select v-model="categoryFilter" class="w-full sm:w-48 pl-4 pr-10 py-3 appearance-none rounded-xl bg-white border border-slate-200 shadow-sm outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 font-semibold text-slate-600 text-sm cursor-pointer transition-all">
                                     <option value="all">Semua Kategori</option>
-                                    <option v-for="cat in categoryOptions" :key="cat" :value="cat">
-                                        {{ cat }}
-                                    </option>
+                                    <option v-for="cat in categoryOptions" :key="cat" :value="cat">{{ cat }}</option>
                                 </select>
                                 <i class="fa-solid fa-chevron-down absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none text-xs"></i>
                             </div>
 
-                            <button v-if="['ADMIN', 'STAFF', 'MANAGER'].includes(userData.role)" 
-                                    @click="exportToExcel" 
-                                    class="w-full sm:w-auto px-5 py-3 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white rounded-xl font-bold shadow-sm shadow-emerald-200 transition-all duration-200 flex items-center justify-center gap-2 whitespace-nowrap text-sm">
-                                <i class="fa-solid fa-file-excel"></i> 
-                                <span>Export</span>
+                            <button v-if="['ADMIN', 'STAFF', 'MANAGER'].includes(userData.role)" @click="exportExcel" :disabled="isExporting" class="w-full sm:w-auto px-5 py-3 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 disabled:bg-emerald-400 disabled:cursor-not-allowed text-white rounded-xl font-bold shadow-sm shadow-emerald-200 transition-all duration-200 flex items-center justify-center gap-2 whitespace-nowrap text-sm">
+                                <i :class="isExporting ? 'fa-solid fa-spinner fa-spin' : 'fa-solid fa-file-excel'"></i>
+                                <span>{{ isExporting ? 'Processing...' : 'Export' }}</span>
                             </button>
                         </div>
                     </div>
 
+                    <!-- TABEL DENGAN INFINITE SCROLL -->
                     <div class="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
                         <div class="overflow-x-auto">
-                            <div class="overflow-y-auto max-h-[calc(100vh-260px)] custom-scrollbar">
+                            <!-- TAMBAHKAN @scroll di sini -->
+                            <div @scroll="handleTableScroll" class="overflow-y-auto max-h-[calc(100vh-260px)] custom-scrollbar">
                                 <table class="min-w-[900px] text-sm">
                                     <thead class="sticky top-0 z-20 bg-slate-50 border-b border-slate-200">
+                                        <!-- ... TH (Tetap Sama) ... -->
                                         <tr class="text-[11px] font-bold uppercase tracking-wider text-slate-500">
                                             <th class="px-5 py-4 w-[12%] text-left">Kode</th>
                                             <th class="px-5 py-4 w-[26%] text-left">Nama Sparepart</th>
                                             <th class="px-5 py-4 w-[12%] text-left">Category</th>
                                             <th class="px-5 py-4 w-[10%] text-left">Satuan</th>
                                             <th class="px-5 py-4 w-[12%] text-center">Lokasi</th>
-                                            <th v-if="['ADMIN','STAFF'].includes(userData.role)" class="px-5 py-4 w-[10%] text-center">
-                                                Stok
-                                            </th>
-                                            <th v-if="userData.role === 'ADMIN' || userData.canPreviewPhoto === true || userData.canPreviewPhoto === 1" 
-                                                class="px-5 py-4 w-[12%] text-center">Foto</th>
+                                            <th v-if="['ADMIN','STAFF'].includes(userData.role)" class="px-5 py-4 w-[10%] text-center">Stok</th>
+                                            <th v-if="userData.role === 'ADMIN' || userData.canPreviewPhoto" class="px-5 py-4 w-[12%] text-center">Foto</th>
                                         </tr>
                                     </thead>
 
                                     <tbody class="divide-y divide-slate-100">
-                                        <tr v-for="item in filteredInventory" :key="item.kode" class="hover:bg-slate-50 transition">
-                                            
+                                        <tr v-for="item in publicInventory || []" :key="item.kode" class="hover:bg-slate-50 transition">
+                                            <!-- ... TD (Tetap Sama) ... -->
                                             <td class="px-5 py-4 align-top">
                                                 <div class="space-y-2">
-                                                    <div @click="bukaPopUpReservasi(item)" 
-                                                        class="font-bold text-xs text-indigo-600 uppercase truncate cursor-pointer hover:text-indigo-800 hover:underline flex items-center gap-1">
-                                                        <i class="fa-solid fa-plus-square"></i>
-                                                        {{ item.kode }}
+                                                    <div @click="bukaPopUpReservasi(item)" class="font-bold text-xs text-indigo-600 uppercase truncate cursor-pointer hover:text-indigo-800 hover:underline flex items-center gap-1">
+                                                        <i class="fa-solid fa-plus-square"></i> {{ item.kode }}
                                                     </div>
-                                                    <div>
-                                                        <span v-if="item.stok <= 0" class="px-2 py-0.5 text-[9px] font-bold rounded bg-rose-50 text-rose-600 border border-rose-100">
-                                                            Habis
-                                                        </span>
-                                                        <span v-else-if="item.stok <= (item.minStok || 1)" class="px-2 py-0.5 text-[9px] font-bold rounded bg-amber-50 text-amber-600 border border-amber-100">
-                                                            Low
-                                                        </span>
-                                                        <span v-else class="px-2 py-0.5 text-[9px] font-bold rounded bg-emerald-50 text-emerald-600 border border-emerald-100">
-                                                            Ready
-                                                        </span>
-                                                    </div>
+                                                    <span v-if="item.stok <= 0" class="px-2 py-0.5 text-[9px] font-bold rounded bg-rose-50 text-rose-600 border border-rose-100">Habis</span>
+                                                    <span v-else-if="item.stok <= (item.min_stok || 1)" class="px-2 py-0.5 text-[9px] font-bold rounded bg-amber-50 text-amber-600 border border-amber-100">Low</span>
+                                                    <span v-else class="px-2 py-0.5 text-[9px] font-bold rounded bg-emerald-50 text-emerald-600 border border-emerald-100">Ready</span>
                                                 </div>
                                             </td>
-
-                                            <td class="px-5 py-4">
-                                                <div class="font-semibold text-slate-700 break-words uppercase">
-                                                    {{ item.nama }}
-                                                </div>
-                                                <div v-if="item.stok <= item.minStok" class="text-[10px] font-semibold text-rose-500 mt-1 italic">
-                                                    e-Budget/Reorder
-                                                </div>
-                                            </td>
-
-                                            <td class="px-5 py-4">
-                                                <span class="px-3 py-1 text-[10px] font-bold rounded-lg bg-indigo-50 text-indigo-600 border border-indigo-100 truncate inline-block max-w-full uppercase">
-                                                    {{ item.category || '-' }}
-                                                </span>
-                                            </td>
-
-                                            <td class="px-5 py-4 text-slate-500 text-xs font-semibold uppercase">
-                                                {{ item.satuan || '-' }}
-                                            </td>
-
-                                            <td class="px-5 py-4 text-center">
-                                                <span class="px-3 py-1 text-[10px] font-bold rounded-lg bg-slate-100 text-slate-600 border border-slate-200">
-                                                    {{ item.lokasi || 'GUDANG' }}
-                                                </span>
-                                            </td>
-
+                                            <td class="px-5 py-4"><div class="font-semibold text-slate-700 break-words uppercase">{{ item.nama }}</div></td>
+                                            <td class="px-5 py-4"><span class="px-3 py-1 text-[10px] font-bold rounded-lg bg-indigo-50 text-indigo-600 border border-indigo-100 uppercase">{{ item.category || '-' }}</span></td>
+                                            <td class="px-5 py-4 text-slate-500 text-xs font-semibold uppercase">{{ item.satuan || '-' }}</td>
+                                            <td class="px-5 py-4 text-center"><span class="px-3 py-1 text-[10px] font-bold rounded-lg bg-slate-100 text-slate-600 border border-slate-200">{{ item.lokasi || 'GUDANG' }}</span></td>
                                             <td v-if="['ADMIN','STAFF'].includes(userData.role)" class="px-5 py-4 text-center">
-                                                <span :class="item.stok <= item.minStok ? 'bg-rose-50 text-rose-600 border-rose-100' : 'bg-emerald-50 text-emerald-600 border-emerald-100'"
-                                                    class="px-4 py-1.5 rounded-xl border font-bold text-sm min-w-[50px] inline-block">
+                                                <span :class="item.stok <= item.min_stok ? 'bg-rose-50 text-rose-600 border-rose-100' : 'bg-emerald-50 text-emerald-600 border-emerald-100'" class="px-4 py-1.5 rounded-xl border font-bold text-sm min-w-[50px] inline-block">
                                                     {{ item.stok }}
                                                 </span>
                                             </td>
-
-                                            <td v-if="userData.role === 'ADMIN' || userData.canPreviewPhoto === true || userData.canPreviewPhoto === 1" 
-                                                class="px-5 py-4 text-center">
-                                                <div v-if="item.foto"
-                                                    @click="previewImage = fixDriveUrl(item.foto)"
-                                                    class="w-16 h-14 mx-auto rounded-lg overflow-hidden bg-slate-100 cursor-pointer hover:shadow-md transition border border-slate-200">
+                                            <td v-if="userData.role === 'ADMIN' || userData.canPreviewPhoto" class="px-5 py-4 text-center">
+                                                <div v-if="item.foto" @click="previewImage = fixDriveUrl(item.foto)" class="w-16 h-14 mx-auto rounded-lg overflow-hidden bg-slate-100 cursor-pointer hover:shadow-md transition border border-slate-200">
                                                     <img :src="fixDriveUrl(item.foto)" class="w-full h-full object-cover">
                                                 </div>
-                                                <div v-else class="text-[10px] text-slate-400 italic">
-                                                    No Image
-                                                </div>
+                                                <div v-else class="text-[10px] text-slate-400 italic">No Image</div>
                                             </td>
-
                                         </tr>
                                     </tbody>
                                 </table>
+
+                                <!-- LOADING INDICATOR (Baru) -->
+                                <div v-if="loading" class="p-8 flex justify-center">
+                                    <div class="flex items-center gap-3 bg-indigo-50 px-6 py-3 rounded-2xl border border-indigo-100">
+                                        <i class="fa-solid fa-circle-notch animate-spin text-indigo-600"></i>
+                                        <span class="text-sm font-bold text-indigo-600">Memuat data...</span>
+                                    </div>
+                                </div>
+
+                                <!-- END OF DATA FOOTER (Baru) -->
+                                <div v-if="!hasMore && (publicInventory && publicInventory.length > 0)" 
+                                    class="p-8 text-center text-slate-400 text-[10px] font-bold uppercase tracking-[0.2em]">
+                                    --- Semua sparepart telah ditampilkan ---
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -1182,21 +1651,240 @@
                     </div>
                 </main>
 
-                <main v-if="page === 'spp' && ['ADMIN', 'STAFF', 'MANAGER'].includes(userData.role)" class="p-4 md:p-6 bg-slate-300 min-h-screen flex flex-col items-center animate-in fade-in duration-500">
-    
-                    <div class="w-full max-w-[297mm] mx-auto bg-white/90 backdrop-blur-md p-3 rounded-2xl shadow-xl border border-white sticky top-4 z-30 transition-all flex flex-wrap md:flex-nowrap items-center justify-between gap-4 md:gap-6">
-    
+                <main v-if="page === 'scrap_monitoring'" class="flex-1 flex flex-col overflow-hidden bg-slate-50/50">
+                    <!-- Header -->
+                    <div class="p-4 md:p-6 border-b bg-white shadow-sm z-10 flex justify-between items-center">
+                        <div>
+                            <h2 class="text-lg font-black text-slate-800 uppercase tracking-tight">Monitoring & Rekap Barang Bekas (Scrap)</h2>
+                            <p class="text-[11px] font-bold text-slate-400 uppercase tracking-widest">Pencatatan manual pemakaian & penukaran suku cadang bekas</p>
+                        </div>
+                        <button @click="scrap.loadScrapData" class="px-4 py-2 bg-slate-100 text-slate-600 rounded-xl text-xs font-bold hover:bg-slate-200 transition">
+                            <i class="fa-solid fa-rotate-right mr-1" :class="scrap.loading.value ? 'animate-spin' : ''"></i> Refresh
+                        </button>
+                    </div>
+
+                    <div class="flex-1 overflow-y-auto p-4 md:p-6 custom-scrollbar grid grid-cols-1 xl:grid-cols-3 gap-6">
+                        
+                        <!-- KOLOM KIRI: FORM INPUT DINAMIS -->
+                        <div class="xl:col-span-1 bg-white p-6 rounded-[2rem] border border-slate-200 shadow-sm h-fit space-y-4">
+                            <h3 class="font-black text-xs uppercase text-teal-600 tracking-wider mb-2 flex items-center justify-between">
+                                <span><i class="fa-solid fa-pen-to-square mr-1"></i> {{ scrap.isEditing.value ? 'Edit Rekor Data' : 'Input Catatan Manual' }}</span>
+                                <span v-if="scrap.isEditing.value" class="bg-amber-100 text-amber-700 px-2 py-0.5 rounded text-[9px]">MODE EDIT</span>
+                            </h3>
+                            
+                            <!-- Pilihan Nama Barang -->
+                            <div>
+                                <label class="block text-[10px] font-black text-slate-400 uppercase mb-1 tracking-widest">Pilih Komoditas</label>
+                                <select v-model="scrap.selectedItemType.value" 
+                                    class="w-full px-4 py-3 bg-slate-50 border-2 border-transparent rounded-xl font-bold text-slate-700 focus:border-teal-500 focus:bg-white transition-all outline-none text-sm shadow-inner">
+                                    <option v-for="opt in scrap.itemOptions" :key="opt" :value="opt">{{ opt }}</option>
+                                </select>
+                            </div>
+
+                            <!-- Input Nama manual jika memilih opsi 'Input Manual' -->
+                            <div v-if="scrap.selectedItemType.value === 'Input Manual'">
+                                <label class="block text-[10px] font-black text-slate-400 uppercase mb-1 tracking-widest">Nama Barang Khusus</label>
+                                <input v-model="scrap.form.value.nama_barang" type="text" placeholder="Masukkan nama barang bekas..."
+                                    class="w-full px-4 py-3 bg-slate-50 border-2 border-transparent rounded-xl font-bold text-slate-700 focus:border-teal-500 focus:bg-white transition-all outline-none text-sm shadow-inner">
+                            </div>
+
+                            <!-- Tanggal Awal & Akhir Pakai (Kondisional disabled jika bukan Jarum) -->
+                            <div class="grid grid-cols-2 gap-3">
+                                <div :class="!scrap.isDateRangeRequired.value ? 'opacity-40' : ''">
+                                    <label class="block text-[10px] font-black text-slate-400 uppercase mb-1 tracking-widest">
+                                        Tgl Awal Pakai <span v-if="scrap.isDateRangeRequired.value" class="text-rose-500">*</span>
+                                    </label>
+                                    <input v-model="scrap.form.value.tgl_awal_pakai" type="date" :disabled="!scrap.isDateRangeRequired.value"
+                                        class="w-full px-4 py-3 bg-slate-50 border-2 border-transparent rounded-xl font-bold text-slate-700 focus:border-teal-500 focus:bg-white transition-all outline-none text-xs shadow-inner disabled:cursor-not-allowed">
+                                </div>
+                                <div :class="!scrap.isDateRangeRequired.value ? 'opacity-40' : ''">
+                                    <label class="block text-[10px] font-black text-slate-400 uppercase mb-1 tracking-widest">
+                                        Tgl Akhir Pakai <span v-if="scrap.isDateRangeRequired.value" class="text-rose-500">*</span>
+                                    </label>
+                                    <input v-model="scrap.form.value.tgl_akhir_pakai" type="date" :disabled="!scrap.isDateRangeRequired.value"
+                                        class="w-full px-4 py-3 bg-slate-50 border-2 border-transparent rounded-xl font-bold text-slate-700 focus:border-teal-500 focus:bg-white transition-all outline-none text-xs shadow-inner disabled:cursor-not-allowed">
+                                </div>
+                            </div>
+
+                            <!-- Tanggal Penukaran (Selalu Wajib) -->
+                            <div>
+                                <label class="block text-[10px] font-black text-slate-400 uppercase mb-1 tracking-widest">Tanggal Penukaran <span class="text-rose-500">*</span></label>
+                                <input v-model="scrap.form.value.tgl_penukaran" type="date"
+                                    class="w-full px-4 py-3 bg-slate-50 border-2 border-transparent rounded-xl font-bold text-slate-700 focus:border-teal-500 focus:bg-white transition-all outline-none text-xs shadow-inner">
+                            </div>
+
+                            <!-- Department dan Qty -->
+                            <div class="grid grid-cols-3 gap-3">
+                                <div class="col-span-2">
+                                    <label class="block text-[10px] font-black text-slate-400 uppercase mb-1 tracking-widest">Department <span class="text-rose-500">*</span></label>
+                                    <input v-model="scrap.form.value.department" list="scrapDeptList" placeholder="Pilih Dept..."
+                                        class="w-full px-4 py-3 bg-slate-50 border-2 border-transparent rounded-xl font-bold text-slate-700 focus:border-teal-500 focus:bg-white transition-all outline-none text-sm shadow-inner">
+                                    <datalist id="scrapDeptList">
+                                        <option v-for="dept in scrap.departments.value" :key="dept" :value="dept">{{ dept }}</option>
+                                    </datalist>
+                                </div>
+                                <div class="col-span-1">
+                                    <label class="block text-[10px] font-black text-slate-400 uppercase mb-1 tracking-widest">Qty <span class="text-rose-500">*</span></label>
+                                    <input v-model.number="scrap.form.value.qty" type="number" min="1"
+                                        class="w-full px-4 py-3 bg-slate-50 border-2 border-transparent rounded-xl font-black text-center text-teal-600 focus:border-teal-500 focus:bg-white transition-all outline-none text-sm shadow-inner">
+                                </div>
+                            </div>
+
+                            <!-- Tombol Submit Form -->
+                            <div class="space-y-2 pt-2">
+                                <button @click="scrap.submitScrap" :disabled="scrap.loading.value"
+                                    class="w-full py-4 bg-slate-900 text-white rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-teal-600 disabled:opacity-50 transition-all shadow-md">
+                                    {{ scrap.isEditing.value ? 'Simpan Perubahan' : 'Simpan Rekor Scrap' }}
+                                </button>
+                                <button v-if="scrap.isEditing.value" @click="scrap.cancelEdit"
+                                    class="w-full py-2 bg-slate-100 text-slate-500 rounded-xl font-bold text-[10px] uppercase tracking-widest hover:bg-slate-200 transition-all">
+                                    Batal
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- KOLOM KANAN: SUMMARY & TABLE DATA -->
+                        <div class="xl:col-span-2 space-y-6">
+                            <!-- Cards Summary (Tetap Sama Seperti Sebelumnya) -->
+                            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <div class="bg-white p-5 border border-slate-200 rounded-2xl flex items-center gap-4 shadow-sm">
+                                    <div class="w-10 h-10 bg-teal-50 text-teal-600 flex items-center justify-center rounded-xl text-lg"><i class="fa-solid fa-boxes-packing"></i></div>
+                                    <div>
+                                        <p class="text-[9px] font-black text-slate-400 uppercase tracking-wider">Total Qty Scrap</p>
+                                        <h4 class="text-xl font-black text-slate-800">{{ scrap.summary.value.totalQty }} pcs</h4>
+                                    </div>
+                                </div>
+                                <div class="bg-white p-5 border border-slate-200 rounded-2xl flex items-center gap-4 shadow-sm">
+                                    <div class="w-10 h-10 bg-blue-50 text-blue-600 flex items-center justify-center rounded-xl text-lg"><i class="fa-solid fa-list"></i></div>
+                                    <div>
+                                        <p class="text-[9px] font-black text-slate-400 uppercase tracking-wider">Total Transaksi</p>
+                                        <h4 class="text-xl font-black text-slate-800">{{ scrap.summary.value.totalRecords }} Data</h4>
+                                    </div>
+                                </div>
+                                <div class="bg-white p-5 border border-slate-200 rounded-2xl flex items-center gap-4 shadow-sm">
+                                    <div class="w-10 h-10 bg-purple-50 text-purple-600 flex items-center justify-center rounded-xl text-lg"><i class="fa-solid fa-industry"></i></div>
+                                    <div>
+                                        <p class="text-[9px] font-black text-slate-400 uppercase tracking-wider">Dept Terbanyak</p>
+                                        <h4 class="text-md font-black text-slate-800 truncate uppercase">{{ scrap.summary.value.topDept }}</h4>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm grid grid-cols-1 md:grid-cols-4 gap-3 items-end mb-4">
+                                <div>
+                                    <label class="block text-[9px] font-black text-slate-400 uppercase mb-1 tracking-widest">Cari Nama / User</label>
+                                    <input v-model="scrap.filterSearch.value" type="text" placeholder="Ketik kata kunci..."
+                                        class="w-full px-3 py-2 bg-slate-50 border rounded-lg text-xs font-bold text-slate-700 outline-none focus:border-teal-500">
+                                </div>
+                                <div>
+                                    <label class="block text-[9px] font-black text-slate-400 uppercase mb-1 tracking-widest">Filter Dept</label>
+                                    <select v-model="scrap.filterDept.value" class="w-full px-3 py-2 bg-slate-50 border rounded-lg text-xs font-bold text-slate-700 outline-none focus:border-teal-500">
+                                        <option value="">-- Semua Department --</option>
+                                        <option v-for="d in scrap.departments.value" :key="d" :value="d">{{ d }}</option>
+                                    </select>
+                                </div>
+                                <div class="grid grid-cols-2 gap-2">
+                                    <div>
+                                        <label class="block text-[9px] font-black text-slate-400 uppercase mb-1 tracking-widest">Mulai Tgl Tukar</label>
+                                        <input v-model="scrap.filterStartRange.value" type="date" class="w-full px-2 py-2 bg-slate-50 border rounded-lg text-xs font-bold text-slate-700 outline-none">
+                                    </div>
+                                    <div>
+                                        <label class="block text-[9px] font-black text-slate-400 uppercase mb-1 tracking-widest">Sampai Tgl</label>
+                                        <input v-model="scrap.filterEndRange.value" type="date" class="w-full px-2 py-2 bg-slate-50 border rounded-lg text-xs font-bold text-slate-700 outline-none">
+                                    </div>
+                                </div>
+                                <div>
+                                    <button @click="scrap.resetFilters" class="w-full py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold text-xs rounded-lg transition">
+                                        <i class="fa-solid fa-filter-circle-xmark mr-1"></i> Reset Filter
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- Table List dengan Tombol Aksi untuk Admin -->
+                            <div class="bg-white rounded-[2rem] border border-slate-200 shadow-sm overflow-hidden flex flex-col">
+                                <div class="p-5 border-b border-slate-100 bg-slate-50/50">
+                                    <h3 class="font-black text-slate-800 uppercase text-xs tracking-wider">Riwayat Pengumpulan Scrap</h3>
+                                </div>
+                                
+                                <div class="overflow-x-auto max-h-[450px] custom-scrollbar">
+                                    <table class="w-full text-left border-collapse whitespace-nowrap">
+                                        <thead class="bg-slate-900 text-white sticky top-0 z-10">
+                                            <tr>
+                                                <th class="px-6 py-4 text-[9px] font-black uppercase tracking-widest">Nama Barang</th>
+                                                <th class="px-6 py-4 text-[9px] font-black uppercase tracking-widest">Periode Pakai</th>
+                                                <th class="px-6 py-4 text-[9px] font-black uppercase tracking-widest">Tgl Tukar</th>
+                                                <th class="px-6 py-4 text-[9px] font-black uppercase tracking-widest text-center">Department</th>
+                                                <th class="px-4 py-4 text-[9px] font-black uppercase tracking-widest text-center">Qty</th>
+                                                <th class="px-6 py-4 text-[9px] font-black uppercase tracking-widest">User</th>
+                                                <!-- Kolom Aksi Hanya Muncul Jika User adalah ADMIN -->
+                                                <th v-if="userData.role === 'ADMIN'" class="px-6 py-4 text-[9px] font-black uppercase tracking-widest text-center">Aksi</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody class="divide-y divide-slate-100 text-xs font-bold text-slate-600">
+                                            <tr v-for="row in scrap.filteredScrapList.value" :key="row.id" class="hover:bg-slate-50/80 transition-colors">
+                                                <td class="px-6 py-4 font-black text-slate-800 uppercase">{{ row.nama_barang }}</td>
+                                                <td class="px-6 py-4 text-[11px] text-slate-500">
+                                                    <span v-if="row.tgl_awal_pakai">{{ row.tgl_awal_pakai }} s/d {{ row.tgl_akhir_pakai }}</span>
+                                                    <span v-else class="text-slate-400 font-normal italic">Tidak Ada Periode</span>
+                                                </td>
+                                                <td class="px-6 py-4"><span class="bg-teal-50 text-teal-700 px-2 py-1 rounded-md text-[11px] font-mono">{{ row.tgl_penukaran }}</span></td>
+                                                <td class="px-6 py-4 text-center uppercase">{{ row.department }}</td>
+                                                <td class="px-4 py-4 text-center font-black text-indigo-600">{{ row.qty }}</td>
+                                                
+                                                <!-- KOLOM BARU: TANGGAL DATA DIBUAT (created_at) -->
+                                                <td class="px-6 py-4 text-[11px] font-medium text-slate-500 font-mono">
+                                                    {{ scrap.formatDateTime(row.created_at) }}
+                                                </td>
+                                                
+                                                <td class="px-6 py-4 text-[10px] font-black uppercase tracking-wide text-slate-400">{{ row.created_by }}</td>
+                                                
+                                                <!-- Tombol Aksi Khusus Admin -->
+                                                <td v-if="userData.role === 'ADMIN'" class="px-6 py-3 text-center space-x-1">
+                                                    <button @click="scrap.editRow(row)" 
+                                                        class="p-2 bg-amber-50 text-amber-600 hover:bg-amber-500 hover:text-white rounded-lg text-xs transition duration-200" title="Edit">
+                                                        <i class="fa-solid fa-pen-to-square"></i>
+                                                    </button>
+                                                    <button @click="scrap.deleteRow(row.id, row.nama_barang)" 
+                                                        class="p-2 bg-rose-50 text-rose-600 hover:bg-rose-600 hover:text-white rounded-lg text-xs transition duration-200" title="Hapus">
+                                                        <i class="fa-solid fa-trash"></i>
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                            <tr v-if="scrap.scrapList.value.length === 0">
+                                                <td :colspan="userData.role === 'ADMIN' ? 7 : 6" class="text-center py-12 text-slate-400 uppercase tracking-widest text-xs">
+                                                    Belum ada rekap data scrap
+                                                </td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+
+                        </div>
+                    </div>
+                </main>
+
+                <main v-if="page === 'spp' && ['ADMIN', 'STAFF', 'MANAGER'].includes(userData.role)"
+                    class="p-4 md:p-6 bg-slate-300 min-h-screen flex flex-col items-center animate-in fade-in duration-500">
+
+                    <div
+                        class="w-full max-w-[297mm] mx-auto bg-white/90 backdrop-blur-md p-3 rounded-2xl shadow-xl border border-white sticky top-4 z-30 transition-all flex flex-wrap md:flex-nowrap items-center justify-between gap-4 md:gap-6">
+
                         <div class="flex items-center gap-3 shrink-0">
-                            <div class="h-10 w-10 rounded-xl bg-orange-600 flex items-center justify-center text-white shadow-lg shrink-0">
+                            <div
+                                class="h-10 w-10 rounded-xl bg-orange-600 flex items-center justify-center text-white shadow-lg shrink-0">
                                 <i class="fa-solid fa-file-lines text-lg"></i>
                             </div>
-                            <div class="hidden sm:block"> <h2 class="text-sm font-black text-slate-800 uppercase leading-none text-nowrap">Draft SPP</h2>
-                                <p class="text-[9px] font-bold text-slate-500 uppercase tracking-tighter mt-1 italic font-mono">{{ noSPP }}</p>
+                            <div class="hidden sm:block">
+                                <h2 class="text-sm font-black text-slate-800 uppercase leading-none text-nowrap">Draft SPP</h2>
+                                <p class="text-[9px] font-bold text-slate-500 uppercase tracking-tighter mt-1 italic font-mono">{{ noSPP
+                                    }}</p>
                             </div>
                         </div>
 
                         <div class="flex-1 min-w-[200px] group relative order-3 md:order-2 w-full md:w-auto">
-                            <i class="fa-solid fa-barcode absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-orange-500 transition-colors"></i>
+                            <i
+                                class="fa-solid fa-barcode absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-orange-500 transition-colors"></i>
                             <input type="text" v-model="inputKodeManual" @keyup.enter="tambahItemManualByKode"
                                 placeholder="Scan / Ketik Kode..."
                                 class="w-full pl-11 pr-4 py-2.5 bg-slate-100 border border-slate-200 rounded-xl text-xs font-bold focus:border-orange-500 focus:bg-white focus:ring-4 focus:ring-orange-500/10 outline-none transition-all">
@@ -1207,12 +1895,14 @@
                                 <p class="text-[8px] font-black text-slate-400 uppercase tracking-widest leading-none">Total</p>
                                 <p class="text-lg font-black leading-none text-orange-600">{{ summarySppItems.length }}</p>
                             </div>
-                            
-                            <button @click="kosongkanSpp" class="px-2 md:px-3 py-2 text-[10px] font-bold text-rose-500 hover:bg-rose-50 rounded-lg transition-all uppercase text-nowrap">
+
+                            <button @click="kosongkanSpp"
+                                class="px-2 md:px-3 py-2 text-[10px] font-bold text-rose-500 hover:bg-rose-50 rounded-lg transition-all uppercase text-nowrap">
                                 Reset
                             </button>
-                            
-                            <button @click="downloadSPPPDF" class="flex items-center gap-2 bg-rose-600 text-white px-4 md:px-5 py-2.5 rounded-xl text-[10px] font-black hover:bg-rose-700 transition-all uppercase shadow-lg shadow-rose-900/20 text-nowrap">
+
+                            <button @click="downloadSPPPDF"
+                                class="flex items-center gap-2 bg-rose-600 text-white px-4 md:px-5 py-2.5 rounded-xl text-[10px] font-black hover:bg-rose-700 transition-all uppercase shadow-lg shadow-rose-900/20 text-nowrap">
                                 <i class="fa-solid fa-file-pdf"></i> <span class="hidden sm:inline">PDF</span>
                             </button>
                         </div>
@@ -1220,151 +1910,179 @@
 
                     <div class="w-full overflow-x-auto">
                         <div class="flex flex-col items-center gap-8 pb-20 mt-6 min-w-[900px] md:min-w-0">
-                        
-                        <div v-for="(pageItems, pageIdx) in chunkedSppItems" :key="pageIdx" 
-                            class="relative w-[900px] md:w-[297mm] min-h-[210mm] bg-white shadow-[0_10px_30px_rgba(0,0,0,0.15)] rounded-sm flex flex-col shrink-0 p-8 transform transition-transform hover:scale-[1.005]">
-                            
-                            <div class="border-b-2 border-slate-900 pb-4 mb-4 shrink-0 relative">
-                                <div class="flex justify-between items-center">
-                                    
-                                    <div class="text-left leading-tight w-1/3">
-                                        <h1 class="text-lg font-black text-slate-900 uppercase tracking-tighter leading-none border-l-4 border-orange-600 pl-3">
-                                            PT BINTANG INDOKARYA GEMILANG
-                                        </h1>
-                                        <p class="text-[8px] text-slate-500 font-bold uppercase tracking-tight italic mt-2 ml-4 leading-relaxed">
-                                            Jl. Raya Cendrawasih No. 6 KM.20 Tengguli, Kec. Tanjung<br> 
-                                             Brebes - Jawa Tengah
+
+                            <div v-for="(pageItems, pageIdx) in chunkedSppItems" :key="pageIdx"
+                                class="relative w-[900px] md:w-[297mm] min-h-[210mm] bg-white shadow-[0_10px_30px_rgba(0,0,0,0.15)] rounded-sm flex flex-col shrink-0 p-8 transform transition-transform hover:scale-[1.005]">
+
+                                <div class="border-b-2 border-slate-900 pb-4 mb-4 shrink-0 relative">
+                                    <div class="flex justify-between items-center">
+
+                                        <div class="text-left leading-tight w-1/3">
+                                            <h1
+                                                class="text-lg font-black text-slate-900 uppercase tracking-tighter leading-none border-l-4 border-orange-600 pl-3">
+                                                PT BINTANG INDOKARYA GEMILANG
+                                            </h1>
+                                            <p
+                                                class="text-[8px] text-slate-500 font-bold uppercase tracking-tight italic mt-2 ml-4 leading-relaxed">
+                                                Jl. Raya Cendrawasih No. 6 KM.20 Tengguli, Kec. Tanjung<br>
+                                                Brebes - Jawa Tengah
+                                            </p>
+                                        </div>
+
+                                        <div class="flex-1 text-center px-4">
+                                            <h2
+                                                class="text-xl font-black underline decoration-2 underline-offset-8 text-slate-900 uppercase tracking-[0.2em]">
+                                                Surat Permohonan Pembelian
+                                            </h2>
+                                        </div>
+
+                                        <div class="w-1/3 flex justify-end">
+                                            <div
+                                                class="text-[9px] font-bold text-slate-800 bg-slate-50 p-2 rounded-lg border border-slate-200 min-w-[200px] shadow-sm">
+                                                <div class="flex justify-between border-b border-slate-200 pb-1 mb-1">
+                                                    <span class="text-slate-400 uppercase tracking-tighter">No SPP </span>
+                                                    <span class="font-mono text-slate-900">{{ noSPP }}</span>
+                                                </div>
+                                                <div class="flex justify-between border-b border-slate-200 pb-1 mb-1">
+                                                    <span class="text-slate-400 uppercase tracking-tighter">Tanggal</span>
+                                                    <span class="text-slate-900">{{ new Date().toLocaleDateString('id-ID') }}</span>
+                                                </div>
+                                                <div class="flex justify-between font-black">
+                                                    <span class="text-slate-400 uppercase tracking-tighter font-bold">Department</span>
+                                                    <span class="text-orange-700">SPAREPART</span>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                    </div>
+                                </div>
+
+                                <div class="flex-1">
+                                    <table class="w-full text-[9px] border-collapse table-fixed">
+                                        <thead>
+                                            <tr class="bg-slate-100 font-bold text-slate-800 uppercase tracking-tighter">
+                                                <th class="border border-slate-900 p-1 w-7 text-center">No</th>
+                                                <th class="border border-slate-900 p-1 w-24 text-center">Kode</th>
+                                                <th class="border border-slate-900 p-1 text-left">Nama & Spesifikasi Barang</th>
+                                                <th class="border border-slate-900 p-1 w-12 text-center">Unit</th>
+                                                <th class="border border-slate-900 p-1 w-16 text-center bg-orange-50 text-orange-700">
+                                                    Jumlah Diminta</th>
+                                                <th class="border border-slate-900 p-1 w-14 text-center">Stock</th>
+                                                <th class="border border-slate-900 p-1 w-20 text-center">Tgl Dibutuhkan</th>
+                                                <th class="border border-slate-900 p-1 w-16 text-center bg-indigo-50 text-indigo-700">
+                                                    Jumlah Pakai</th>
+                                                <th class="border border-slate-900 p-1 w-32 text-left">Keterangan</th>
+                                                <th class="border-0 w-6 print:hidden"></th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <tr v-for="(item, index) in pageItems" :key="index"
+                                                class="h-[28px] group hover:bg-slate-50 border-b border-slate-200">
+                                                <td class="border border-slate-900 text-center text-slate-400 font-mono">{{ (pageIdx *
+                                                    17) + index + 1 }}</td>
+                                                <td class="border border-slate-900 px-1 font-bold text-slate-700 truncate text-[8px]">{{
+                                                    item.kode }}</td>
+                                                <td class="border border-slate-900 px-1">
+                                                    <div class="font-black text-slate-900 leading-none truncate uppercase">{{ item.nama
+                                                        }}</div>
+                                                </td>
+                                                <td class="border border-slate-900 text-center font-bold text-slate-600 uppercase">{{
+                                                    item.satuan }}</td>
+                                                <td class="border border-slate-900 bg-orange-50/50">
+                                                    <input type="number" v-model="item.qtyDiminta" min="0"
+                                                        oninput="validity.valid||(value='0');"
+                                                        class="w-full text-center font-black bg-transparent border-none p-0 focus:ring-0 text-orange-600">
+                                                </td>
+                                                <td class="border border-slate-900 text-center font-bold text-slate-400">{{ item.stok }}
+                                                </td>
+                                                <td class="border border-slate-900 text-center px-1">
+                                                    <input type="date" v-model="txTanggal"
+                                                        class="w-full text-[8px] bg-transparent border-none p-0 focus:ring-0 font-bold cursor-pointer text-center">
+                                                </td>
+                                                <td class="border border-slate-900 bg-indigo-50/50">
+                                                    <input type="number" v-model="item.jmlPakai" min="0"
+                                                        oninput="validity.valid||(value='0');"
+                                                        class="w-full text-center font-black bg-transparent border-none p-0 focus:ring-0 text-indigo-600">
+                                                        <span v-if="item.jmlPakai > 50" class="text-rose-500">🔥 High Usage</span>
+                                                </td>
+                                                <td class="border border-slate-900 px-1 italic text-slate-500">
+                                                    <input type="text" v-model="item.keterangan" placeholder="..."
+                                                        class="w-full bg-transparent border-none p-0 focus:ring-0 text-[8px]">
+                                                </td>
+                                                <td class="text-center p-0 print:hidden border-0">
+                                                    <button @click="removeItemSpp((pageIdx * 15) + index)"
+                                                        class="text-slate-300 hover:text-rose-500 transition-all opacity-0 group-hover:opacity-100">
+                                                        <i class="fa-solid fa-circle-xmark text-[11px]"></i>
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                            <tr v-for="n in (17 - pageItems.length)" :key="'empty-'+n"
+                                                class="h-[28px] border-b border-slate-100">
+                                                <td class="border border-slate-900" v-for="c in 9"></td>
+                                                <td class="border-0"></td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+
+                                <div class="mt-3 grid grid-cols-2 gap-4 shrink-0">
+                                    <div class="border border-slate-900 p-2 min-h-[50px]">
+                                        <p class="text-[8px] font-black uppercase text-slate-400 mb-1 leading-none">Catatan Pendukung:
                                         </p>
+                                        <textarea v-model="catatanSpp"
+                                            class="w-full text-[9px] border-none p-0 focus:ring-0 resize-none bg-transparent h-8 italic"
+                                            placeholder="Tambahkan catatan jika ada..."></textarea>
                                     </div>
-
-                                    <div class="flex-1 text-center px-4">
-                                        <h2 class="text-xl font-black underline decoration-2 underline-offset-8 text-slate-900 uppercase tracking-[0.2em]">
-                                            Surat Permohonan Pembelian
-                                        </h2>
+                                    <div class="border border-slate-900 p-2 min-h-[50px]">
+                                        <p class="text-[8px] font-black uppercase text-slate-400 mb-1 leading-none">Rekomendasi /
+                                            Evaluasi :</p>
+                                        <div class="text-[9px] text-slate-300 italic">Diisi oleh bagian terkait...</div>
                                     </div>
+                                </div>
 
-                                    <div class="w-1/3 flex justify-end">
-                                        <div class="text-[9px] font-bold text-slate-800 bg-slate-50 p-2 rounded-lg border border-slate-200 min-w-[200px] shadow-sm">
-                                            <div class="flex justify-between border-b border-slate-200 pb-1 mb-1">
-                                                <span class="text-slate-400 uppercase tracking-tighter">No SPP </span> 
-                                                <span class="font-mono text-slate-900">{{ noSPP }}</span>
-                                            </div>
-                                            <div class="flex justify-between border-b border-slate-200 pb-1 mb-1">
-                                                <span class="text-slate-400 uppercase tracking-tighter">Tanggal</span> 
-                                                <span class="text-slate-900">{{ new Date().toLocaleDateString('id-ID') }}</span>
-                                            </div>
-                                            <div class="flex justify-between font-black">
-                                                <span class="text-slate-400 uppercase tracking-tighter font-bold">Department</span> 
-                                                <span class="text-orange-700">SPAREPART</span>
-                                            </div>
+                                <div class="mt-4 shrink-0">
+                                    <div
+                                        class="grid grid-cols-4 gap-2 text-center text-[8px] font-bold uppercase tracking-wider text-slate-900">
+                                        <div class="flex flex-col justify-between h-20 group">
+                                            <p>Dibuat Oleh,</p>
+                                            <input type="text" v-model="sppSign.pembuat"
+                                                class="border-t border-slate-900 pt-1 mx-2 bg-transparent text-center focus:ring-0 focus:border-orange-500 outline-none font-black uppercase">
+                                        </div>
+                                        <div class="flex flex-col justify-between h-20 group">
+                                            <p>Diperiksa,</p>
+                                            <input type="text" v-model="sppSign.pemeriksa"
+                                                class="border-t border-slate-900 pt-1 mx-2 bg-transparent text-center focus:ring-0 focus:border-orange-500 outline-none font-black uppercase">
+                                        </div>
+                                        <div class="flex flex-col justify-between h-20 group">
+                                            <p>Diketahui,</p>
+                                            <input type="text" v-model="sppSign.diketahui"
+                                                class="border-t border-slate-900 pt-1 mx-2 bg-transparent text-center focus:ring-0 focus:border-orange-500 outline-none font-black uppercase">
+                                        </div>
+                                        <div class="flex flex-col justify-between h-20 group">
+                                            <p>Disetujui,</p>
+                                            <input type="text" v-model="sppSign.disetujui"
+                                                class="border-t border-slate-900 pt-1 mx-2 bg-transparent text-center focus:ring-0 focus:border-orange-500 outline-none font-black uppercase">
                                         </div>
                                     </div>
 
-                                </div>
-                            </div>
-
-                            <div class="flex-1">
-                                <table class="w-full text-[9px] border-collapse table-fixed">
-                                    <thead>
-                                        <tr class="bg-slate-100 font-bold text-slate-800 uppercase tracking-tighter">
-                                            <th class="border border-slate-900 p-1 w-7 text-center">No</th>
-                                            <th class="border border-slate-900 p-1 w-24 text-center">Kode</th>
-                                            <th class="border border-slate-900 p-1 text-left">Nama & Spesifikasi Barang</th>
-                                            <th class="border border-slate-900 p-1 w-12 text-center">Unit</th>
-                                            <th class="border border-slate-900 p-1 w-16 text-center bg-orange-50 text-orange-700">Jumlah Diminta</th>
-                                            <th class="border border-slate-900 p-1 w-14 text-center">Stock</th>
-                                            <th class="border border-slate-900 p-1 w-20 text-center">Tgl Dibutuhkan</th>
-                                            <th class="border border-slate-900 p-1 w-16 text-center bg-indigo-50 text-indigo-700">Jumlah Pakai</th>
-                                            <th class="border border-slate-900 p-1 w-32 text-left">Keterangan</th>
-                                            <th class="border-0 w-6 print:hidden"></th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        <tr v-for="(item, index) in pageItems" :key="index" class="h-[28px] group hover:bg-slate-50 border-b border-slate-200">
-                                            <td class="border border-slate-900 text-center text-slate-400 font-mono">{{ (pageIdx * 17) + index + 1 }}</td>
-                                            <td class="border border-slate-900 px-1 font-bold text-slate-700 truncate text-[8px]">{{ item.kode }}</td>
-                                            <td class="border border-slate-900 px-1">
-                                                <div class="font-black text-slate-900 leading-none truncate uppercase">{{ item.nama }}</div>
-                                            </td>
-                                            <td class="border border-slate-900 text-center font-bold text-slate-600 uppercase">{{ item.satuan }}</td>
-                                            <td class="border border-slate-900 bg-orange-50/50">
-                                                <input type="number" v-model="item.qtyDiminta" min="0" oninput="validity.valid||(value='0');" 
-                                                    class="w-full text-center font-black bg-transparent border-none p-0 focus:ring-0 text-orange-600">
-                                            </td>
-                                            <td class="border border-slate-900 text-center font-bold text-slate-400">{{ item.stok }}</td>
-                                            <td class="border border-slate-900 text-center px-1">
-                                                <input type="date" v-model="txTanggal" class="w-full text-[8px] bg-transparent border-none p-0 focus:ring-0 font-bold cursor-pointer text-center">
-                                            </td>
-                                            <td class="border border-slate-900 bg-indigo-50/50">
-                                                <input type="number" v-model="item.jmlPakai" min="0" oninput="validity.valid||(value='0');" 
-                                                    class="w-full text-center font-black bg-transparent border-none p-0 focus:ring-0 text-indigo-600">
-                                            </td>
-                                            <td class="border border-slate-900 px-1 italic text-slate-500">
-                                                <input type="text" v-model="item.keterangan" placeholder="..." class="w-full bg-transparent border-none p-0 focus:ring-0 text-[8px]">
-                                            </td>
-                                            <td class="text-center p-0 print:hidden border-0">
-                                                <button @click="removeItemSpp((pageIdx * 15) + index)" class="text-slate-300 hover:text-rose-500 transition-all opacity-0 group-hover:opacity-100">
-                                                    <i class="fa-solid fa-circle-xmark text-[11px]"></i>
-                                                </button>
-                                            </td>
-                                        </tr>
-                                        <tr v-for="n in (17 - pageItems.length)" :key="'empty-'+n" class="h-[28px] border-b border-slate-100">
-                                            <td class="border border-slate-900" v-for="c in 9"></td>
-                                            <td class="border-0"></td>
-                                        </tr>
-                                    </tbody>
-                                </table>
-                            </div>
-
-                            <div class="mt-3 grid grid-cols-2 gap-4 shrink-0">
-                                <div class="border border-slate-900 p-2 min-h-[50px]">
-                                    <p class="text-[8px] font-black uppercase text-slate-400 mb-1 leading-none">Catatan Pendukung:</p>
-                                    <textarea v-model="catatanSpp" class="w-full text-[9px] border-none p-0 focus:ring-0 resize-none bg-transparent h-8 italic" placeholder="Tambahkan catatan jika ada..."></textarea>
-                                </div>
-                                <div class="border border-slate-900 p-2 min-h-[50px]">
-                                    <p class="text-[8px] font-black uppercase text-slate-400 mb-1 leading-none">Rekomendasi / Evaluasi :</p>
-                                    <div class="text-[9px] text-slate-300 italic">Diisi oleh bagian terkait...</div>
-                                </div>
-                            </div>
-
-                            <div class="mt-4 shrink-0">
-                                <div class="grid grid-cols-4 gap-2 text-center text-[8px] font-bold uppercase tracking-wider text-slate-900">
-                                    <div class="flex flex-col justify-between h-20 group">
-                                        <p>Dibuat Oleh,</p>
-                                        <input type="text" v-model="sppSign.pembuat" 
-                                            class="border-t border-slate-900 pt-1 mx-2 bg-transparent text-center focus:ring-0 focus:border-orange-500 outline-none font-black uppercase">
-                                    </div>
-                                    <div class="flex flex-col justify-between h-20 group">
-                                        <p>Diperiksa,</p>
-                                        <input type="text" v-model="sppSign.pemeriksa" 
-                                            class="border-t border-slate-900 pt-1 mx-2 bg-transparent text-center focus:ring-0 focus:border-orange-500 outline-none font-black uppercase">
-                                    </div>
-                                    <div class="flex flex-col justify-between h-20 group">
-                                        <p>Diketahui,</p>
-                                        <input type="text" v-model="sppSign.diketahui" 
-                                            class="border-t border-slate-900 pt-1 mx-2 bg-transparent text-center focus:ring-0 focus:border-orange-500 outline-none font-black uppercase">
-                                    </div>
-                                    <div class="flex flex-col justify-between h-20 group">
-                                        <p>Disetujui,</p>
-                                        <input type="text" v-model="sppSign.disetujui" 
-                                            class="border-t border-slate-900 pt-1 mx-2 bg-transparent text-center focus:ring-0 focus:border-orange-500 outline-none font-black uppercase">
-                                    </div>
-                                </div>
-
-                                <div class="mt-3 flex justify-between items-center text-[7px] text-slate-400 border-t border-slate-100 pt-2 font-mono uppercase">
-                                    <div class="flex gap-4 italic font-bold">
-                                        <span>Dicetak: {{ new Date().toLocaleString('id-ID') }}</span>
-                                    </div>
-                                    <div class="flex gap-4 font-black">
-                                        <span class="bg-slate-900 text-white px-2 py-0.5 rounded">Hal: {{ pageIdx + 1 }} / {{ chunkedSppItems.length }}</span>
+                                    <div
+                                        class="mt-3 flex justify-between items-center text-[7px] text-slate-400 border-t border-slate-100 pt-2 font-mono uppercase">
+                                        <div class="flex gap-4 italic font-bold">
+                                            <span>Dicetak: {{ new Date().toLocaleString('id-ID') }}</span>
+                                        </div>
+                                        <div class="flex gap-4 font-black">
+                                            <span class="bg-slate-900 text-white px-2 py-0.5 rounded">Hal: {{ pageIdx + 1 }} / {{
+                                                chunkedSppItems.length }}</span>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
-                        </div>
 
-                        <div v-if="summarySppItems.length === 0" class="w-[297mm] h-[210mm] bg-white rounded-sm border-2 border-dashed border-slate-300 flex flex-col items-center justify-center opacity-50 shadow-inner">
-                            <i class="fa-solid fa-folder-open text-6xl text-slate-200 mb-4"></i>
-                            <p class="font-black text-slate-300 uppercase tracking-[0.5em]">SPP Belum Tersedia</p>
+                            <div v-if="summarySppItems.length === 0"
+                                class="w-[297mm] h-[210mm] bg-white rounded-sm border-2 border-dashed border-slate-300 flex flex-col items-center justify-center opacity-50 shadow-inner">
+                                <i class="fa-solid fa-folder-open text-6xl text-slate-200 mb-4"></i>
+                                <p class="font-black text-slate-300 uppercase tracking-[0.5em]">SPP Belum Tersedia</p>
+                            </div>
                         </div>
                     </div>
                 </main>
@@ -1424,7 +2142,7 @@
                     <div class="flex-1 p-2 md:p-4 lg:p-6 overflow-hidden flex flex-col">
                         <div
                             class="bg-white border border-slate-100 rounded-[2rem] shadow-xl shadow-slate-200/40 flex-1 flex flex-col overflow-hidden">
-                            <div class="overflow-x-auto overflow-y-auto flex-1 custom-scrollbar">
+                            <div class="overflow-x-auto overflow-y-auto flex-1 custom-scrollbar" @scroll="handleTableScroll">
                                 <table class="w-full text-left border-collapse whitespace-nowrap min-w-[900px]">
                                     <thead class="sticky top-0 bg-white/90 backdrop-blur-md z-10 shadow-sm border-b-2 border-slate-100">
                                         <tr>
@@ -1476,10 +2194,10 @@
                                                 </div>
                                             </th>
 
-                                            <th @click="sortBy('minStok')"
+                                            <th @click="sortBy('min_stok')"
                                                 class="px-5 py-4 text-[11px] font-black text-slate-400 uppercase tracking-widest cursor-pointer hover:text-indigo-600 transition-colors group">
                                                 <div class="flex items-center gap-2">Min. Stok
-                                                    <i v-if="sortKey === 'minStok'" class="fa-solid"
+                                                    <i v-if="sortKey === 'min_stok'" class="fa-solid"
                                                         :class="sortOrder === 1 ? 'fa-sort-up text-indigo-500' : 'fa-sort-down text-indigo-500'"></i>
                                                     <i v-else class="fa-solid fa-sort text-slate-200 group-hover:text-indigo-300"></i>
                                                 </div>
@@ -1492,7 +2210,7 @@
                                     </thead>
 
                                     <tbody class="divide-y divide-slate-100">
-                                        <tr v-for="item in sortedMaster" :key="item.kode"
+                                        <tr v-for="item in finalInventory" :key="item.kode"
                                             class="hover:bg-indigo-50/40 transition-colors group">
 
                                             <td class="px-5 py-3">
@@ -1530,17 +2248,17 @@
                                             <td class="px-5 py-3">
                                                 <div class="flex items-center gap-2">
                                                     <span class="text-base font-black px-3 py-1.5 rounded-xl"
-                                                        :class="Number(item.stok) <= Number(item.minStok) ? 'text-rose-600 bg-rose-50 border border-rose-200 shadow-sm' : 'text-slate-800 bg-slate-50'">
+                                                        :class="Number(item.stok) <= Number(item.min_stok) ? 'text-rose-600 bg-rose-50 border border-rose-200 shadow-sm' : 'text-slate-800 bg-slate-50'">
                                                         {{ item.stok }}
                                                     </span>
-                                                    <i v-if="Number(item.stok) <= Number(item.minStok)"
+                                                    <i v-if="Number(item.stok) <= Number(item.min_stok)"
                                                         class="fa-solid fa-triangle-exclamation text-rose-500 animate-pulse text-sm"
                                                         title="Stok Menipis"></i>
                                                 </div>
                                             </td>
 
                                             <td class="px-5 py-3">
-                                                <span class="text-xs font-bold text-slate-400">{{ item.minStok }}</span>
+                                                <span class="text-xs font-bold text-slate-400">{{ item.min_stok }}</span>
                                             </td>
 
                                             <td class="px-5 py-3">
@@ -1575,7 +2293,18 @@
                                     </tbody>
                                 </table>
 
-                                <div v-if="searchInMaster.length === 0"
+                                <div v-if="loading" class="py-10 flex justify-center items-center">
+                                    <div class="flex items-center gap-3 bg-white px-6 py-3 rounded-2xl shadow-sm border border-slate-100">
+                                        <i class="fa-solid fa-circle-notch animate-spin text-indigo-600"></i>
+                                        <span class="text-sm font-bold text-slate-500">Memuat lebih banyak data...</span>
+                                    </div>
+                                </div>
+
+                                <div v-if="!hasMore && inventory.inventory.value.length > 0" class="py-10 text-center text-slate-400 text-xs font-bold uppercase tracking-widest">
+                                    --- Semua data telah dimuat ---
+                                </div>
+
+                                <div v-if="finalInventory.length === 0 && !loading"
                                     class="flex flex-col items-center justify-center py-20 text-slate-400">
                                     <div class="w-24 h-24 mb-6 rounded-full bg-slate-50 flex items-center justify-center">
                                         <i class="fa-solid fa-box-open text-4xl text-slate-300"></i>
@@ -1588,7 +2317,7 @@
                     </div>
                 </main>
 
-                <main v-if="page === 'cancel_tx'" class="flex-1 p-4 lg:p-8 space-y-6 flex flex-col h-[calc(100vh-64px)] overflow-hidden">
+                <main v-if="page === 'cancel_tx' && ['ADMIN', 'MANAGER'].includes(userData.role)" class="flex-1 p-4 lg:p-8 space-y-6 flex flex-col h-[calc(100vh-64px)] overflow-hidden">
                     <div class="flex justify-between items-center shrink-0">
                         <h2 class="text-xl lg:text-2xl font-black text-slate-800 uppercase tracking-tight">Pembatalan Transaksi</h2>
                         <span class="bg-rose-100 text-rose-600 px-3 py-1 rounded-full text-[10px] font-black uppercase">Admin Panel</span>
@@ -1613,15 +2342,15 @@
                                 <tbody class="divide-y divide-slate-50">
                                     <tr v-for="tx in recentTx.filter(t => t.jenis !== 'OPNAME')" :key="tx.rowId" 
                                         class="hover:bg-slate-50/50 transition-colors"
-                                        :class="{'opacity-50 bg-slate-50': String(tx.ket || '').toUpperCase().includes('[DIBATALKAN]')}"
+                                        :class="{'opacity-50 bg-slate-50': isVoided(tx)}"
                                     >
                                         <td class="p-4">
                                             <div class="font-bold text-xs text-slate-700">{{ tx.user }}</div>
                                             <div class="text-[9px] text-slate-400 font-medium">{{ tx.tanggal }}</div>
                                         </td>
                                         <td class="p-4">
-                                            <div class="font-bold text-xs text-slate-800">{{ tx.nama }}</div>
-                                            <div class="text-[9px] font-mono text-indigo-500 uppercase">{{ tx.kode }}</div>
+                                            <div class="font-bold text-xs text-slate-800">{{ tx.kode }}</div>
+                                            <div class="text-[9px] font-mono text-indigo-500 uppercase">{{ tx.nama }}</div>
                                         </td>
 
                                         <td class="p-4 text-center text-[10px] font-bold text-slate-700">{{ tx.jenis }}</td>
@@ -1637,14 +2366,14 @@
                                                 @click="handleCancelTx(tx)"
                                                 :disabled="cancellingId === tx.rowId || isVoided(tx)"
                                                 class="mx-auto min-w-[90px] py-2 rounded-xl text-[10px] font-black transition-all flex items-center justify-center gap-2 shadow-sm"
-                                                :class="isVoided(tx)
-                                                    ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
-                                                    : 'bg-rose-50 text-rose-600 hover:bg-rose-600 hover:text-white active:scale-90'"
+                                                :class="[
+                                                    isVoided(tx)
+                                                        ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
+                                                        : 'bg-rose-50 text-rose-600 hover:bg-rose-600 hover:text-white',
+                                                    cancellingId === tx.rowId ? 'opacity-60 cursor-wait' : ''
+                                                ]"
                                             >
-                                                <i 
-                                                    v-if="cancellingId === tx.rowId" 
-                                                    class="fa-solid fa-circle-notch animate-spin">
-                                                </i>
+                                                <i v-if="cancellingId === tx.rowId" class="fa-solid fa-circle-notch animate-spin"></i>
 
                                                 <span v-else>
                                                     {{ isVoided(tx) ? 'VOIDED' : 'VOID' }}
@@ -1658,7 +2387,7 @@
                     </div>
                 </main>
 
-                <main v-if="page==='user_management'" class="flex-1 flex flex-col h-screen overflow-hidden bg-[#f8fafc] font-sans">
+                <main v-if="page === 'user_management' && ['ADMIN'].includes(userData.role)" class="flex-1 flex flex-col h-screen overflow-hidden bg-[#f8fafc] font-sans">
     
                     <div class="px-6 md:px-8 py-5 md:py-6 bg-white border-b border-slate-100 shadow-[0_4px_20px_rgba(0,0,0,0.01)] z-10 flex flex-col md:flex-row md:items-center justify-between gap-4 md:gap-8">
                         <div class="shrink-0">
@@ -1702,7 +2431,7 @@
                                             </tr>
                                         </thead>
                                         <tbody class="divide-y divide-amber-50">
-                                            <tr v-for="u in filteredAdminUsers.filter(u => u.status === 'PENDING')" :key="'pending-'+u.username" class="hover:bg-amber-50/30 transition-colors">
+                                            <tr v-for="u in pendingUsers" :key="'pending-'+u.username" class="hover:bg-amber-50/30 transition-colors">
                                                 <td class="px-6 py-4">
                                                     <div class="flex items-center gap-3">
                                                         <div class="w-10 h-10 rounded-full bg-amber-100 text-amber-600 flex items-center justify-center font-bold text-sm border border-amber-200">
@@ -1716,8 +2445,8 @@
                                                 </td>
                                                 <td class="px-6 py-4">
                                                     <div class="flex items-center gap-2 text-slate-600">
-                                                        <i :class="u.deviceInfo?.includes('Android') || u.deviceInfo?.includes('iOS') ? 'fa-mobile-alt' : 'fa-laptop'" class="fa-solid text-slate-400"></i>
-                                                        <span class="text-xs">{{ u.deviceInfo || 'Belum Login' }}</span>
+                                                        <i :class="u.device_info?.includes('Android') || u.device_info?.includes('iOS') ? 'fa-mobile-alt' : 'fa-laptop'" class="fa-solid text-slate-400"></i>
+                                                        <span class="text-xs">{{ u.device_info || 'Belum Login' }}</span>
                                                     </div>
                                                 </td>
                                                 <td class="px-6 py-4 text-center">
@@ -1729,7 +2458,7 @@
                                                     </div>
                                                 </td>
                                                 <td class="px-6 py-4 text-right">
-                                                    <button @click="deleteUser(u)" class="w-8 h-8 rounded-lg text-rose-400 hover:bg-rose-50 hover:text-rose-600 transition-all" title="Tolak Pendaftaran">
+                                                    <button @click="handleDeleteUser(u)" class="w-8 h-8 rounded-lg text-rose-400 hover:bg-rose-50 hover:text-rose-600 transition-all" title="Tolak Pendaftaran">
                                                         <i class="fa-solid fa-trash-can"></i>
                                                     </button>
                                                 </td>
@@ -1773,7 +2502,7 @@
                                                 </td>
                                                 <td class="px-6 py-4">
                                                     <div class="relative inline-block w-32">
-                                                        <select v-model="u.role" @change="updateUserRole(u)" class="w-full bg-slate-50 border border-slate-200 rounded-lg py-2 pl-3 pr-8 text-[11px] font-black text-slate-700 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 cursor-pointer appearance-none transition-all">
+                                                        <select v-model="u.role" :disabled="u.role === 'ADMIN'" @change="handleUpdateUserRole(u)" class="w-full bg-slate-50 border border-slate-200 rounded-lg py-2 pl-3 pr-8 text-[11px] font-black text-slate-700 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 cursor-pointer appearance-none transition-all">
                                                             <option value="VIEWER">VIEWER</option>
                                                             <option value="STAFF">STAFF</option>
                                                             <option value="MANAGER">MANAGER</option>
@@ -1784,7 +2513,7 @@
                                                 </td>
                                                 <td class="px-6 py-4 text-center">
                                                     <label class="relative inline-flex items-center cursor-pointer justify-center">
-                                                        <input type="checkbox" class="sr-only peer" :checked="u.canPreviewPhoto === true || u.canPreviewPhoto === 1" @change="togglePhotoAccess(u, $event.target.checked)">
+                                                        <input type="checkbox" class="sr-only peer" :checked="u.can_preview_photo" @change="handleTogglePhotoAccess(u, u.can_preview_photo)">
                                                         <div class="w-10 h-5 bg-slate-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-500"></div>
                                                     </label>
                                                 </td>
@@ -1796,19 +2525,19 @@
                                                 </td>
                                                 <td class="px-6 py-4 text-sm text-slate-600">
                                                     <div class="flex items-center gap-2">
-                                                        <i :class="u.deviceInfo?.includes('Android') || u.deviceInfo?.includes('iOS') ? 'fa-mobile-alt' : 'fa-laptop'" class="fa-solid text-slate-400"></i>
-                                                        <span class="text-[11px]">{{ u.deviceInfo || 'Belum Login' }}</span>
+                                                        <i :class="u.device_info?.includes('Android') || u.device_info?.includes('iOS') ? 'fa-mobile-alt' : 'fa-laptop'" class="fa-solid text-slate-400"></i>
+                                                        <span class="text-[11px]">{{ u.device_info || 'Belum Login' }}</span>
                                                     </div>
                                                 </td>
                                                 <td class="px-6 py-4 text-right">
                                                     <div class="flex justify-end items-center gap-1">
-                                                        <button @click="toggleUser(u)" 
+                                                        <button  v-if="u.role !== 'ADMIN'" @click="toggleUser(u)" 
                                                             :class="u.status==='AKTIF' ? 'text-amber-500 hover:bg-amber-50' : 'text-emerald-500 hover:bg-emerald-50'" 
                                                             class="w-8 h-8 flex items-center justify-center rounded-lg transition-colors"
                                                             :title="u.status==='AKTIF' ? 'Suspend' : 'Aktifkan'">
                                                             <i :class="u.status==='AKTIF' ? 'fa-solid fa-ban' : 'fa-solid fa-power-off'"></i>
                                                         </button>
-                                                        <button @click="deleteUser(u)" class="w-8 h-8 flex items-center justify-center rounded-lg text-slate-400 hover:bg-rose-50 hover:text-rose-600 transition-colors" title="Hapus">
+                                                        <button v-if="u.role !== 'ADMIN'" @click="handleDeleteUser(u)" class="w-8 h-8 flex items-center justify-center rounded-lg text-slate-400 hover:bg-rose-50 hover:text-rose-600 transition-colors" title="Hapus">
                                                             <i class="fa-solid fa-trash-can"></i>
                                                         </button>
                                                     </div>
@@ -1895,7 +2624,7 @@
                     </button>
                 </div>
 
-                <form @submit.prevent="saveItem" class="p-8 overflow-y-auto custom-scrollbar">
+                <form @submit.prevent="saveItem(formItem, showItemModal)" class="p-8 overflow-y-auto custom-scrollbar">
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-10">
                         
                         <div class="space-y-5">
@@ -1941,7 +2670,7 @@
                                     <label class="block text-[10px] font-black text-rose-500 uppercase tracking-wider ml-1">Ambang Batas Minimum</label>
                                     <i class="fa-solid fa-bell text-rose-300 text-xs animate-bounce"></i>
                                 </div>
-                                <input v-model.number="formItem.minStok" type="number" 
+                                <input v-model.number="formItem.min_stok" type="number" 
                                     class="w-full px-4 py-3 rounded-xl border-2 border-rose-200 focus:border-rose-500 outline-none text-xl font-black text-rose-600 bg-white/80 backdrop-blur-sm transition-all">
                                 <p class="text-[9px] text-rose-400 mt-2 italic font-medium">*Sistem akan memberi peringatan jika stok di bawah angka ini.</p>
                             </div>
@@ -1963,7 +2692,7 @@
                                 </div>
                                 
                                 <div v-if="!isCameraActive && formItem.foto" class="relative h-full w-full bg-white flex items-center justify-center animate-in fade-in duration-500">
-                                    <img :src="formItem.foto" class="h-full w-full object-contain p-6 drop-shadow-md">
+                                    <img :src="fixDriveUrl(formItem.foto)" class="h-full w-full object-contain p-6 drop-shadow-md">
                                     <div class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                                         <button type="button" @click="removePhoto" class="bg-rose-500 text-white px-4 py-2 rounded-full text-[10px] font-bold shadow-xl transform translate-y-4 group-hover:translate-y-0 transition-all">
                                             <i class="fa-solid fa-trash-can mr-2"></i>HAPUS FOTO
@@ -1985,7 +2714,7 @@
                                     </button>
                                     
                                     <template v-if="isCameraActive">
-                                        <button type="button" @click="takeSnapshot" class="bg-emerald-500 text-white w-14 h-14 rounded-full shadow-2xl flex items-center justify-center active:scale-75 transition-all border-4 border-white">
+                                        <button type="button" @click="handleTakePhoto" class="bg-emerald-500 text-white w-14 h-14 rounded-full shadow-2xl flex items-center justify-center active:scale-75 transition-all border-4 border-white">
                                             <i class="fa-solid fa-check text-2xl"></i>
                                         </button>
                                         <button type="button" @click="stopCamera" class="bg-white/10 text-white w-14 h-14 backdrop-blur-md rounded-full flex items-center justify-center border border-white/20 active:scale-75 transition-all">
@@ -2114,7 +2843,7 @@
                         type="text" 
                         class="w-full px-4 py-3 bg-slate-100 border-none rounded-xl text-sm font-bold focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
                         placeholder="Contoh: Rak A-10"
-                        @keyup.enter="saveNewLocation"
+                        @keyup.enter="saveNewLocation(locationForm, showLocationModal)"
                     >
                 </div>
 
@@ -2122,7 +2851,7 @@
                     <button @click="showLocationModal = false" class="flex-1 py-3 text-sm font-bold text-slate-400 hover:bg-slate-50 rounded-xl transition-colors">
                         Batal
                     </button>
-                    <button @click="saveNewLocation" :disabled="loading" class="flex-[2] py-3 bg-emerald-500 text-white text-sm font-bold rounded-xl shadow-lg shadow-emerald-100 hover:bg-emerald-600 disabled:opacity-50 transition-all">
+                    <button @click="saveNewLocation(locationForm, showLocationModal)" :disabled="loading" class="flex-[2] py-3 bg-emerald-500 text-white text-sm font-bold rounded-xl shadow-lg shadow-emerald-100 hover:bg-emerald-600 disabled:opacity-50 transition-all">
                         {{ loading ? 'Menyimpan...' : 'Simpan Lokasi' }}
                     </button>
                 </div>
@@ -2180,7 +2909,7 @@
                             </button>
                         </div>
 
-                        <button v-if="isCameraActive" @click="takeSnapshot" 
+                        <button v-if="isCameraActive" @click="handleTakePhoto" 
                                 class="w-full py-5 bg-rose-500 text-white rounded-3xl font-black uppercase tracking-widest shadow-lg shadow-rose-200 flex items-center justify-center gap-4 active:scale-95 transition-all">
                             <div class="w-4 h-4 bg-white rounded-full animate-ping"></div>
                             Ambil Foto
@@ -2281,7 +3010,7 @@
                             </div>
 
                             <div class="pt-2">
-                                <button @click="handleUpdateProfile" :disabled="loadingProfile"
+                                <button @click="handleUpdateProfile({ profileForm, showProfileModal, refreshSession })" :disabled="loadingProfile"
                                     class="w-full bg-gradient-to-br from-blue-500 via-blue-600 to-indigo-700 hover:shadow-xl hover:shadow-blue-500/20 text-white py-4 rounded-[1.5rem] font-black text-sm transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-3 border-t border-white/20">
                                     <i v-if="loadingProfile" class="fa-solid fa-circle-notch animate-spin"></i>
                                     <i v-else class="fa-solid fa-cloud-arrow-up"></i>
@@ -2298,147 +3027,126 @@
             </div>
         </transition>
 
-        <transition name="fade">
-            <div v-show="showLowStock" class="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
-                <div class="bg-white rounded-3xl w-full max-w-4xl max-h-[85vh] overflow-hidden shadow-2xl flex flex-col animate-in zoom-in duration-300 ring-1 ring-slate-100">
-                    
-                    <div class="px-8 py-6 border-b border-slate-100 flex justify-between items-start bg-gradient-to-r from-rose-50/50 to-white">
-                        <div class="flex items-start gap-4">
-                            <div class="w-12 h-12 rounded-2xl bg-rose-100 flex items-center justify-center text-rose-500 shadow-inner">
-                                <i class="fa-solid fa-triangle-exclamation text-xl"></i>
-                            </div>
-                            <div>
-                                <h3 class="text-xl font-bold text-slate-800 tracking-tight">Peringatan Stok Minimum</h3>
-                                <p class="text-sm text-slate-500 mt-1">Segera buat Purchase Requisition (PR) untuk barang di bawah ini.</p>
-                            </div>
+        <div v-if="showOpnameModal" class="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div class="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" @click="showOpnameModal = false"></div>
+
+            <div class="bg-white rounded-3xl w-full max-w-lg shadow-2xl transform transition-all overflow-hidden">
+                <div class="px-8 py-6 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+                    <div>
+                        <h3 class="text-lg font-black text-slate-800 uppercase tracking-tight">Detail Selisih Opname</h3>
+                        <p class="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-0.5">Daftar Barang Tidak Sesuai</p>
+                    </div>
+                    <button @click="showOpnameModal = false" class="p-2 hover:bg-slate-200 rounded-full transition-colors">
+                        <i class="fa-solid fa-times text-slate-400"></i>
+                    </button>
+                </div>
+
+                <div class="max-h-[60vh] overflow-y-auto custom-scrollbar">
+                    <table class="w-full text-left border-collapse">
+                        <thead class="sticky top-0 bg-slate-50 z-10">
+                            <tr>
+                                <th class="px-8 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Kode</th>
+                                <th class="px-8 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Nama Barang</th>
+                                <th class="px-8 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Selisih</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-100">
+                            <tr v-for="item in opnameDetail" :key="item.barang_kode" class="hover:bg-slate-50 transition-colors">
+                                <td class="px-8 py-4 font-bold text-slate-700 text-sm">{{ item.barang_kode }}</td>
+                                <td class="px-8 py-4 font-bold text-slate-700 text-sm">{{ item.barang_nama }}</td>
+                                <td class="px-8 py-4 text-right">
+                                    <span :class="item.selisih < 0 ? 'bg-rose-50 text-rose-600' : 'bg-emerald-50 text-emerald-600'" 
+                                        class="px-3 py-1 rounded-lg font-black text-xs">
+                                        {{ item.selisih > 0 ? '+' : '' }}{{ item.selisih }}
+                                    </span>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="p-6 border-t border-slate-100 text-center">
+                    <button @click="showOpnameModal = false" class="w-full py-3 bg-slate-900 text-white rounded-xl font-black text-xs uppercase tracking-widest hover:bg-slate-800 transition-all active:scale-95">
+                        Tutup Detail
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div v-if="showLowStock" class="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm animate-in fade-in duration-200">
+            <div class="bg-white rounded-[2rem] w-full max-w-3xl max-h-[85vh] overflow-hidden shadow-2xl flex flex-col zoom-in duration-300 border border-slate-100">
+                
+                <div class="px-8 py-6 border-b border-slate-100 flex justify-between items-center bg-white">
+                    <div>
+                        <h3 class="text-xl font-black text-slate-800 tracking-tight">Peringatan Stok Rendah</h3>
+                        <p class="text-xs font-medium text-slate-400 mt-1 uppercase tracking-widest">Items perlu segera diorder</p>
+                    </div>
+                    <button @click="showLowStock = false" class="w-10 h-10 rounded-full bg-slate-100 text-slate-500 hover:bg-rose-100 hover:text-rose-600 transition-all flex items-center justify-center">
+                        <i class="fa-solid fa-xmark"></i>
+                    </button>
+                </div>
+
+                <div class="flex-1 overflow-y-auto custom-scrollbar bg-slate-50/50">
+                    <table v-if="lowStockItems.length > 0" class="w-full text-left">
+                        <thead class="bg-slate-100/50 text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 sticky top-0 z-10">
+                            <tr>
+                                <th class="px-8 py-4">Item Sparepart</th>
+                                <th class="px-6 py-4 text-center">Stok</th>
+                                <th class="px-6 py-4 text-center">Min</th>
+                                <th class="px-8 py-4 text-right">Rekomendasi</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-100 bg-white">
+                            <tr v-for="item in lowStockItems" :key="item.kode" class="hover:bg-indigo-50/30 transition-colors">
+                                <td class="px-8 py-5">
+                                    <div class="font-bold text-slate-800 text-sm leading-tight uppercase">{{ item.nama }}</div>
+                                    <div class="font-mono text-[10px] font-black text-indigo-400 mt-1 tracking-wider">{{ item.kode }}</div>
+                                </td>
+                                <td class="px-6 py-5 text-center">
+                                    <span class="px-3 py-1 rounded-lg bg-rose-50 text-rose-600 font-black text-xs border border-rose-100">
+                                        {{ item.stok }}
+                                    </span>
+                                </td>
+                                <td class="px-6 py-5 text-center">
+                                    <span class="text-xs font-black text-slate-400">{{ item.min_stok }}</span>
+                                </td>
+                                <td class="px-8 py-5 text-right">
+                                    <div class="text-xs font-black text-indigo-600">
+                                        {{ Math.max(0, (Number(item.min_stok) * 2) - Number(item.stok)) }} {{item.satuan}}
+                                    </div>
+                                    <div class="text-[9px] text-slate-400 font-bold uppercase tracking-wide mt-0.5">
+                                        Target: {{ Number(item.min_stok) * 2 }}
+                                    </div>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+
+                    <div v-else class="flex flex-col items-center justify-center py-20 text-center">
+                        <div class="w-16 h-16 bg-emerald-50 text-emerald-500 rounded-2xl flex items-center justify-center mb-4">
+                            <i class="fa-solid fa-check-double text-2xl"></i>
                         </div>
-                        <button @click="showLowStock = false" class="w-10 h-10 rounded-full bg-slate-50 text-slate-400 hover:bg-rose-50 hover:text-rose-500 flex items-center justify-center transition-colors">
-                            <i class="fa-solid fa-xmark text-lg"></i>
+                        <h4 class="text-sm font-black text-slate-800 uppercase tracking-widest">Stok Aman</h4>
+                    </div>
+                </div>
+
+                <div class="p-6 border-t border-slate-100 bg-white flex justify-between items-center">
+                    <div class="text-[10px] font-black text-slate-400 uppercase tracking-[0.1em]">
+                        {{ lowStockItems.length }} Item Kritis
+                    </div>
+                    <div class="flex gap-3">
+                        <button @click="tambahSemuaKeSpp" :disabled="lowStockItems.length === 0"
+                            class="px-5 py-3 rounded-2xl font-black text-[11px] uppercase tracking-widest bg-slate-900 text-white hover:bg-indigo-600 disabled:opacity-30 transition-all flex items-center gap-2 shadow-lg shadow-slate-200">
+                            <i class="fa-solid fa-plus"></i> Tambah SPP
+                        </button>
+                        <button @click="exportExcel" :disabled="lowStockItems.length === 0" 
+                            class="px-5 py-3 rounded-2xl font-black text-[11px] uppercase tracking-widest bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-30 transition-all flex items-center gap-2 shadow-lg shadow-emerald-200">
+                            <i class="fa-solid fa-file-excel"></i> Export
                         </button>
                     </div>
-
-                    <div class="flex-1 overflow-y-auto custom-scrollbar relative">
-                        
-                        <table v-if="lowStockItems.length > 0" class="w-full text-left border-collapse">
-                            <thead class="sticky top-0 bg-white/95 backdrop-blur-sm z-10 shadow-[0_4px_10px_rgba(0,0,0,0.02)]">
-                                <tr class="text-[11px] font-semibold uppercase tracking-wider text-slate-400 border-b border-slate-200">
-                                    <th class="px-8 py-4">Informasi Barang</th>
-                                    <th class="px-6 py-4 text-center">Stok Saat Ini</th>
-                                    <th class="px-6 py-4 text-center">Batas Min</th>
-                                    <th class="px-8 py-4 text-right text-blue-600">Saran Order (PR)</th>
-                                </tr>
-                            </thead>
-                            <tbody class="divide-y divide-slate-100">
-                                <tr v-for="item in lowStockItems" :key="item.kode" class="hover:bg-slate-50/80 transition-colors group">
-                                    
-                                    <td class="px-8 py-4">
-                                        <div class="font-semibold text-slate-800">{{ item.nama }}</div>
-                                        <div class="font-mono text-[11px] text-slate-400 mt-0.5">{{ item.kode }}</div>
-                                    </td>
-                                    
-                                    <td class="px-6 py-4 text-center">
-                                        <span class="inline-flex items-center justify-center min-w-[3rem] px-2.5 py-1 rounded-lg bg-rose-50 text-rose-600 font-bold text-sm border border-rose-100">
-                                            {{ item.stok }}
-                                        </span>
-                                    </td>
-                                    
-                                    <td class="px-6 py-4 text-center">
-                                        <span class="text-sm font-semibold text-slate-500">
-                                            {{ item.minStok }}
-                                        </span>
-                                    </td>
-                                    
-                                    <td class="px-8 py-4 text-right">
-                                        <div class="flex flex-col items-end gap-1">
-                                            <span class="inline-flex items-center justify-center px-4 py-1.5 rounded-xl bg-blue-500 text-white font-bold text-sm shadow-sm group-hover:bg-blue-600 transition-colors">
-                                                {{ (Number(item.minStok) * 2) - Number(item.stok) }}
-                                            </span>
-                                            <div class="text-[11px] text-slate-400 mt-0.5">
-                                                Target: <span class="font-semibold text-slate-600">{{ Number(item.minStok) * 2 }}</span> {{ item.satuan }}
-                                            </div>
-                                        </div>
-                                    </td>
-                                    
-                                </tr>
-                            </tbody>
-                        </table>
-
-                        <div v-else class="flex flex-col items-center justify-center h-full py-20">
-                            <div class="w-24 h-24 bg-emerald-50 rounded-full flex items-center justify-center mb-6">
-                                <i class="fa-solid fa-check text-4xl text-emerald-500"></i>
-                            </div>
-                            <h4 class="text-lg font-bold text-slate-800">Semua Stok Aman</h4>
-                            <p class="text-sm text-slate-500 mt-1">Tidak ada barang yang berada di bawah batas minimum.</p>
-                        </div>
-
-                    </div>
-
-                    <div class="px-8 py-5 bg-slate-50/50 border-t border-slate-100 flex justify-between items-center">
-                        <div class="flex items-center gap-2">
-                            <span class="w-2 h-2 rounded-full" :class="lowStockItems.length > 0 ? 'bg-rose-500 animate-pulse' : 'bg-emerald-500'"></span>
-                            <span class="text-xs font-semibold text-slate-500">
-                                Total <strong class="text-slate-800">{{ lowStockItems.length }}</strong> item perlu perhatian
-                            </span>
-                        </div>
-                        
-                        <div class="flex gap-3"> <button @click="tambahSemuaKeSpp" :disabled="lowStockItems.length === 0"
-                                class="px-6 py-3 rounded-xl font-bold text-sm text-white shadow-md transition-all active:scale-95 disabled:opacity-50 bg-indigo-600 hover:bg-indigo-700 flex items-center gap-2">
-                                <i class="fa-solid fa-layer-group"></i>
-                                <span>Tambah Semua ke SPP</span>
-                            </button>
-
-                            <button @click="exportToExcel" :disabled="lowStockItems.length === 0" 
-                                class="px-6 py-3 rounded-xl font-bold text-sm text-white shadow-md transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-                                :class="lowStockItems.length > 0 ? 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 shadow-blue-500/20' : 'bg-slate-300 shadow-none'"
-                            >
-                                <i class="fa-solid fa-file-excel"></i> 
-                                <span>Download List PR</span>
-                            </button>
-                        </div>
-                    </div>
-
                 </div>
             </div>
-        </transition>
-
-        <transition name="fade">
-            <div v-if="scannerActive" class="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6">
-                <div class="absolute inset-0 bg-slate-900/80 backdrop-blur-sm" @click="closeScanner"></div>
-
-                <div class="relative bg-white w-full max-w-lg rounded-[2.5rem] shadow-2xl overflow-hidden flex flex-col animate-in fade-in zoom-in duration-300">
-                
-                <div class="p-6 flex justify-between items-center border-b border-slate-100">
-                    <div>
-                    <h3 class="font-black text-xl text-slate-800">Scan Barcode</h3>
-                    <p class="text-xs text-slate-400 font-bold uppercase tracking-widest">Arahkan kamera ke kode barang</p>
-                    </div>
-                    <button @click="closeScanner" class="w-10 h-10 rounded-full bg-slate-100 text-slate-500 hover:bg-rose-100 hover:text-rose-500 transition-all flex items-center justify-center">
-                    <i class="fa-solid fa-xmark text-lg"></i>
-                    </button>
-                </div>
-
-                <div class="relative bg-black aspect-square w-full overflow-hidden">
-                    <div class="absolute inset-0 z-10 pointer-events-none flex items-center justify-center">
-                    <div class="w-64 h-64 border-2 border-indigo-500 rounded-3xl opacity-50 shadow-[0_0_0_1000px_rgba(0,0,0,0.5)]"></div>
-                    <div class="absolute w-64 h-0.5 bg-indigo-400 shadow-[0_0_15px_rgba(99,102,241,0.8)] animate-scan"></div>
-                    </div>
-                    
-                    <div id="reader" class="w-full h-full object-cover"></div>
-                </div>
-
-                <div class="p-6 bg-slate-50 flex flex-col gap-3">
-                    <div class="flex items-center gap-3 text-slate-500">
-                    <i class="fa-solid fa-lightbulb text-amber-400"></i>
-                    <p class="text-xs font-medium">Pastikan cahaya ruangan cukup dan kode berada di tengah kotak.</p>
-                    </div>
-                    
-                    <button @click="closeScanner" class="w-full py-4 rounded-2xl bg-slate-800 text-white font-black text-sm uppercase tracking-widest hover:bg-slate-900 transition-all">
-                    Tutup Kamera
-                    </button>
-                </div>
-                </div>
-            </div>
-        </transition>
+        </div>
 
         <transition name="toast-samsung">
             <div v-if="toast.show" 
@@ -2480,9 +3188,9 @@
             </div>
         </transition>
 
-    </div>
+    </div>   
 
-    <script src="app.js"></script>
+    <script type="module" src="./src/app.js"></script>
 
 </body>
 </html>
