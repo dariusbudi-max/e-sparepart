@@ -1285,7 +1285,7 @@ createApp({
 
             setInterval(() => {
                 if (isLoggedIn.value) refreshSession();
-            }, 600000);
+            }, 15000);
 
             inventory.loadInventory(true);
 
