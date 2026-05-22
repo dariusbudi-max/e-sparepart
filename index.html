@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <link rel="icon" type="image/png" href="https://cdn-icons-png.flaticon.com/512/679/679922.png">
-    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="src/output.css" rel="stylesheet">
     <title>WMS SPAREPART</title>
     
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -273,7 +273,7 @@
                                 class="flex-1 py-4 bg-white border border-slate-200 hover:bg-slate-50 text-slate-600 rounded-[1.25rem] font-bold text-sm transition-all active:scale-95">
                                 Batal
                             </button>
-                            <button @click="handleRegister(regData)"
+                            <button @click="handleRegister({ regData, showRegisterModal })"
                                 class="flex-[1.5] py-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-[1.25rem] font-bold text-sm shadow-xl shadow-indigo-100 transition-all active:scale-95 disabled:opacity-50 disabled:active:scale-100"
                                 :disabled="regData.password.length < 6 || loading">
                                 <span v-if="!loading">Kirim Request</span>
