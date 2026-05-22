@@ -18,15 +18,8 @@ export function useAuth({
 	refreshAllData,
 	ROLE_LANDING_PAGE,
 }) {
-	/* ================= LOGIN ================= */
-
 	const handleLogin = async (loginData) => {
-		if (!loginData) {
-			showToast("Data login tidak ditemukan", "error");
-			return;
-		}
-
-		if (!loginData.username || !loginData.password) {
+		if (!loginData?.username || !loginData?.password) {
 			showToast("Username dan Password wajib diisi", "error");
 			return;
 		}
@@ -34,19 +27,11 @@ export function useAuth({
 		loading.value = true;
 
 		try {
-			const user = await login(
-				loginData.username,
-				loginData.password
-			);
-
+			const user = await login(loginData.username, loginData.password);
 			const sessionToken = crypto.randomUUID();
 			const { deviceId, deviceName } = getDeviceInfo();
 
-			await updateSessionToken(
-				user.username,
-				sessionToken
-			);
-
+			await updateSessionToken(user.username, sessionToken);
 			await updateDeviceInfo(user.username, deviceId, deviceName);
 
 			userData.value = {
@@ -61,25 +46,27 @@ export function useAuth({
 
 			isLoggedIn.value = true;
 
+			page.value = ROLE_LANDING_PAGE[user.role] || "dashboard";
+
 			localStorage.setItem(
 				"wms_user",
 				JSON.stringify({
 					...userData.value,
+					page: page.value,
 					session_token: sessionToken,
 					loginAt: Date.now(),
 				})
 			);
 
-			showToast(`Selamat datang, ${user.nama}!`, "success");
 			await refreshAllData();
+
+			showToast(`Selamat datang, ${user.nama}!`, "success");
 		} catch (err) {
-			showToast(err.message, "error");
-		} finally {
+			showToast(err.message || "Login gagal", "error");
+		} {
 			loading.value = false;
 		}
 	};
-
-	/* ================= REGISTER ================= */
 
 	const handleRegister = async ({ regData, showRegisterModal }) => {
 		if (regData.value.password.length < 6) {
@@ -97,13 +84,12 @@ export function useAuth({
 				device_name: deviceName
 			});
 
-			showToast("Pendaftaran berhasil! Menunggu approval VicKey.", "success");
-
+			showToast("Pendaftaran berhasil! Menunggu approval.", "success");
 			showRegisterModal.value = false;
 			regData.value = {
 				nama: "",
 				username: "",
-				password: "",
+				password: ""
 			};
 		} catch (err) {
 			showToast(err.message, "error");
@@ -112,20 +98,11 @@ export function useAuth({
 		}
 	};
 
-	/* ================= UPDATE PROFILE ================= */
-
-	const handleUpdateProfile = async ({
-		profileForm,
-		showProfileModal,
-		refreshSession,
-	}) => {
+	const handleUpdateProfile = async ({ profileForm, showProfileModal }) => {
 		loadingProfile.value = true;
 
 		try {
-			const updatedUser = await updateProfile(
-				userData.value.username,
-				profileForm
-			);
+			const updatedUser = await updateProfile(userData.value.username, profileForm);
 
 			userData.value.nama = updatedUser.nama;
 
@@ -133,16 +110,15 @@ export function useAuth({
 				"wms_user",
 				JSON.stringify({
 					...userData.value,
-					loginAt: Date.now(),
+					loginAt: Date.now()
 				})
 			);
 
-			if (showProfileModal && typeof showProfileModal.value === "boolean") {
+			if (showProfileModal?.value !== undefined) {
 				showProfileModal.value = false;
 			}
 
 			showToast("Profil berhasil diperbarui", "success");
-
 			await refreshSession();
 		} catch (err) {
 			showToast(err.message, "error");
@@ -151,8 +127,6 @@ export function useAuth({
 		}
 	};
 
-	/* ================= REFRESH SESSION ================= */
-
 	const refreshSession = async () => {
 		try {
 			const saved = localStorage.getItem("wms_user");
@@ -160,7 +134,6 @@ export function useAuth({
 
 			const parsed = JSON.parse(saved);
 			const { deviceId, deviceName } = getDeviceInfo();
-
 			const freshUser = await validateSession(parsed.username);
 
 			if (freshUser.session_token !== parsed.session_token) {
@@ -191,30 +164,31 @@ export function useAuth({
 				"wms_user",
 				JSON.stringify({
 					...userData.value,
-					loginAt: Date.now(),
+					page: page.value,
+					loginAt: Date.now()
 				})
 			);
 		} catch (err) {
-			console.error(err);
+			console.error("Refresh session error:", err);
 			await handleLogout();
 		}
 	};
 
-	/* ================= LOGOUT ================= */
-
 	const handleLogout = async () => {
 		try {
 			if (userData.value?.username) {
-				await updateSessionToken(
-					userData.value.username,
-					null,
-					userData.value.session_token
-				);
+				await updateSessionToken(userData.value.username, null);
 			}
 		} catch (err) { }
 
 		isLoggedIn.value = false;
-		userData.value = {};
+		userData.value = {
+			username: "",
+			nama: "",
+			role: "",
+			canPreviewPhoto: false
+		};
+
 		localStorage.removeItem("wms_user");
 		page.value = "login";
 	};
