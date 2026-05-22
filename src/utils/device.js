@@ -2,11 +2,13 @@ const UAParser = window.UAParser;
 
 export const getDeviceInfo = () => {
     if (!UAParser) {
-        return "Unknown Device";
+        return {
+            deviceId: getDeviceId(),
+            deviceName: "Unknown Device"
+        };
     }
 
     const parser = new UAParser();
-
     const result = parser.getResult();
 
     const browser =
@@ -18,5 +20,19 @@ export const getDeviceInfo = () => {
     const device =
         result.device.model || "PC/Laptop";
 
-    return `${browser} on ${os} (${device})`;
+    return {
+        deviceId: getDeviceId(),
+        deviceName: `${browser} on ${os} (${device})`
+    };
+};
+
+const getDeviceId = () => {
+    let deviceId = localStorage.getItem("wms_device_id");
+
+    if (!deviceId) {
+        deviceId = crypto.randomUUID();
+        localStorage.setItem("wms_device_id", deviceId);
+    }
+
+    return deviceId;
 };
