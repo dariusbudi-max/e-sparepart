@@ -1,15 +1,11 @@
 import { supabaseClient } from "../api/supabase.js";
 
-/* ================= HELPERS ================= */
-
 const handleResponse = ({ data, error }) => {
     if (error) throw new Error(error.message);
     return data;
 };
 
 const cleanUsername = (username) => username.trim().toLowerCase();
-
-/* ================= AUTH SERVICES ================= */
 
 export const login = async (username, password) => {
     const usernameClean = cleanUsername(username);
@@ -33,7 +29,6 @@ export const login = async (username, password) => {
 export const register = async (payload, deviceInfo) => {
     const usernameClean = cleanUsername(payload.username);
 
-    // Cek duplikasi username
     const { data: existing } = await supabaseClient
         .from("users")
         .select("username")
@@ -53,7 +48,8 @@ export const register = async (payload, deviceInfo) => {
             role: "VIEWER",
             status: "PENDING",
             can_preview_photo: false,
-            device_info: deviceInfo,
+            device_id: deviceInfo.device_id,
+            device_name: deviceInfo.device_name
         }])
         .select()
         .single();
@@ -61,12 +57,12 @@ export const register = async (payload, deviceInfo) => {
     return handleResponse(res);
 };
 
-/* ================= PROFILE & SESSION ================= */
-
 export const updateProfile = async (username, data) => {
-    const payload = { nama: data.nama };
+    const payload = {
+        nama: data.nama
+    };
 
-    if (data.password) {
+    if (data.password && data.password.trim() !== "") {
         payload.password = data.password;
     }
 
@@ -83,20 +79,41 @@ export const updateProfile = async (username, data) => {
 export const validateSession = async (username) => {
     const { data, error } = await supabaseClient
         .from("users")
-        .select("username, nama, role, status, can_preview_photo, session_token, device_info")
+        .select(`
+            username,
+            nama,
+            role,
+            status,
+            can_preview_photo,
+            session_token,
+            device_id,
+            device_name
+        `)
         .eq("username", username)
         .single();
 
-    if (error || !data) throw new Error("Session tidak valid atau akun tidak aktif");
-    if (data.status !== "AKTIF") throw new Error("Akun dinonaktifkan");
+    if (error || !data) {
+        throw new Error("Session tidak valid");
+    }
+
+    if (data.status !== "AKTIF") {
+        throw new Error("Akun dinonaktifkan");
+    }
 
     return data;
 };
 
-export const updateDeviceInfo = async (username, deviceInfo) => {
+export const updateDeviceInfo = async (
+    username,
+    deviceId,
+    deviceName
+) => {
     const res = await supabaseClient
         .from("users")
-        .update({ device_info: deviceInfo })
+        .update({
+            device_id: deviceId,
+            device_name: deviceName
+        })
         .eq("username", username)
         .select()
         .single();
@@ -104,10 +121,15 @@ export const updateDeviceInfo = async (username, deviceInfo) => {
     return handleResponse(res);
 };
 
-export const updateSessionToken = async (username, token) => {
+export const updateSessionToken = async (
+    username,
+    token
+) => {
     const { error } = await supabaseClient
         .from("users")
-        .update({ session_token: token })
+        .update({
+            session_token: token
+        })
         .eq("username", username);
 
     if (error) throw error;
