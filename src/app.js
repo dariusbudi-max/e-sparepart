@@ -822,6 +822,22 @@ createApp({
             showToast: showToast
         });
 
+        watch(page, (newPage) => {
+            const saved = localStorage.getItem("wms_user");
+
+            if (!saved) return;
+
+            const parsed = JSON.parse(saved);
+
+            localStorage.setItem(
+                "wms_user",
+                JSON.stringify({
+                    ...parsed,
+                    page: newPage
+                })
+            );
+        });
+
 
 
 
