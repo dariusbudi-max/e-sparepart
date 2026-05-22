@@ -8,7 +8,7 @@ export function useScrapMonitoring({ supabaseClient, userData, showToast }) {
     const isEditing = ref(false);
     const currentEditId = ref(null);
 
-    const itemOptions = ["Jarum", "Cutting Board", "Input Manual"];
+    const itemOptions = ["Jarum", "Cutting Board", "Pantex", "Input Manual"];
     const selectedItemType = ref("Input Manual");
 
     const form = ref({
@@ -20,29 +20,9 @@ export function useScrapMonitoring({ supabaseClient, userData, showToast }) {
         qty: 1
     });
 
-    const filterSearch = ref("");
-    const filterDept = ref("");
-    const filterStartRange = ref("");
-    const filterEndRange = ref("");
-
     const isDateRangeRequired = computed(() => {
         return selectedItemType.value === "Jarum";
     });
-
-    const formatDateTime = (isoString) => {
-        if (!isoString) return "-";
-        const date = new Date(isoString);
-        if (isNaN(date.getTime())) return "-";
-
-        const pad = (num) => String(num).padStart(2, '0');
-        const day = pad(date.getDate());
-        const month = pad(date.getMonth() + 1);
-        const year = date.getFullYear();
-        const hours = pad(date.getHours());
-        const minutes = pad(date.getMinutes());
-
-        return `${day}-${month}-${year} ${hours}:${minutes}`;
-    };
 
     const loadScrapData = async () => {
         loading.value = true;
@@ -65,16 +45,14 @@ export function useScrapMonitoring({ supabaseClient, userData, showToast }) {
     };
 
     const submitScrap = async () => {
-        let finalNamaBarang = selectedItemType.value === "Input Manual"
-            ? form.value.nama_barang.trim()
-            : selectedItemType.value;
+        const finalNamaBarang = selectedItemType.value === "Input Manual"
+            ? form.value.nama_barang.toUpperCase().trim()
+            : selectedItemType.value.toUpperCase();
 
         if (!finalNamaBarang || !form.value.department || !form.value.tgl_penukaran) {
             showToast("Mohon lengkapi kolom yang wajib diisi!", "error");
             return;
         }
-
-        finalNamaBarang = finalNamaBarang.toUpperCase();
 
         if (isDateRangeRequired.value) {
             if (!form.value.tgl_awal_pakai || !form.value.tgl_akhir_pakai) {
@@ -132,9 +110,8 @@ export function useScrapMonitoring({ supabaseClient, userData, showToast }) {
         isEditing.value = true;
         currentEditId.value = row.id;
 
-        const namaUpper = (row.nama_barang || "").toUpperCase();
-        if (["JARUM", "CUTTING BOARD"].includes(namaUpper)) {
-            selectedItemType.value = namaUpper === "JARUM" ? "Jarum" : "Cutting Board";
+        if (["Jarum", "Cutting Board", "Pantex"].includes(row.nama_barang)) {
+            selectedItemType.value = row.nama_barang;
             form.value.nama_barang = "";
         } else {
             selectedItemType.value = "Input Manual";
@@ -184,44 +161,12 @@ export function useScrapMonitoring({ supabaseClient, userData, showToast }) {
         };
     };
 
-    const resetFilters = () => {
-        filterSearch.value = "";
-        filterDept.value = "";
-        filterStartRange.value = "";
-        filterEndRange.value = "";
-    };
-
-    const filteredScrapList = computed(() => {
-        return scrapList.value.filter(item => {
-            if (filterSearch.value.trim()) {
-                const q = filterSearch.value.toLowerCase();
-                const matchNama = (item.nama_barang || "").toLowerCase().includes(q);
-                const matchUser = (item.created_by || "").toLowerCase().includes(q);
-                if (!matchNama && !matchUser) return false;
-            }
-
-            if (filterDept.value) {
-                if (item.department !== filterDept.value) return false;
-            }
-
-            if (filterStartRange.value) {
-                if (item.tgl_penukaran < filterStartRange.value) return false;
-            }
-            if (filterEndRange.value) {
-                if (item.tgl_penukaran > filterEndRange.value) return false;
-            }
-
-            return true;
-        });
-    });
-
     const summary = computed(() => {
-        const listToCalculate = filteredScrapList.value;
-        const totalRecords = listToCalculate.length;
-        const totalQty = listToCalculate.reduce((sum, item) => sum + Number(item.qty || 0), 0);
+        const totalRecords = scrapList.value.length;
+        const totalQty = scrapList.value.reduce((sum, item) => sum + Number(item.qty || 0), 0);
 
         const deptMap = {};
-        listToCalculate.forEach(item => {
+        scrapList.value.forEach(item => {
             deptMap[item.department] = (deptMap[item.department] || 0) + Number(item.qty);
         });
 
@@ -238,26 +183,7 @@ export function useScrapMonitoring({ supabaseClient, userData, showToast }) {
     });
 
     return {
-        form,
-        scrapList,
-        filteredScrapList,
-        departments,
-        loading,
-        summary,
-        itemOptions,
-        selectedItemType,
-        isDateRangeRequired,
-        isEditing,
-        filterSearch,
-        filterDept,
-        filterStartRange,
-        filterEndRange,
-        loadScrapData,
-        submitScrap,
-        editRow,
-        deleteRow,
-        cancelEdit: resetForm,
-        resetFilters,
-        formatDateTime
+        form, scrapList, departments, loading, summary, itemOptions, selectedItemType, isDateRangeRequired, isEditing,
+        loadScrapData, submitScrap, editRow, deleteRow, cancelEdit: resetForm
     };
 }
