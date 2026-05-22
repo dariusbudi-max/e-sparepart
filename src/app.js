@@ -1271,10 +1271,10 @@ createApp({
                     await refreshSession();
 
                     if (isLoggedIn.value) {
+                        const saved = JSON.parse(localStorage.getItem("wms_user"));
+                        page.value = saved?.page || ROLE_LANDING_PAGE[userData.value.role];
+
                         await refreshAllData();
-                        if (userData.value.role === "ADMIN") {
-                            await loadUsers();
-                        }
                     }
                 } catch (err) {
                     console.warn("Session invalid:", err.message);
