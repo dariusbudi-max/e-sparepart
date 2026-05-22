@@ -4,13 +4,13 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <link rel="icon" type="image/png" href="https://cdn-icons-png.flaticon.com/512/679/679922.png">
-    <link href="src/output.css" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
     <title>WMS SPAREPART</title>
     
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/ua-parser-js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
     <script src="https://unpkg.com/html5-qrcode"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
@@ -1770,36 +1770,6 @@
                                 </div>
                             </div>
 
-                            <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm grid grid-cols-1 md:grid-cols-4 gap-3 items-end mb-4">
-                                <div>
-                                    <label class="block text-[9px] font-black text-slate-400 uppercase mb-1 tracking-widest">Cari Nama / User</label>
-                                    <input v-model="scrap.filterSearch.value" type="text" placeholder="Ketik kata kunci..."
-                                        class="w-full px-3 py-2 bg-slate-50 border rounded-lg text-xs font-bold text-slate-700 outline-none focus:border-teal-500">
-                                </div>
-                                <div>
-                                    <label class="block text-[9px] font-black text-slate-400 uppercase mb-1 tracking-widest">Filter Dept</label>
-                                    <select v-model="scrap.filterDept.value" class="w-full px-3 py-2 bg-slate-50 border rounded-lg text-xs font-bold text-slate-700 outline-none focus:border-teal-500">
-                                        <option value="">-- Semua Department --</option>
-                                        <option v-for="d in scrap.departments.value" :key="d" :value="d">{{ d }}</option>
-                                    </select>
-                                </div>
-                                <div class="grid grid-cols-2 gap-2">
-                                    <div>
-                                        <label class="block text-[9px] font-black text-slate-400 uppercase mb-1 tracking-widest">Mulai Tgl Tukar</label>
-                                        <input v-model="scrap.filterStartRange.value" type="date" class="w-full px-2 py-2 bg-slate-50 border rounded-lg text-xs font-bold text-slate-700 outline-none">
-                                    </div>
-                                    <div>
-                                        <label class="block text-[9px] font-black text-slate-400 uppercase mb-1 tracking-widest">Sampai Tgl</label>
-                                        <input v-model="scrap.filterEndRange.value" type="date" class="w-full px-2 py-2 bg-slate-50 border rounded-lg text-xs font-bold text-slate-700 outline-none">
-                                    </div>
-                                </div>
-                                <div>
-                                    <button @click="scrap.resetFilters" class="w-full py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold text-xs rounded-lg transition">
-                                        <i class="fa-solid fa-filter-circle-xmark mr-1"></i> Reset Filter
-                                    </button>
-                                </div>
-                            </div>
-
                             <!-- Table List dengan Tombol Aksi untuk Admin -->
                             <div class="bg-white rounded-[2rem] border border-slate-200 shadow-sm overflow-hidden flex flex-col">
                                 <div class="p-5 border-b border-slate-100 bg-slate-50/50">
@@ -1821,21 +1791,21 @@
                                             </tr>
                                         </thead>
                                         <tbody class="divide-y divide-slate-100 text-xs font-bold text-slate-600">
-                                            <tr v-for="row in scrap.filteredScrapList.value" :key="row.id" class="hover:bg-slate-50/80 transition-colors">
+                                            <tr v-for="row in scrap.scrapList.value" :key="row.id" class="hover:bg-slate-50/80 transition-colors">
                                                 <td class="px-6 py-4 font-black text-slate-800 uppercase">{{ row.nama_barang }}</td>
-                                                <td class="px-6 py-4 text-[11px] text-slate-500">
-                                                    <span v-if="row.tgl_awal_pakai">{{ row.tgl_awal_pakai }} s/d {{ row.tgl_akhir_pakai }}</span>
-                                                    <span v-else class="text-slate-400 font-normal italic">Tidak Ada Periode</span>
+                                                <td class="px-6 py-4 text-[11px] font-medium text-slate-500">
+                                                    <span v-if="row.tgl_awal_pakai && row.tgl_akhir_pakai">
+                                                        {{ row.tgl_awal_pakai }} s/d {{ row.tgl_akhir_pakai }}
+                                                    </span>
+                                                    <span v-else class="text-slate-300 font-normal italic">Tidak Ada Periode</span>
                                                 </td>
-                                                <td class="px-6 py-4"><span class="bg-teal-50 text-teal-700 px-2 py-1 rounded-md text-[11px] font-mono">{{ row.tgl_penukaran }}</span></td>
-                                                <td class="px-6 py-4 text-center uppercase">{{ row.department }}</td>
+                                                <td class="px-6 py-4">
+                                                    <span class="bg-teal-50 text-teal-700 px-2 py-1 rounded-md text-[11px] font-mono">{{ row.tgl_penukaran }}</span>
+                                                </td>
+                                                <td class="px-6 py-4 text-center uppercase">
+                                                    <span class="bg-slate-100 px-2 py-0.5 rounded text-[10px] font-black">{{ row.department }}</span>
+                                                </td>
                                                 <td class="px-4 py-4 text-center font-black text-indigo-600">{{ row.qty }}</td>
-                                                
-                                                <!-- KOLOM BARU: TANGGAL DATA DIBUAT (created_at) -->
-                                                <td class="px-6 py-4 text-[11px] font-medium text-slate-500 font-mono">
-                                                    {{ scrap.formatDateTime(row.created_at) }}
-                                                </td>
-                                                
                                                 <td class="px-6 py-4 text-[10px] font-black uppercase tracking-wide text-slate-400">{{ row.created_by }}</td>
                                                 
                                                 <!-- Tombol Aksi Khusus Admin -->
@@ -2445,8 +2415,8 @@
                                                 </td>
                                                 <td class="px-6 py-4">
                                                     <div class="flex items-center gap-2 text-slate-600">
-                                                        <i :class="u.device_info?.includes('Android') || u.device_info?.includes('iOS') ? 'fa-mobile-alt' : 'fa-laptop'" class="fa-solid text-slate-400"></i>
-                                                        <span class="text-xs">{{ u.device_info || 'Belum Login' }}</span>
+                                                        <i :class="u.device_name?.includes('Android') || u.device_name?.includes('iOS') ? 'fa-mobile-alt' : 'fa-laptop'" class="fa-solid text-slate-400"></i>
+                                                        <span class="text-xs">{{ u.device_name || 'Belum Login' }}</span>
                                                     </div>
                                                 </td>
                                                 <td class="px-6 py-4 text-center">
@@ -2525,8 +2495,8 @@
                                                 </td>
                                                 <td class="px-6 py-4 text-sm text-slate-600">
                                                     <div class="flex items-center gap-2">
-                                                        <i :class="u.device_info?.includes('Android') || u.device_info?.includes('iOS') ? 'fa-mobile-alt' : 'fa-laptop'" class="fa-solid text-slate-400"></i>
-                                                        <span class="text-[11px]">{{ u.device_info || 'Belum Login' }}</span>
+                                                        <i :class="u.device_name?.includes('Android') || u.device_name?.includes('iOS') ? 'fa-mobile-alt' : 'fa-laptop'" class="fa-solid text-slate-400"></i>
+                                                        <span class="text-[11px]">{{ u.device_name || 'Belum Login' }}</span>
                                                     </div>
                                                 </td>
                                                 <td class="px-6 py-4 text-right">
