@@ -29,23 +29,18 @@ export function useAuth({
 		try {
 			const user = await login(loginData.username, loginData.password);
 			const sessionToken = crypto.randomUUID();
-			const { deviceId, deviceName } = getDeviceInfo();
 
 			await updateSessionToken(user.username, sessionToken);
-			await updateDeviceInfo(user.username, deviceId, deviceName);
 
 			userData.value = {
 				username: user.username,
 				nama: user.nama,
 				role: user.role,
 				canPreviewPhoto: user.can_preview_photo,
-				device_id: deviceId,
-				device_name: deviceName,
-				session_token: sessionToken
+				session_token: sessionToken,
 			};
 
 			isLoggedIn.value = true;
-
 			page.value = ROLE_LANDING_PAGE[user.role] || "dashboard";
 
 			localStorage.setItem(
@@ -59,11 +54,10 @@ export function useAuth({
 			);
 
 			await refreshAllData();
-
 			showToast(`Selamat datang, ${user.nama}!`, "success");
 		} catch (err) {
 			showToast(err.message || "Login gagal", "error");
-		} {
+		} finally {
 			loading.value = false;
 		}
 	};
@@ -133,17 +127,10 @@ export function useAuth({
 			if (!saved) return;
 
 			const parsed = JSON.parse(saved);
-			const { deviceId, deviceName } = getDeviceInfo();
 			const freshUser = await validateSession(parsed.username);
 
 			if (freshUser.session_token !== parsed.session_token) {
 				showToast("Sesi login digunakan di perangkat lain", "error");
-				await handleLogout();
-				return;
-			}
-
-			if (freshUser.device_id && freshUser.device_id !== deviceId) {
-				showToast("Perangkat tidak dikenali", "error");
 				await handleLogout();
 				return;
 			}
