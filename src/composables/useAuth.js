@@ -31,6 +31,7 @@ export function useAuth({
 			const sessionToken = crypto.randomUUID();
 
 			await updateSessionToken(user.username, sessionToken);
+			await new Promise(resolve => setTimeout(resolve, 300));
 
 			userData.value = {
 				username: user.username,
@@ -63,7 +64,12 @@ export function useAuth({
 	};
 
 	const handleRegister = async ({ regData, showRegisterModal }) => {
-		if (regData.value.password.length < 6) {
+		if (!regData || !regData.password) {
+			showToast("Data register tidak valid", "error");
+			return;
+		}
+
+		if (regData.password.length < 6) {
 			showToast("Password minimal 6 karakter", "error");
 			return;
 		}
@@ -73,20 +79,22 @@ export function useAuth({
 		try {
 			const { deviceId, deviceName } = getDeviceInfo();
 
-			await register(regData.value, {
+			await register(regData, {
 				device_id: deviceId,
 				device_name: deviceName
 			});
 
 			showToast("Pendaftaran berhasil! Menunggu approval.", "success");
-			showRegisterModal.value = false;
-			regData.value = {
-				nama: "",
-				username: "",
-				password: ""
-			};
+
+			if (showRegisterModal) {
+				showRegisterModal = false;
+			}
+
+			regData.nama = "";
+			regData.username = "";
+			regData.password = "";
 		} catch (err) {
-			showToast(err.message, "error");
+			showToast(err.message || "Register gagal", "error");
 		} finally {
 			loading.value = false;
 		}
@@ -129,11 +137,23 @@ export function useAuth({
 			const parsed = JSON.parse(saved);
 			const freshUser = await validateSession(parsed.username);
 
-			if (freshUser.session_token !== parsed.session_token) {
-				showToast("Sesi login digunakan di perangkat lain", "error");
-				await handleLogout();
+			if (!freshUser) {
+				showToast("Session tidak valid", "error");
+				await handleLogout(true);
 				return;
 			}
+
+			if (
+				freshUser.session_token &&
+				parsed.session_token &&
+				freshUser.session_token !== parsed.session_token
+			) {
+				showToast("Sesi login Anda telah berakhir karena akun digunakan di perangkat lain", "error");
+				await handleLogout(true, true); 
+				return;
+			}
+
+			const { deviceId, deviceName } = getDeviceInfo();
 
 			userData.value = {
 				username: freshUser.username,
@@ -152,21 +172,23 @@ export function useAuth({
 				JSON.stringify({
 					...userData.value,
 					page: page.value,
-					loginAt: Date.now()
+					loginAt: parsed.loginAt || Date.now()
 				})
 			);
+
 		} catch (err) {
 			console.error("Refresh session error:", err);
-			await handleLogout();
 		}
 	};
 
-	const handleLogout = async () => {
+	const handleLogout = async (silent = false, isKicked = false) => {
 		try {
-			if (userData.value?.username) {
+			if (userData.value?.username && !isKicked) {
 				await updateSessionToken(userData.value.username, null);
 			}
-		} catch (err) { }
+		} catch (err) {
+			console.warn("Logout API error:", err);
+		}
 
 		isLoggedIn.value = false;
 		userData.value = {
@@ -178,6 +200,10 @@ export function useAuth({
 
 		localStorage.removeItem("wms_user");
 		page.value = "login";
+
+		if (!silent) {
+			showToast("Logout berhasil", "success");
+		}
 	};
 
 	return {
