@@ -47,10 +47,7 @@ export function useAuth({
 				sessionToken
 			);
 
-			await updateDeviceInfo(
-				user.username,
-				deviceId
-			);
+			await updateDeviceInfo(user.username, deviceId, deviceName);
 
 			userData.value = {
 				username: user.username,
@@ -63,7 +60,6 @@ export function useAuth({
 			};
 
 			isLoggedIn.value = true;
-			page.value = ROLE_LANDING_PAGE[user.role] || "dashboard";
 
 			localStorage.setItem(
 				"wms_user",
@@ -94,9 +90,12 @@ export function useAuth({
 		loading.value = true;
 
 		try {
-			const deviceInfo = getDeviceInfo();
+			const { deviceId, deviceName } = getDeviceInfo();
 
-			await register(regData.value, deviceInfo);
+			await register(regData.value, {
+				device_id: deviceId,
+				device_name: deviceName
+			});
 
 			showToast("Pendaftaran berhasil! Menunggu approval VicKey.", "success");
 
@@ -138,7 +137,10 @@ export function useAuth({
 				})
 			);
 
-			showProfileModal.value = false;
+			if (showProfileModal && typeof showProfileModal.value === "boolean") {
+				showProfileModal.value = false;
+			}
+
 			showToast("Profil berhasil diperbarui", "success");
 
 			await refreshSession();
@@ -158,6 +160,7 @@ export function useAuth({
 
 			const parsed = JSON.parse(saved);
 			const { deviceId, deviceName } = getDeviceInfo();
+
 			const freshUser = await validateSession(parsed.username);
 
 			if (freshUser.session_token !== parsed.session_token) {
@@ -166,7 +169,7 @@ export function useAuth({
 				return;
 			}
 
-			if (freshUser.device_info && freshUser.device_info !== deviceId) {
+			if (freshUser.device_id && freshUser.device_id !== deviceId) {
 				showToast("Perangkat tidak dikenali", "error");
 				await handleLogout();
 				return;
@@ -177,12 +180,12 @@ export function useAuth({
 				nama: freshUser.nama,
 				role: freshUser.role,
 				canPreviewPhoto: freshUser.can_preview_photo,
-				device_info: currentDevice,
+				device_id: deviceId,
+				device_name: deviceName,
 				session_token: parsed.session_token
 			};
 
 			isLoggedIn.value = true;
-			page.value = ROLE_LANDING_PAGE[freshUser.role] || "dashboard";
 
 			localStorage.setItem(
 				"wms_user",
@@ -192,7 +195,7 @@ export function useAuth({
 				})
 			);
 		} catch (err) {
-			console.error("Refresh session error:", err);
+			console.error(err);
 			await handleLogout();
 		}
 	};
@@ -202,7 +205,11 @@ export function useAuth({
 	const handleLogout = async () => {
 		try {
 			if (userData.value?.username) {
-				await updateSessionToken(userData.value.username, null);
+				await updateSessionToken(
+					userData.value.username,
+					null,
+					userData.value.session_token
+				);
 			}
 		} catch (err) { }
 
