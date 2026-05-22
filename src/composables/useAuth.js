@@ -40,7 +40,7 @@ export function useAuth({
 			);
 
 			const sessionToken = crypto.randomUUID();
-			const deviceInfo = getDeviceInfo();
+			const { deviceId, deviceName } = getDeviceInfo();
 
 			await updateSessionToken(
 				user.username,
@@ -49,7 +49,7 @@ export function useAuth({
 
 			await updateDeviceInfo(
 				user.username,
-				deviceInfo
+				deviceId
 			);
 
 			userData.value = {
@@ -57,7 +57,8 @@ export function useAuth({
 				nama: user.nama,
 				role: user.role,
 				canPreviewPhoto: user.can_preview_photo,
-				device_info: deviceInfo,
+				device_id: deviceId,
+				device_name: deviceName,
 				session_token: sessionToken
 			};
 
@@ -156,7 +157,7 @@ export function useAuth({
 			if (!saved) return;
 
 			const parsed = JSON.parse(saved);
-			const currentDevice = getDeviceInfo();
+			const { deviceId, deviceName } = getDeviceInfo();
 			const freshUser = await validateSession(parsed.username);
 
 			if (freshUser.session_token !== parsed.session_token) {
@@ -165,7 +166,7 @@ export function useAuth({
 				return;
 			}
 
-			if (freshUser.device_info && freshUser.device_info !== currentDevice) {
+			if (freshUser.device_info && freshUser.device_info !== deviceId) {
 				showToast("Perangkat tidak dikenali", "error");
 				await handleLogout();
 				return;
