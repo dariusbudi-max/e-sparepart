@@ -1282,7 +1282,12 @@ createApp({
                         localStorage.setItem("wms_user", JSON.stringify(parsed));
                     }
 
-                    if (isExpired) throw new Error("Session expired");
+                    if (isExpired) {
+                        console.warn("Session expired local");
+                        localStorage.removeItem("wms_user");
+                        isLoggedIn.value = false;
+                        return;
+                    }
 
                     await refreshSession();
 
@@ -1299,9 +1304,22 @@ createApp({
                 }
             }
 
+            let isRefreshing = false;
+
+            const refreshSessionSafe = async () => {
+                if (isRefreshing) return;
+
+                isRefreshing = true;
+                try {
+                    await refreshSession();
+                } finally {
+                    isRefreshing = false;
+                }
+            };
+
             setInterval(() => {
-                if (isLoggedIn.value) refreshSession();
-            }, 15000);
+                if (isLoggedIn.value) refreshSessionSafe();
+            }, 30000);
 
             inventory.loadInventory(true);
 
