@@ -149,7 +149,7 @@ export function useAuth({
 				freshUser.session_token !== parsed.session_token
 			) {
 				showToast("Sesi login Anda telah berakhir karena akun digunakan di perangkat lain", "error");
-				await handleLogout(true, true); 
+				await handleLogout(true, true);
 				return;
 			}
 
