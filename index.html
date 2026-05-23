@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <link rel="icon" type="image/png" href="https://cdn-icons-png.flaticon.com/512/679/679922.png">
-    <link href="src/output.css" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
     <title>WMS SPAREPART</title>
     
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -2396,6 +2396,7 @@
                                             <tr class="text-[11px] uppercase tracking-wider font-bold text-amber-700/70">
                                                 <th class="px-6 py-4">Informasi Akun</th>
                                                 <th class="px-6 py-4">Sesi Perangkat</th>
+                                                <th class="px-6 py-4">Terakhir Login</th>
                                                 <th class="px-6 py-4 text-center">Pilih Role & Approve Langsung</th>
                                                 <th class="px-6 py-4 text-right">Aksi</th>
                                             </tr>
@@ -2417,6 +2418,12 @@
                                                     <div class="flex items-center gap-2 text-slate-600">
                                                         <i :class="u.device_name?.includes('Android') || u.device_name?.includes('iOS') ? 'fa-mobile-alt' : 'fa-laptop'" class="fa-solid text-slate-400"></i>
                                                         <span class="text-xs">{{ u.device_name || 'Belum Login' }}</span>
+                                                    </div>
+                                                </td>
+                                                <td class="px-6 py-4">
+                                                    <div class="flex flex-col text-xs text-slate-600">
+                                                        <span class="font-medium">{{ u.last_login ? new Date(u.last_login).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' }) : 'Belum pernah' }}</span>
+                                                        <span class="text-[10px] text-slate-400 font-mono">{{ u.last_login ? new Date(u.last_login).toLocaleTimeString('id-ID', { hour: '2-digit', minute:'2-digit' }) : '' }}</span>
                                                     </div>
                                                 </td>
                                                 <td class="px-6 py-4 text-center">
@@ -2453,6 +2460,7 @@
                                                 <th class="px-6 py-4">Level Akses</th>
                                                 <th class="px-6 py-4 text-center">Photo Access</th>
                                                 <th class="px-6 py-4">Status Akun</th>
+                                                <th class="px-6 py-4">Terakhir Login</th>
                                                 <th class="px-6 py-4">Sesi Perangkat</th>
                                                 <th class="px-6 py-4 text-right">Aksi</th>
                                             </tr>
@@ -2491,6 +2499,16 @@
                                                     <div class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-bold border" :class="u.status==='AKTIF' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-rose-50 text-rose-600 border-rose-100'">
                                                         <span class="w-1.5 h-1.5 rounded-full" :class="u.status==='AKTIF' ? 'bg-emerald-500' : 'bg-rose-500'"></span>
                                                         {{ u.status }}
+                                                    </div>
+                                                </td>
+                                                <td class="px-6 py-4">
+                                                    <div class="flex flex-col text-xs text-slate-600">
+                                                        <span class="font-medium text-slate-700">
+                                                            {{ u.last_login ? new Date(u.last_login).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' }) : 'Belum pernah' }}
+                                                        </span>
+                                                        <span class="text-[10px] text-slate-400 font-mono">
+                                                            {{ u.last_login ? new Date(u.last_login).toLocaleTimeString('id-ID', { hour: '2-digit', minute:'2-digit' }) : '-' }}
+                                                        </span>
                                                     </div>
                                                 </td>
                                                 <td class="px-6 py-4 text-sm text-slate-600">
