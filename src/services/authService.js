@@ -23,7 +23,15 @@ export const login = async (username, password) => {
         throw new Error("Password salah");
     }
 
-    return user;
+    const currentTimestamp = new Date().toISOString();
+    const updateRes = await supabaseClient
+        .from("users")
+        .update({ last_login: currentTimestamp })
+        .eq("username", usernameClean)
+        .select()
+        .single();
+
+    return handleResponse(updateRes);
 };
 
 export const register = async (payload, deviceInfo) => {
@@ -87,7 +95,8 @@ export const validateSession = async (username) => {
             can_preview_photo,
             session_token,
             device_id,
-            device_name
+            device_name,
+            last_login 
         `)
         .eq("username", username)
         .single();

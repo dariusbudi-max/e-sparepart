@@ -8,7 +8,7 @@ import {
 	fetchAllInventory
 } from "../services/inventoryService.js";
 
-export function useInventory({ showToast, userRole }) {
+export function useInventory({ showToast, userRole, userData }) {
 	const inventory = ref([]);
 	const isInventoryReady = ref(false);
 	const loading = ref(false);
@@ -87,14 +87,22 @@ export function useInventory({ showToast, userRole }) {
 	};
 
 	const saveNewLocation = async (payload) => {
+		if (!payload?.kode || !payload?.lokasi) {
+			showToast("Data lokasi tidak valid", "error");
+			return;
+		}
+
 		loading.value = true;
 		try {
-			const data = await updateLocation(payload.kode, payload.lokasi);
+			const username = userData?.value?.nama || "SYSTEM";
+			const data = await updateLocation(payload.kode, payload.lokasi, username);
+
 			const item = inventory.value.find(i => i.kode === payload.kode);
 			if (item) item.lokasi = data.lokasi;
-			showToast("Lokasi diperbarui", "success");
+
+			showToast("Lokasi berhasil diperbarui", "success");
 		} catch (err) {
-			showToast(err.message, "error");
+			showToast(err.message || "Gagal update lokasi", "error");
 		} finally {
 			loading.value = false;
 		}

@@ -30,15 +30,49 @@ export const upsertItem = async (payload) => {
     return data;
 };
 
-export const updateLocation = async (kode, lokasi) => {
+export const updateLocation = async (kode, lokasiBaru, username = "SYSTEM") => {
+    const { data: item, error: itemError } = await supabaseClient
+        .from("inventory")
+        .select("*")
+        .eq("kode", kode)
+        .single();
+
+    if (itemError) throw itemError;
+
+    const lokasiLama = item.lokasi || "-";
+
+    if (lokasiLama.trim().toUpperCase() === lokasiBaru.trim().toUpperCase()) {
+        throw new Error("Lokasi baru sama dengan lokasi saat ini");
+    }
+
     const { data, error } = await supabaseClient
         .from("inventory")
-        .update({ lokasi })
+        .update({ lokasi: lokasiBaru })
         .eq("kode", kode)
         .select()
         .single();
 
     if (error) throw error;
+
+    const { error: riwayatError } = await supabaseClient
+        .from("riwayat")
+        .insert({
+            barang_kode: item.kode,
+            barang_nama: item.nama,
+            jenis: "UPDATE_LOKASI",
+            qty: 0,
+            user_username: username,
+            dept: "SPAREPART",
+            keterangan: `Relokasi ${lokasiLama} → ${lokasiBaru}`,
+            stok_sebelum: item.stok,
+            stok_akhir: item.stok,
+            is_void: false
+        });
+
+    if (riwayatError) {
+        console.error("Gagal insert riwayat relokasi:", riwayatError);
+    }
+
     return data;
 };
 

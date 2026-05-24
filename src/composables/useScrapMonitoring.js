@@ -45,64 +45,116 @@ export function useScrapMonitoring({ supabaseClient, userData, showToast }) {
     };
 
     const submitScrap = async () => {
-        const finalNamaBarang = selectedItemType.value === "Input Manual"
-            ? form.value.nama_barang.toUpperCase().trim()
-            : selectedItemType.value.toUpperCase();
 
-        if (!finalNamaBarang || !form.value.department || !form.value.tgl_penukaran) {
+        const finalNamaBarang =
+            selectedItemType.value === "Input Manual"
+                ? form.value.nama_barang.toUpperCase().trim()
+                : selectedItemType.value.toUpperCase();
+
+        if (
+            !finalNamaBarang ||
+            !form.value.department ||
+            !form.value.tgl_penukaran
+        ) {
             showToast("Mohon lengkapi kolom yang wajib diisi!", "error");
             return;
         }
 
-        if (isDateRangeRequired.value) {
-            if (!form.value.tgl_awal_pakai || !form.value.tgl_akhir_pakai) {
-                showToast("Untuk item JARUM, Tanggal Awal & Akhir Pakai WAJIB diisi!", "error");
-                return;
-            }
+        if (
+            isDateRangeRequired.value &&
+            (
+                !form.value.tgl_awal_pakai ||
+                !form.value.tgl_akhir_pakai
+            )
+        ) {
+            showToast(
+                "Untuk item JARUM, Tanggal Awal & Akhir Pakai WAJIB diisi!",
+                "error"
+            );
+            return;
         }
 
-        const inputDeptClean = form.value.department.trim().toLowerCase();
-        const isDeptValid = departments.value.some(d => d.trim().toLowerCase() === inputDeptClean);
+        const inputDeptClean =
+            form.value.department.trim().toLowerCase();
+
+        const isDeptValid = departments.value.some(
+            d => d.trim().toLowerCase() === inputDeptClean
+        );
+
         if (!isDeptValid) {
             showToast("Department tidak terdaftar", "error");
             return;
         }
 
         loading.value = true;
+
         try {
+
             const payload = {
                 nama_barang: finalNamaBarang,
-                tgl_awal_pakai: isDateRangeRequired.value ? form.value.tgl_awal_pakai : null,
-                tgl_akhir_pakai: isDateRangeRequired.value ? form.value.tgl_akhir_pakai : null,
+
+                tgl_awal_pakai: isDateRangeRequired.value
+                    ? form.value.tgl_awal_pakai
+                    : null,
+
+                tgl_akhir_pakai: isDateRangeRequired.value
+                    ? form.value.tgl_akhir_pakai
+                    : null,
+
                 tgl_penukaran: form.value.tgl_penukaran,
+
                 department: form.value.department,
+
                 qty: Number(form.value.qty || 1),
+
                 created_by: userData.value?.nama || "USER"
             };
 
+            let response;
+
             if (isEditing.value) {
-                const { error } = await supabaseClient
+
+                response = await supabaseClient
                     .from("scrap_monitoring")
                     .update(payload)
                     .eq("id", currentEditId.value);
 
-                if (error) throw error;
-                showToast("Data scrap berhasil diperbarui", "success");
             } else {
-                const { error } = await supabaseClient
-                    .from("scrap_monitoring")
-                    .insert([payload]);
 
-                if (error) throw error;
-                showToast("Data scrap berhasil disimpan", "success");
+                response = await supabaseClient
+                    .from("scrap_monitoring")
+                    .insert(payload);
+
             }
 
+            if (response.error) {
+                throw response.error;
+            }
+
+            showToast(
+                isEditing.value
+                    ? "Data scrap berhasil diperbarui"
+                    : "Data scrap berhasil disimpan",
+                "success"
+            );
+
             resetForm();
+
             await loadScrapData();
+
         } catch (err) {
-            showToast(err.message, "error");
+
+            console.error("SCRAP ERROR:", err);
+
+            showToast(
+                err.message || "Terjadi kesalahan saat menyimpan data",
+                "error"
+            );
+
         } finally {
+
             loading.value = false;
+
         }
     };
 

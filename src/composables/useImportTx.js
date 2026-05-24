@@ -34,18 +34,30 @@ export const useImportTx = (inventoryRef, onSubmit) => {
 
     const submit = async () => {
         if (loading.value) return;
-        const currentInv = unref(inventoryRef.inventory) || [];
-        const revalidated = await validateRows(preview.value, currentInv);
-
-        if (revalidated.some(r => !r.valid)) {
-            preview.value = revalidated;
-            throw new Error("Terdapat data tidak valid");
-        }
 
         loading.value = true;
+
         try {
-            await onSubmit(revalidated);
+            const currentInv = unref(inventoryRef.inventory) || [];
+
+            const revalidated = await validateRows(preview.value, currentInv);
+
+            if (revalidated.some(r => !r.valid)) {
+                preview.value = revalidated;
+                throw new Error("Terdapat data tidak valid");
+            }
+
+            const validRows =
+                revalidated.filter(r => r.valid);
+
+            if (!validRows.length) {
+                throw new Error("Tidak ada transaksi valid");
+            }
+
+            await onSubmit(validRows);
+
             reset();
+
         } finally {
             loading.value = false;
         }

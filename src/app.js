@@ -109,6 +109,8 @@ createApp({
 
         const qtyInputRef = ref(null);
         const searchInputRef = ref(null);
+        const showScrapInput = ref(false);
+
 
         const isRefreshing = ref(false);
         const pivotRawTx = ref([]);
@@ -386,6 +388,7 @@ createApp({
         const inventory = useInventory({
             showToast,
             userRole,
+            userData
         });
 
         const saveItem = async () => {
@@ -1382,7 +1385,7 @@ createApp({
 
             // 9. UPDATE SUPABASE
             exportExcel, exportDashboardExcel, exportInventoryExcel, exportLowStockExcel, isExporting, analyticsFilter, loadPivot, safeFetch, loadHistory,
-            catatanSpp, scrap, loadScrapData: scrap.loadScrapData,
+            catatanSpp, scrap, loadScrapData: scrap.loadScrapData, showScrapInput,
 
             // 10. DASHBOARD & REPORTING
             dashboard, dashData, dashFilter, handlePrint, downloadPDF, historySearch, dashboardTx, recentTx, loadLowStock, exportHistory,
