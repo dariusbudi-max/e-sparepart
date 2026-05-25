@@ -35,7 +35,14 @@ export function useUsers({ userData, loading, showToast, closeUserModal }) {
 	const submitNewUser = async (newUser) => {
 		try {
 			isSubmitting.value = true;
-			const createdUser = await createUser(newUser);
+			const payload = {
+				nama: newUser.nama,
+				username: newUser.username,
+				password: newUser.password,
+				role: newUser.role,
+			};
+
+			const createdUser = await createUser(payload);
 
 			adminUsers.value.unshift(createdUser);
 			showToast("User berhasil ditambahkan!", "success");
