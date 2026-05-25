@@ -1517,7 +1517,7 @@
                                             <th class="px-5 py-4 w-[10%] text-left">Satuan</th>
                                             <th class="px-5 py-4 w-[12%] text-center">Lokasi</th>
                                             <th v-if="['ADMIN','STAFF'].includes(userData.role)" class="px-5 py-4 w-[10%] text-center">Stok</th>
-                                            <th v-if="userData.role === 'ADMIN' || userData.canPreviewPhoto" class="px-5 py-4 w-[12%] text-center">Foto</th>
+                                            <th v-if="userData.role === 'ADMIN' || userData.can_preview_photo" class="px-5 py-4 w-[12%] text-center">Foto</th>
                                         </tr>
                                     </thead>
 
@@ -1543,7 +1543,7 @@
                                                     {{ item.stok }}
                                                 </span>
                                             </td>
-                                            <td v-if="userData.role === 'ADMIN' || userData.canPreviewPhoto" class="px-5 py-4 text-center">
+                                            <td v-if="userData.role === 'ADMIN' || userData.can_preview_photo" class="px-5 py-4 text-center">
                                                 <div v-if="item.foto" @click="previewImage = fixDriveUrl(item.foto)" class="w-16 h-14 mx-auto rounded-lg overflow-hidden bg-slate-100 cursor-pointer hover:shadow-md transition border border-slate-200">
                                                     <img :src="fixDriveUrl(item.foto)" class="w-full h-full object-cover">
                                                 </div>
@@ -2544,7 +2544,7 @@
                                                 </td>
                                                 <td class="px-6 py-4 text-center">
                                                     <label class="relative inline-flex items-center cursor-pointer justify-center">
-                                                        <input type="checkbox" class="sr-only peer" :checked="u.can_preview_photo" @change="handleTogglePhotoAccess(u, u.can_preview_photo)">
+                                                        <input type="checkbox" class="sr-only peer" :checked="u.can_preview_photo" @change="handleTogglePhotoAccess(u, $event.target.checked)">
                                                         <div class="w-10 h-5 bg-slate-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-500"></div>
                                                     </label>
                                                 </td>
