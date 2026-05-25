@@ -2412,40 +2412,40 @@
 
                 <main v-if="page === 'user_management' && ['ADMIN'].includes(userData.role)" class="flex-1 flex flex-col h-screen overflow-hidden bg-[#f8fafc] font-sans">
     
-                    <div class="px-6 md:px-8 py-5 md:py-6 bg-white border-b border-slate-100 shadow-[0_4px_20px_rgba(0,0,0,0.01)] z-10 flex flex-col md:flex-row md:items-center justify-between gap-4 md:gap-8">
-                        <div class="shrink-0">
-                            <h2 class="text-xl md:text-2xl font-bold text-slate-800 tracking-tight flex items-center gap-2">
-                                <i class="fa-solid fa-users-gear text-blue-600"></i> Kelola User
-                            </h2>
-                            <p class="text-xs md:text-sm text-slate-500 font-medium mt-1">
-                                Total Pengguna: <span class="text-blue-600 font-bold">{{ adminUsers.length }}</span> Akun
-                            </p>
+                    <div class="px-6 md:px-8 py-4 bg-white border-b border-slate-100 shadow-[0_4px_20px_rgba(0,0,0,0.01)] z-30 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shrink-0">
+                        <div class="flex items-center gap-2 text-slate-800 shrink-0">
+                            <i class="fa-solid fa-users text-blue-500 text-sm md:text-base"></i>
+                            <h3 class="text-xs md:text-sm font-black uppercase tracking-wider">
+                                <span class="text-blue-600 font-mono">{{ adminUsers.length }}</span> Pengguna Terdaftar
+                            </h3>
                         </div>
                         
-                        <div class="flex flex-row items-center gap-2 md:gap-3 w-full md:w-auto md:max-w-md justify-end">
-                            <div class="relative flex-1 group">
-                                <i class="fa-solid fa-magnifying-glass absolute left-3 md:left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-blue-500 transition-colors text-xs md:text-sm"></i>
-                                <input v-model="userSearchQuery" type="text" placeholder="Cari user..." 
-                                    class="w-full pl-9 md:pl-10 pr-3 md:pr-4 py-2 md:py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs md:text-sm font-medium text-slate-700 focus:bg-white focus:border-blue-500 outline-none transition-all">
+                        <div class="flex items-center gap-3 w-full sm:w-auto">
+                            <div class="relative flex-1 sm:w-64 group">
+                                <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-blue-500 transition-colors text-xs md:text-sm"></i>
+                                <input v-model="userSearchQuery" type="text" placeholder="Cari nama atau email..." 
+                                    class="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs md:text-sm font-semibold text-slate-700 placeholder:text-slate-400 focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 outline-none transition-all shadow-inner">
                             </div>
-                            <button @click="showUserModal = true" class="bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-4 md:px-5 py-2 md:py-2.5 rounded-xl text-xs md:text-sm font-bold shadow-lg shadow-blue-500/30 transition-all active:scale-95 flex items-center gap-2 shrink-0">
-                                <i class="fa-solid fa-user-plus"></i> <span class="hidden sm:inline">Tambah User</span>
+                            
+                            <button @click="showUserModal = true" class="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white px-4 py-2.5 rounded-xl text-xs md:text-sm font-black tracking-wide shadow-md shadow-blue-500/20 hover:shadow-lg hover:shadow-blue-500/30 transition-all active:scale-95 flex items-center gap-2 shrink-0">
+                                <i class="fa-solid fa-user-plus text-xs"></i>
+                                <span>Tambah User</span>
                             </button>
                         </div>
                     </div>
 
-                    <div class="flex-1 overflow-y-auto p-6 md:p-8 custom-scrollbar">
+                    <div class="flex-1 overflow-y-auto p-6 md:p-8 custom-scrollbar min-h-0 flex flex-col gap-6">
                         
-                        <div v-if="filteredAdminUsers.filter(u => u.status === 'PENDING').length > 0" class="mb-10 animate-fade-in">
-                            <h3 class="text-sm font-bold text-slate-800 mb-4 flex items-center gap-2 uppercase tracking-wide">
+                        <div v-if="filteredAdminUsers.filter(u => u.status === 'PENDING').length > 0" class="flex flex-col min-h-0 shrink-0 animate-fade-in">
+                            <h3 class="text-sm font-bold text-slate-800 mb-4 flex items-center gap-2 uppercase tracking-wide shrink-0">
                                 <i class="fa-solid fa-user-clock text-amber-500 animate-pulse"></i> Approval User Baru
                                 <span class="bg-amber-100 text-amber-700 py-0.5 px-2.5 rounded-full text-[10px] font-black">{{ filteredAdminUsers.filter(u => u.status === 'PENDING').length }}</span>
                             </h3>
                             
-                            <div class="bg-white rounded-3xl border border-amber-200 shadow-[0_8px_30px_rgba(245,158,11,0.06)] overflow-hidden">
-                                <div class="overflow-auto w-full max-h-[400px] custom-scrollbar">
+                            <div class="bg-white rounded-3xl border border-amber-200 shadow-[0_8px_30px_rgba(245,158,11,0.06)] overflow-hidden flex flex-col min-h-0">
+                                <div class="overflow-auto w-full custom-scrollbar">
                                     <table class="w-full text-left border-collapse min-w-[950px]">
-                                        <thead class="bg-amber-50/50 border-b border-amber-100 sticky top-0 z-20">
+                                        <thead class="bg-amber-50/70 border-b border-amber-100 sticky top-0 z-20 backdrop-blur-sm">
                                             <tr class="text-[11px] uppercase tracking-wider font-bold text-amber-700/70">
                                                 <th class="px-6 py-4">Informasi Akun</th>
                                                 <th class="px-6 py-4">Sesi Perangkat</th>
@@ -2462,7 +2462,7 @@
                                                             {{ (u.nama || u.username || '?').charAt(0).toUpperCase() }}
                                                         </div>
                                                         <div>
-                                                            <div class="font-bold text-slate-800 text-sm">{{ u.nama || 'Tanpa Nama' }}</div>
+                                                            <div class="font-bold text-slate-800 text-sm">礼 u.nama || 'Tanpa Nama' }}</div>
                                                             <div class="text-[11px] font-mono text-slate-400">@{{ u.username }}</div>
                                                         </div>
                                                     </div>
@@ -2499,15 +2499,11 @@
                             </div>
                         </div>
 
-                        <div>
-                            <h3 class="text-sm font-bold text-slate-800 mb-4 flex items-center gap-2 uppercase tracking-wide">
-                                <i class="fa-solid fa-users text-blue-500"></i> Pengguna Terdaftar
-                            </h3>
-                            
-                            <div class="bg-white rounded-3xl border border-slate-100 shadow-[0_8px_30px_rgba(0,0,0,0.03)] overflow-hidden">
-                                <div class="overflow-auto w-full max-h-[700px] custom-scrollbar">
+                        <div class="flex-1 flex flex-col min-h-0">                            
+                            <div class="bg-white rounded-3xl border border-slate-100 shadow-[0_8px_30px_rgba(0,0,0,0.03)] overflow-hidden flex flex-col min-h-0">
+                                <div class="overflow-auto w-full custom-scrollbar">
                                     <table class="w-full text-left border-collapse min-w-[900px]">
-                                        <thead class="bg-slate-50 border-b border-slate-100 sticky top-0 z-20">
+                                        <thead class="bg-slate-50 border-b border-slate-100 sticky top-0 z-20 backdrop-blur-sm">
                                             <tr class="text-[11px] uppercase tracking-wider font-semibold text-slate-500">
                                                 <th class="px-6 py-4">User Name</th>
                                                 <th class="px-6 py-4">Level Akses</th>
@@ -2526,7 +2522,7 @@
                                                             {{ (u.nama || u.username || '?').charAt(0).toUpperCase() }}
                                                         </div>
                                                         <div>
-                                                            <div class="font-bold text-slate-800 text-sm">{{ u.nama || 'Tanpa Nama' }}</div>
+                                                            <div class="font-bold text-slate-800 uppercase">{{ u.nama || 'Tanpa Nama' }}</div>
                                                             <div class="text-[11px] font-mono text-slate-400">@{{ u.username }}</div>
                                                         </div>
                                                     </div>
@@ -2572,7 +2568,7 @@
                                                 </td>
                                                 <td class="px-6 py-4 text-right">
                                                     <div class="flex justify-end items-center gap-1">
-                                                        <button  v-if="u.role !== 'ADMIN'" @click="toggleUser(u)" 
+                                                        <button v-if="u.role !== 'ADMIN'" @click="toggleUser(u)" 
                                                             :class="u.status==='AKTIF' ? 'text-amber-500 hover:bg-amber-50' : 'text-emerald-500 hover:bg-emerald-50'" 
                                                             class="w-8 h-8 flex items-center justify-center rounded-lg transition-colors"
                                                             :title="u.status==='AKTIF' ? 'Suspend' : 'Aktifkan'">
@@ -2589,7 +2585,6 @@
                                 </div>
                             </div>
                         </div>
-                        <div class="h-10"></div>
                     </div>
                 </main>
 
@@ -3068,7 +3063,7 @@
             </div>
         </transition>
 
-        <div v-if="showOpnameModal" class="fixed inset-0 z-100 flex items-center justify-center p-4">
+        <div v-if="showOpnameModal" class="fixed inset-0 z-[100] flex items-center justify-center p-4">
             <div class="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" @click="showOpnameModal = false"></div>
 
             <div class="bg-white rounded-3xl w-full max-w-lg shadow-2xl transform transition-all overflow-hidden">
