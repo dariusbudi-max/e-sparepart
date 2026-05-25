@@ -3065,9 +3065,9 @@
 
         <div v-if="showOpnameModal" class="fixed inset-0 z-[100] flex items-center justify-center p-4">
             <div class="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" @click="showOpnameModal = false"></div>
-
-            <div class="bg-white rounded-3xl w-full max-w-lg shadow-2xl transform transition-all overflow-hidden">
-                <div class="px-8 py-6 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+        
+            <div class="bg-white rounded-3xl w-full max-w-lg max-h-[90vh] flex flex-col shadow-2xl transform transition-all overflow-hidden relative z-10">
+                <div class="px-8 py-6 border-b border-slate-100 flex justify-between items-center bg-slate-50/50 shrink-0">
                     <div>
                         <h3 class="text-lg font-black text-slate-800 uppercase tracking-tight">Detail Selisih Opname</h3>
                         <p class="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-0.5">Daftar Barang Tidak Sesuai</p>
@@ -3076,8 +3076,8 @@
                         <i class="fa-solid fa-times text-slate-400"></i>
                     </button>
                 </div>
-
-                <div class="max-h-[60vh] overflow-y-auto custom-scrollbar">
+        
+                <div class="flex-1 overflow-y-auto custom-scrollbar">
                     <table class="w-full text-left border-collapse">
                         <thead class="sticky top-0 bg-slate-50 z-10">
                             <tr>
@@ -3089,10 +3089,10 @@
                         <tbody class="divide-y divide-slate-100">
                             <tr v-for="item in opnameDetail" :key="item.barang_kode" class="hover:bg-slate-50 transition-colors">
                                 <td class="px-8 py-4 font-bold text-slate-700 text-sm">{{ item.barang_kode }}</td>
-                                <td class="px-8 py-4 font-bold text-slate-700 text-sm">{{ item.barang_nama }}</td>
+                                <td class="px-8 py-4 font-bold text-slate-700 text-sm whitespace-normal break-words max-w-[180px]">{{ item.barang_nama }}</td>
                                 <td class="px-8 py-4 text-right">
                                     <span :class="item.selisih < 0 ? 'bg-rose-50 text-rose-600' : 'bg-emerald-50 text-emerald-600'" 
-                                        class="px-3 py-1 rounded-lg font-black text-xs">
+                                        class="px-3 py-1 rounded-lg font-black text-xs inline-block">
                                         {{ item.selisih > 0 ? '+' : '' }}{{ item.selisih }}
                                     </span>
                                 </td>
@@ -3100,8 +3100,8 @@
                         </tbody>
                     </table>
                 </div>
-
-                <div class="p-6 border-t border-slate-100 text-center">
+        
+                <div class="p-6 border-t border-slate-100 text-center shrink-0 bg-white">
                     <button @click="showOpnameModal = false" class="w-full py-3 bg-slate-900 text-white rounded-xl font-black text-xs uppercase tracking-widest hover:bg-slate-800 transition-all active:scale-95">
                         Tutup Detail
                     </button>
