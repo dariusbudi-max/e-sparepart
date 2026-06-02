@@ -87,6 +87,7 @@ createApp({
             disetujui: 'Asyiriah'
         });
 
+        const photoPreview = ref(null);
         const previewImage = ref(null);
         const showImportMode = ref(false);
 
@@ -728,6 +729,7 @@ createApp({
 
         const closeModal = () => {
             if (isCameraActive.value) stopCamera();
+            photoPreview.value = null;
             isUploading.value = false;
             showItemModal.value = false;
         };
@@ -735,6 +737,13 @@ createApp({
         const removePhoto = () => {
             if (confirm("Hapus foto produk ini?")) {
                 formItem.value.foto = null;
+            }
+        };
+
+        const removePhotoStaff = () => {
+            if (confirm("Apakah Anda yakin ingin menghapus foto produk ini dari data sementara? (Jangan lupa klik 'Simpan Perubahan' setelah ini)")) {
+                formItem.value.foto = null;
+                showToast("Foto dihapus sementara. Klik 'Simpan Perubahan' untuk memperbarui database.", "success");
             }
         };
 
@@ -749,6 +758,7 @@ createApp({
 
         const closePhotoModal = () => {
             stopCamera();
+            photoPreview.value = null;
             showPhotoModal.value = false;
             loading.value = false;
         };
@@ -763,32 +773,67 @@ createApp({
             }
         };
 
-        const handleTakePhoto = async () => {
-            const base64 = takeSnapshot();
-
-            if (!base64) {
+        const handleTakePhoto = () => {
+            if (!videoFeed.value || videoFeed.value.readyState !== 4) {
                 showToast("Kamera belum siap", "error");
                 return;
             }
 
-            isUploading.value = true;
-
             try {
-                const url = await uploadBase64Photo(base64, formItem.value.kode);
+                const video = videoFeed.value;
+                const canvas = document.createElement("canvas");
+                const size = Math.min(video.videoWidth, video.videoHeight);
+
+                canvas.width = size;
+                canvas.height = size;
+
+                const context = canvas.getContext("2d");
+                const sx = (video.videoWidth - size) / 2;
+                const sy = (video.videoHeight - size) / 2;
+
+                context.drawImage(video, sx, sy, size, size, 0, 0, size, size);
+
+                const base64Data = canvas.toDataURL("image/jpeg", 0.95);
+
+                photoPreview.value = base64Data;
+                stopCamera();
+                showToast("Foto berhasil diambil! Silakan tinjau.", "success");
+            } catch (err) {
+                showToast("Gagal memproses gambar: " + err.message, "error");
+            }
+        };
+
+        const confirmAndUploadPhoto = async () => {
+            if (!photoPreview.value) return;
+
+            isUploading.value = true;
+            try {
+                showToast("Memulai proses upload...", "success");
+
+                let rawBase64 = photoPreview.value;
+
+                if (rawBase64.includes(",")) {
+                    rawBase64 = rawBase64.split(",")[1];
+                }
+
+                const url = await uploadBase64Photo(rawBase64, formItem.value.kode);
 
                 formItem.value.foto = url;
 
-                stopCamera();
-                isCameraActive.value = false;
-                await nextTick();
+                photoPreview.value = null;
 
-                showToast("Foto berhasil diambil", "success");
-
+                showToast("Foto produk berhasil diunggah ke Drive!", "success");
             } catch (err) {
-                showToast(err.message, "error");
+                console.error("Upload Error:", err);
+                showToast("Gagal mengunggah foto: " + err.message, "error");
             } finally {
                 isUploading.value = false;
             }
+        };
+
+        const cancelPreview = () => {
+            photoPreview.value = null;
+            startLiveCamera();
         };
 
         const startLiveCamera = async () => {
@@ -1370,7 +1415,7 @@ createApp({
             isStockInsufficientUI, getMasterStockUI, isCameraActive, videoFeed, fileInput, startScanner, stopScanner, handleScan,
             openScanner, scannerActive, handleTakePhoto, scanner, importer, useTransaction, focusSearch, closeScanner, handleFileUpload,
             launchGallery, previewImage, openUpdateFoto, savePhotoOnly, startLiveCamera, stopCamera, takeSnapshot, uploadPhoto, uploadBase64Photo,
-            removePhoto, isUploading, toggleUser,
+            removePhoto, isUploading, toggleUser, photoPreview, confirmAndUploadPhoto, cancelPreview, removePhotoStaff,
 
             // 7. SPP (SURAT PERMOHONAN PEMBELIAN) & RESERVASI
             summarySppItems, inputKodeManual, tambahSemuaKeSpp, tambahItemManualByKode, kosongkanSpp, usageMap,
