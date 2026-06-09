@@ -3093,31 +3093,52 @@
         <div v-if="showOpnameModal" class="fixed inset-0 z-[100] flex items-center justify-center p-4">
             <div class="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" @click="showOpnameModal = false"></div>
 
-            <div class="bg-white rounded-3xl w-full max-w-lg shadow-2xl transform transition-all overflow-hidden">
+            <div class="bg-white rounded-3xl w-full max-w-2xl shadow-2xl transform transition-all overflow-hidden relative z-10">
+                
                 <div class="px-8 py-6 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
                     <div>
                         <h3 class="text-lg font-black text-slate-800 uppercase tracking-tight">Detail Selisih Opname</h3>
-                        <p class="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-0.5">Daftar Barang Tidak Sesuai</p>
+                        <div class="flex items-center gap-1.5 mt-0.5">
+                            <i class="fa-solid fa-clock-rotate-left text-amber-500 text-[10px]"></i>
+                            <p class="text-[10px] text-slate-400 font-bold uppercase tracking-widest">
+                                Menampilkan data selisih opname
+                            </p>
+                        </div>
                     </div>
-                    <button @click="showOpnameModal = false" class="p-2 hover:bg-slate-200 rounded-full transition-colors">
-                        <i class="fa-solid fa-times text-slate-400"></i>
-                    </button>
+                    
+                    <div class="flex items-center gap-2">
+                        <button @click="exportExcel" class="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all active:scale-95 shadow-lg shadow-emerald-600/20">
+                            <i class="fa-solid fa-file-excel"></i> Export Excel
+                        </button>
+                        <button @click="showOpnameModal = false" class="p-2 hover:bg-slate-200 rounded-full transition-colors">
+                            <i class="fa-solid fa-times text-slate-400"></i>
+                        </button>
+                    </div>
                 </div>
 
                 <div class="max-h-[60vh] overflow-y-auto custom-scrollbar">
-                    <table class="w-full text-left border-collapse">
-                        <thead class="sticky top-0 bg-slate-50 z-10">
+                    <div v-if="filteredOpnameDetail.length === 0" class="p-12 text-center text-slate-400">
+                        <i class="fa-solid fa-folder-open text-3xl opacity-20 mb-3 block"></i>
+                        <p class="text-xs font-bold uppercase tracking-wide">Tidak ada selisih opname</p>
+                    </div>
+
+                    <table v-else class="w-full text-left border-collapse">
+                        <thead class="sticky top-0 bg-slate-50 z-10 shadow-sm">
                             <tr>
-                                <th class="px-8 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Kode</th>
-                                <th class="px-8 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Nama Barang</th>
-                                <th class="px-8 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Selisih</th>
+                                <th class="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Tanggal Opname</th>
+                                <th class="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Kode</th>
+                                <th class="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Nama Barang</th>
+                                <th class="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Selisih</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-slate-100">
-                            <tr v-for="item in opnameDetail" :key="item.barang_kode" class="hover:bg-slate-50 transition-colors">
-                                <td class="px-8 py-4 font-bold text-slate-700 text-sm">{{ item.barang_kode }}</td>
-                                <td class="px-8 py-4 font-bold text-slate-700 text-sm">{{ item.barang_nama }}</td>
-                                <td class="px-8 py-4 text-right">
+                            <tr v-for="item in filteredOpnameDetail" :key="item.barang_kode" class="hover:bg-slate-50 transition-colors">
+                                <td class="px-6 py-4 font-mono text-slate-500 text-xs">
+                                    {{ item.tanggal ? new Date(item.tanggal).toLocaleDateString("id-ID") : '-' }}
+                                </td>
+                                <td class="px-6 py-4 font-bold text-slate-700 text-sm">{{ item.barang_kode }}</td>
+                                <td class="px-6 py-4 font-bold text-slate-700 text-sm truncate max-w-[200px]">{{ item.barang_nama }}</td>
+                                <td class="px-6 py-4 text-right">
                                     <span :class="item.selisih < 0 ? 'bg-rose-50 text-rose-600' : 'bg-emerald-50 text-emerald-600'" 
                                         class="px-3 py-1 rounded-lg font-black text-xs">
                                         {{ item.selisih > 0 ? '+' : '' }}{{ item.selisih }}
