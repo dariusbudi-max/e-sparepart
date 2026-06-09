@@ -1,4 +1,4 @@
-const { ref } = Vue;
+const { ref, computed } = Vue;
 import { fetchOpnameDetail } from "../services/analyticsService.js";
 
 export function useOpname() {
@@ -19,5 +19,18 @@ export function useOpname() {
         }
     };
 
-    return { opnameDetail, loadingOpname, showOpnameModal, loadOpnameDetail };
+    const filteredOpnameDetail = computed(() => {
+        const SEVEN_DAYS_IN_MS = 7 * 24 * 60 * 60 * 1000;
+        const now = new Date();
+
+        return opnameDetail.value.filter(item => {
+            const dateProperty = item.created_at || item.tanggal || new Date(); 
+            const opnameDate = new Date(dateProperty);
+            const timeDiff = now - opnameDate;
+            
+            return timeDiff <= SEVEN_DAYS_IN_MS;
+        });
+    });
+
+    return { opnameDetail, filteredOpnameDetail, loadingOpname, showOpnameModal, loadOpnameDetail };
 }
