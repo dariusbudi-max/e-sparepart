@@ -683,7 +683,7 @@ createApp({
         } = dashboard;
 
         const { pivotData, filter: analyticsFilter, isLoading: isPivotLoading, isPivotLoaded, loadPivot } = analytics;
-        const { opnameDetail, loadingOpname, showOpnameModal, loadOpnameDetail } = opname;
+        const { opnameDetail, filteredOpnameDetail, loadingOpname, showOpnameModal, loadOpnameDetail } = opname;
 
         const usageMap = computed(() => {
             if (!pivotData.value || pivotData.value.length === 0) return {};
@@ -1050,21 +1050,62 @@ createApp({
         };
 
         const exportExcel = () => {
-            if (showLowStock.value) {
-                exportLowStockExcel(); // 🔥 prioritas
-            }
-            else if (page.value === 'dashboard') {
+            if (showOpnameModal.value) {
+                exportOpnameExcel();
+            } else if (showLowStock.value) {
+                exportLowStockExcel();
+            } else if (page.value === 'dashboard') {
                 exportDashboardExcel();
-            }
-            else if (page.value === 'inventory' || page.value === 'master_barang') {
+            } else if (page.value === 'inventory' || page.value === 'master_barang') {
                 exportInventoryExcel();
-            }
-            else if (page.value === 'riwayat') {
+            } else if (page.value === 'riwayat') {
                 exportDashboardExcel();
-            }
-            else {
+            } else {
                 alert("Halaman tidak support export");
             }
+        };
+
+        const exportOpnameExcel = () => {
+            const dataOpname = filteredOpnameDetail.value;
+
+            if (!dataOpname || dataOpname.length === 0) {
+                alert("Data selisih opname kosong atau sudah kedaluwarsa!");
+                return;
+            }
+
+            const timestamp = new Date().toLocaleDateString("id-ID").replace(/\//g, "-");
+
+            const dataMapped = dataOpname.map(item => ({
+                "TANGGAL OPNAME": item.tanggal ? new Date(item.tanggal).toLocaleString("id-ID") : "-",
+                "KODE BARANG": item.barang_kode,
+                "NAMA BARANG": item.barang_nama,
+                "STOK SISTEM (SEBELUM)": item.stok_sebelum,
+                "STOK NYATA (OPNAME)": item.stok_opname,
+                "SELISIH STOK": item.selisih
+            }));
+
+            const ws = XLSX.utils.json_to_sheet(dataMapped, { origin: "A5" });
+
+            XLSX.utils.sheet_add_aoa(ws, [
+                ["LAPORAN DETAIL SELISIH OPNAME (7 HARI TERAKHIR)"],
+                [`Tanggal Unduh : ${new Date().toLocaleString("id-ID")}`],
+                [`Total Item Selisih : ${dataOpname.length}`]
+            ], { origin: "A1" });
+
+            ws["!cols"] = [
+                { wch: 22 },
+                { wch: 15 },
+                { wch: 35 },
+                { wch: 22 },
+                { wch: 22 },
+                { wch: 15 }
+            ];
+
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, "Selisih Opname");
+
+            XLSX.writeFile(wb, `Detail_Selisih_Opname_${timestamp}.xlsx`);
+            showToast(`Export Berhasil (${dataOpname.length} data)`, "success");
         };
 
         const exportDashboardExcel = async () => {
@@ -1429,12 +1470,12 @@ createApp({
             pivotData, isPivotLoaded, isPivotLoading, refreshAllData,
 
             // 9. UPDATE SUPABASE
-            exportExcel, exportDashboardExcel, exportInventoryExcel, exportLowStockExcel, isExporting, analyticsFilter, loadPivot, safeFetch, loadHistory,
+            exportExcel, exportDashboardExcel, exportInventoryExcel, exportLowStockExcel, exportOpnameExcel, isExporting, analyticsFilter, loadPivot, safeFetch, loadHistory,
             catatanSpp, scrap, loadScrapData: scrap.loadScrapData, showScrapInput,
 
             // 10. DASHBOARD & REPORTING
             dashboard, dashData, dashFilter, handlePrint, downloadPDF, historySearch, dashboardTx, recentTx, loadLowStock, exportHistory,
-            loadOpnameDetail, showOpnameModal, loadingOpname, opnameDetail, resetFilter, isRefreshing, fetchDashboardAll, loadDepartments,
+            loadOpnameDetail, showOpnameModal, loadingOpname, filteredOpnameDetail, opnameDetail, resetFilter, isRefreshing, fetchDashboardAll, loadDepartments,
             downloadSPPPDF, docNumber
         };
     }
