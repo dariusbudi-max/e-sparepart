@@ -1168,7 +1168,7 @@ createApp({
                         item.nama,
                         item.category || "-",
                         item.stok,
-                        item.stok <= item.min_stok ? "LOW" : "AMAN"
+                        item.lokasi
                     ]);
                 });
                 const ws = XLSX.utils.aoa_to_sheet(rows);
