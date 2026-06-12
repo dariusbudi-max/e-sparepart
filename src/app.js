@@ -5,7 +5,7 @@ import { useAuth } from "./composables/useAuth.js";
 import { useUsers } from "./composables/useUsers.js";
 
 import { useInventory } from "./composables/useInventory.js";
-import { searchInventory } from "./services/inventoryService.js";
+import { searchInventory, updatePhoto } from "./services/inventoryService.js";
 
 import { useScrapMonitoring } from "./composables/useScrapMonitoring.js";
 
@@ -66,7 +66,6 @@ createApp({
         const searchCache = ref({});
         const isExporting = ref(false);
 
-        const serverResults = ref([]);
         const isServerMode = ref(false);
         const selectedRow = ref(null);
 
@@ -717,8 +716,11 @@ createApp({
         const { uploadPhoto, uploadBase64Photo, handleFileUpload } = useUploadPhoto({
             isUploading,
             formItem,
-            loadInventory,
-            showToast
+            loadInventory: inventory.loadInventory,
+            showToast,
+            inventory: inventory.inventory,
+            isServerMode: inventory.isServerMode,
+            serverResults: inventory.serverResults
         });
 
         const launchGallery = () => {
@@ -728,9 +730,17 @@ createApp({
         };
 
         const closeModal = () => {
-            if (isCameraActive.value) stopCamera();
+            if (isCameraActive.value) {
+                stopCamera();
+            }
+
             photoPreview.value = null;
             isUploading.value = false;
+
+            if (fileInput.value) {
+                fileInput.value.value = "";
+            }
+
             showItemModal.value = false;
         };
 
@@ -759,17 +769,84 @@ createApp({
         const closePhotoModal = () => {
             stopCamera();
             photoPreview.value = null;
+            if (fileInput.value) {
+                fileInput.value.value = "";
+            }
+
             showPhotoModal.value = false;
             loading.value = false;
         };
 
         const savePhotoOnly = async () => {
+            loading.value = true;
             try {
-                await loadInventory();
-                showToast("Foto berhasil disimpan", "success");
+                const targetKode = formItem.value.kode;
+                const newFotoUrl = formItem.value.foto;
+
+                await updatePhoto(targetKode, newFotoUrl);
+
+                const item = inventory.inventory.value.find(i => i.kode === targetKode);
+                if (item) {
+                    item.foto = newFotoUrl;
+                }
+
+                if (inventory.isServerMode?.value && inventory.serverResults?.value) {
+                    const serverItem = inventory.serverResults.value.find(i => i.kode === targetKode);
+                    if (serverItem) {
+                        serverItem.foto = newFotoUrl;
+                    }
+                }
+
+                await inventory.loadInventory(true);
+                showToast("Foto berhasil disimpan ke database", "success");
                 showPhotoModal.value = false;
             } catch (err) {
                 showToast(err.message, "error");
+            } finally {
+                loading.value = false;
+            }
+        };
+
+        const confirmAndUploadPhoto = async () => {
+            if (isUploading.value) return;
+            if (!photoPreview.value) return;
+
+            isUploading.value = true;
+
+            try {
+                showToast("Memulai proses upload...", "success");
+
+                let rawBase64 = photoPreview.value;
+                if (rawBase64.includes(",")) {
+                    rawBase64 = rawBase64.split(",")[1];
+                }
+
+                const targetKode = formItem.value.kode;
+                const url = await uploadBase64Photo(rawBase64, targetKode);
+
+                formItem.value.foto = url;
+                stopCamera();
+                photoPreview.value = null;
+
+                const item = inventory.inventory.value.find(i => i.kode === targetKode);
+                if (item) {
+                    item.foto = url;
+                }
+
+                if (inventory.isServerMode?.value && inventory.serverResults?.value) {
+                    const serverItem = inventory.serverResults.value.find(i => i.kode === targetKode);
+                    if (serverItem) {
+                        serverItem.foto = url;
+                    }
+                }
+
+                await inventory.loadInventory(true);
+                showToast("Foto produk berhasil diunggah dan database diperbarui", "success");
+            } catch (err) {
+                console.error("Upload Error:", err);
+                showToast("Gagal mengunggah foto: " + err.message, "error");
+            } finally {
+                isUploading.value = false;
             }
         };
 
@@ -793,6 +870,31 @@ createApp({
 
                 context.drawImage(video, sx, sy, size, size, 0, 0, size, size);
 
+                const kodeBarang = formItem.value.kode || "NO-KODE";
+                const textToRender = `Kode: ${kodeBarang}`;
+
+                context.font = "bold 20px Arial";
+                context.textAlign = "left";
+                context.textBaseline = "middle";
+
+                const textMetrics = context.measureText(textToRender);
+                const textWidth = textMetrics.width;
+
+                const paddingHorizontal = 15;
+                const boxWidth = textWidth + (paddingHorizontal * 2);
+                const boxHeight = 45;
+                const boxX = 10;
+                const boxY = size - boxHeight - 15;
+
+                context.fillStyle = "rgba(0, 0, 0, 0.65)";
+                context.fillRect(boxX, boxY, boxWidth, boxHeight);
+
+                context.fillStyle = "#FFFFFF";
+                const textX = boxX + paddingHorizontal;
+                const textY = boxY + (boxHeight / 2);
+
+                context.fillText(textToRender, textX, textY);
+
                 const base64Data = canvas.toDataURL("image/jpeg", 0.95);
 
                 photoPreview.value = base64Data;
@@ -800,34 +902,6 @@ createApp({
                 showToast("Foto berhasil diambil! Silakan tinjau.", "success");
             } catch (err) {
                 showToast("Gagal memproses gambar: " + err.message, "error");
-            }
-        };
-
-        const confirmAndUploadPhoto = async () => {
-            if (!photoPreview.value) return;
-
-            isUploading.value = true;
-            try {
-                showToast("Memulai proses upload...", "success");
-
-                let rawBase64 = photoPreview.value;
-
-                if (rawBase64.includes(",")) {
-                    rawBase64 = rawBase64.split(",")[1];
-                }
-
-                const url = await uploadBase64Photo(rawBase64, formItem.value.kode);
-
-                formItem.value.foto = url;
-
-                photoPreview.value = null;
-
-                showToast("Foto produk berhasil diunggah ke Drive!", "success");
-            } catch (err) {
-                console.error("Upload Error:", err);
-                showToast("Gagal mengunggah foto: " + err.message, "error");
-            } finally {
-                isUploading.value = false;
             }
         };
 
