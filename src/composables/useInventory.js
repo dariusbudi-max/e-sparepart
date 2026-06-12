@@ -70,12 +70,23 @@ export function useInventory({ showToast, userRole, userData }) {
 		loading.value = true;
 		try {
 			const data = await upsertItem(formItem);
+
 			const index = inventory.value.findIndex(i => i.kode === data.kode);
 			if (index !== -1) {
 				inventory.value[index] = data;
 			} else {
 				inventory.value.unshift(data);
 			}
+
+			if (isServerMode.value) {
+				const serverIndex = serverResults.value.findIndex(i => i.kode === data.kode);
+				if (serverIndex !== -1) {
+					serverResults.value[serverIndex] = data;
+				} else {
+					serverResults.value.unshift(data);
+				}
+			}
+
 			showToast("Data disimpan", "success");
 			return data;
 		} catch (err) {
@@ -100,6 +111,11 @@ export function useInventory({ showToast, userRole, userData }) {
 			const item = inventory.value.find(i => i.kode === payload.kode);
 			if (item) item.lokasi = data.lokasi;
 
+			if (isServerMode.value) {
+				const serverItem = serverResults.value.find(i => i.kode === payload.kode);
+				if (serverItem) serverItem.lokasi = data.lokasi;
+			}
+
 			showToast("Lokasi berhasil diperbarui", "success");
 		} catch (err) {
 			showToast(err.message || "Gagal update lokasi", "error");
@@ -111,10 +127,16 @@ export function useInventory({ showToast, userRole, userData }) {
 	const toggleStatus = async (item) => {
 		const confirmMsg = item.status === "AKTIF" ? "menonaktifkan" : "mengaktifkan";
 		if (!confirm(`Yakin ingin ${confirmMsg} ${item.nama}?`)) return;
+
 		loading.value = true;
 		try {
 			const newStatus = await toggleStatusService(item.kode, item.status);
+
 			item.status = newStatus;
+
+			const mainItem = inventory.value.find(i => i.kode === item.kode);
+			if (mainItem) mainItem.status = newStatus;
+
 			showToast(`Status diperbarui`, "success");
 		} catch (err) {
 			showToast(err.message, "error");
@@ -275,7 +297,7 @@ export function useInventory({ showToast, userRole, userData }) {
 	return {
 		inventory, isInventoryReady, loading, isSearching, inventorySearch,
 		filterLocation, categoryFilter, stockFilter, finalInventory, hasMore,
-		publicInventory, categoryOptions, uniqueLocations, loadInventory,
+		publicInventory, categoryOptions, uniqueLocations, loadInventory, serverResults,
 		saveItem, saveNewLocation, toggleStatus, handleSearch, sortBy, getExportInventory,
 		resetAllFilters, sortKey, sortOrder, isServerMode
 	};
