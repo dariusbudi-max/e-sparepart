@@ -1694,38 +1694,33 @@
                 </main>
 
                 <main v-if="page === 'scrap_monitoring'" class="flex-1 flex flex-col overflow-hidden bg-slate-50/50">
-                    <!-- Header Minimalis -->
                     <div class="px-4 py-3 md:px-6 border-b bg-white shadow-sm z-10 flex justify-between items-center gap-4">
                         <div class="min-w-0">
                             <h2 class="text-sm md:text-base font-black text-slate-800 uppercase tracking-tight truncate">Monitoring Scrap</h2>
-                            <p class="hidden md:block text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">Pencatatan manual suku cadang bekas</p>
+                            <p class="hidden md:block text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">Pencatatan manual suku cadang bekas (Maks. 1000 Data)</p>
                         </div>
                         
-                        <!-- Grup Tombol Kontrol (Hanya Tombol Toggle Form) -->
                         <div class="flex items-center gap-2 shrink-0">
-                            <!-- Tombol Toggle Form Input -->
                             <button @click="showScrapInput = !showScrapInput" 
                                 class="px-3.5 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center gap-1.5 shadow-sm border"
                                 :class="showScrapInput ? 'bg-rose-50 border-rose-200 text-rose-600 hover:bg-rose-100' : 'bg-teal-600 border-teal-600 text-white hover:bg-teal-700'">
-                                <i class="fa-solid" :class="showScrapInput ? 'fa-xmark' : 'fa-plus'"></i>
-                                <span>{{ showScrapInput ? 'Tutup Input' : 'Input Baru' }}</span>
+                                <i class="fa-solid" :class="showScrapInput ? 'fa-xmark' : (scrap.isEditing.value ? 'fa-pen-to-square' : 'fa-plus')"></i>
+                                <span>
+                                    {{ showScrapInput ? 'Tutup Input' : (scrap.isEditing.value ? 'Lihat Mode Edit' : 'Input Baru') }}
+                                </span>
                             </button>
                         </div>
                     </div>
 
-                    <!-- Area Konten Utama (Menggunakan susunan vertikal flex-col bukan grid kolom lagi) -->
                     <div class="flex-1 overflow-y-auto p-4 md:p-6 custom-scrollbar flex flex-col gap-6">
                         
-                        <!-- BAGIAN ATAS: FORM INPUT DINAMIS (Muncul dari atas ke bawah jika tombol Input Baru aktif) -->
                         <div v-if="showScrapInput" class="w-full bg-white p-6 rounded-[2rem] border border-slate-200 shadow-sm h-fit space-y-4 animate-in fade-in slide-in-from-top-4 duration-300">
                             <h3 class="font-black text-xs uppercase text-teal-600 tracking-wider mb-2 flex items-center justify-between">
                                 <span><i class="fa-solid fa-pen-to-square mr-1"></i> {{ scrap.isEditing.value ? 'Edit Rekor Data' : 'Input Catatan Manual' }}</span>
                                 <span v-if="scrap.isEditing.value" class="bg-amber-100 text-amber-700 px-2 py-0.5 rounded text-[9px]">MODE EDIT</span>
                             </h3>
                             
-                            <!-- Struktur Grid di Dalam Form Agar Proporsional Saat Memanjang ke Samping -->
                             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                                <!-- Pilihan Nama Barang -->
                                 <div>
                                     <label class="block text-[10px] font-black text-slate-400 uppercase mb-1 tracking-widest">Pilih Komoditas</label>
                                     <select v-model="scrap.selectedItemType.value" 
@@ -1734,21 +1729,18 @@
                                     </select>
                                 </div>
 
-                                <!-- Input Nama manual jika memilih opsi 'Input Manual' -->
                                 <div v-if="scrap.selectedItemType.value === 'Input Manual'">
                                     <label class="block text-[10px] font-black text-slate-400 uppercase mb-1 tracking-widest">Nama Barang</label>
                                     <input v-model="scrap.form.value.nama_barang" type="text" placeholder="Masukkan nama barang bekas..."
                                         class="w-full px-4 py-3 bg-slate-50 border-2 border-transparent rounded-xl font-bold text-slate-700 focus:border-teal-500 focus:bg-white transition-all outline-none text-sm shadow-inner">
                                 </div>
 
-                                <!-- Tanggal Penukaran -->
                                 <div>
                                     <label class="block text-[10px] font-black text-slate-400 uppercase mb-1 tracking-widest">Tanggal Penukaran <span class="text-rose-500">*</span></label>
                                     <input v-model="scrap.form.value.tgl_penukaran" type="date"
                                         class="w-full px-4 py-3 bg-slate-50 border-2 border-transparent rounded-xl font-bold text-slate-700 focus:border-teal-500 focus:bg-white transition-all outline-none text-xs shadow-inner">
                                 </div>
 
-                                <!-- Department dan Qty -->
                                 <div class="grid grid-cols-3 gap-3">
                                     <div class="col-span-2">
                                         <label class="block text-[10px] font-black text-slate-400 uppercase mb-1 tracking-widest">Department <span class="text-rose-500">*</span></label>
@@ -1765,7 +1757,6 @@
                                     </div>
                                 </div>
 
-                                <!-- Tanggal Awal & Akhir Pakai -->
                                 <div class="grid grid-cols-2 gap-3" :class="!scrap.isDateRangeRequired.value ? 'lg:col-span-1 opacity-40' : 'lg:col-span-1'">
                                     <div>
                                         <label class="block text-[10px] font-black text-slate-400 uppercase mb-1 tracking-widest truncate">Tgl Awal Pakai</label>
@@ -1780,22 +1771,22 @@
                                 </div>
                             </div>
 
-                            <!-- Tombol Submit Form (Lebih Progresif Sejajar Horizontal) -->
                             <div class="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
-                                <button v-if="scrap.isEditing.value" @click="scrap.cancelEdit"
-                                    class="px-5 py-2.5 bg-slate-100 text-slate-500 rounded-xl font-bold text-[10px] uppercase tracking-widest hover:bg-slate-200 transition-all">
-                                    Batal
+                                <button type="button" @click="scrap.cancelEdit" :disabled="scrap.loading.value"
+                                    class="px-5 py-2.5 bg-slate-100 hover:bg-slate-200 disabled:opacity-50 text-slate-500 rounded-xl font-bold text-[10px] uppercase tracking-widest transition-all flex items-center gap-1.5">
+                                    <i class="fa-solid fa-arrow-rotate-left"></i>
+                                    <span>{{ scrap.isEditing.value ? 'Batal Edit' : 'Reset Form' }}</span>
                                 </button>
-                                <button @click="scrap.submitScrap" :disabled="scrap.loading.value"
-                                    class="px-6 py-2.5 bg-slate-900 text-white rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-teal-600 disabled:opacity-50 transition-all shadow-md">
+                                
+                                <button @click="scrap.submitScrap" 
+                                    :disabled="scrap.loading.value || scrap.isFormInvalid.value"
+                                    class="px-6 py-2.5 bg-slate-900 text-white rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-teal-600 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-slate-900 transition-all shadow-md">
                                     {{ scrap.isEditing.value ? 'Simpan Perubahan' : 'Simpan Scrap' }}
                                 </button>
                             </div>
                         </div>
 
-                        <!-- BAGIAN BAWAH: SUMMARY & TABLE DATA -->
                         <div class="w-full space-y-6 transition-all duration-300">
-                            <!-- Cards Summary -->
                             <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
                                 <div class="bg-white p-5 border border-slate-200 rounded-2xl flex items-center gap-4 shadow-sm">
                                     <div class="w-10 h-10 bg-teal-50 text-teal-600 flex items-center justify-center rounded-xl text-lg shrink-0"><i class="fa-solid fa-boxes-packing"></i></div>
@@ -1807,7 +1798,7 @@
                                 <div class="bg-white p-5 border border-slate-200 rounded-2xl flex items-center gap-4 shadow-sm">
                                     <div class="w-10 h-10 bg-blue-50 text-blue-600 flex items-center justify-center rounded-xl text-lg shrink-0"><i class="fa-solid fa-list"></i></div>
                                     <div class="min-w-0">
-                                        <p class="text-[9px] font-black text-slate-400 uppercase tracking-wider truncate">Total Transaksi</p>
+                                        <p class="text-[9px] font-black text-slate-400 uppercase tracking-wider truncate">Total Hasil Filter</p>
                                         <h4 class="text-xl font-black text-slate-800 truncate">{{ scrap.summary.value.totalRecords }} Data</h4>
                                     </div>
                                 </div>
@@ -1820,23 +1811,63 @@
                                 </div>
                             </div>
 
-                            <!-- Table List Riwayat -->
+                            <div class="w-full bg-white p-5 rounded-[2rem] border border-slate-200 shadow-sm space-y-4">
+                                <div class="flex items-center justify-between border-b border-slate-50 pb-2">
+                                    <h4 class="text-[11px] font-black uppercase tracking-widest text-slate-500 flex items-center gap-2">
+                                        <i class="fa-solid fa-filter text-teal-500"></i> Panel Filter Penyaringan Data
+                                    </h4>
+                                    <button @click="scrap.resetFilters" class="text-[10px] font-bold uppercase tracking-wider text-rose-500 hover:text-rose-700 transition">
+                                        <i class="fa-solid fa-trash-can mr-1"></i> Bersihkan Filter
+                                    </button>
+                                </div>
+                                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                                    <div>
+                                        <label class="block text-[9px] font-black text-slate-400 uppercase mb-1 tracking-wider">Cari Nama Barang</label>
+                                        <input v-model="scrap.searchQuery.value" type="text" placeholder="Ketik nama barang..." 
+                                            class="w-full px-3.5 py-2.5 bg-slate-50 text-xs font-bold border border-slate-200 rounded-xl outline-none focus:border-teal-500 focus:bg-white transition">
+                                    </div>
+                                    <div>
+                                        <label class="block text-[9px] font-black text-slate-400 uppercase mb-1 tracking-wider">Filter Department</label>
+                                        <select v-model="scrap.filterDept.value" class="w-full px-3.5 py-2.5 bg-slate-50 text-xs font-bold border border-slate-200 rounded-xl outline-none focus:border-teal-500 focus:bg-white transition">
+                                            <option value="">-- Semua Dept --</option>
+                                            <option v-for="dept in scrap.departments.value" :key="dept" :value="dept">{{ dept }}</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label class="block text-[9px] font-black text-slate-400 uppercase mb-1 tracking-wider">Tgl Input (Mulai)</label>
+                                        <input v-model="scrap.filterStartDate.value" type="date" class="w-full px-3.5 py-2.5 bg-slate-50 text-xs font-bold border border-slate-200 rounded-xl outline-none focus:border-teal-500 focus:bg-white transition">
+                                    </div>
+                                    <div>
+                                        <label class="block text-[9px] font-black text-slate-400 uppercase mb-1 tracking-wider">Tgl Input (Selesai)</label>
+                                        <input v-model="scrap.filterEndDate.value" type="date" class="w-full px-3.5 py-2.5 bg-slate-50 text-xs font-bold border border-slate-200 rounded-xl outline-none focus:border-teal-500 focus:bg-white transition">
+                                    </div>
+                                </div>
+                            </div>
+
                             <div class="bg-white rounded-[2rem] border border-slate-200 shadow-sm overflow-hidden flex flex-col">
-                                <!-- Bagian Judul Tabel & Tombol Refresh Sebelah Kanan -->
-                                <div class="p-5 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between gap-4">
+                                <div class="p-5 border-b border-slate-100 bg-slate-50/50 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                                     <h3 class="font-black text-slate-800 uppercase text-xs tracking-wider">Riwayat Pengumpulan Scrap</h3>
                                     
-                                    <!-- Tombol Refresh Dipindahkan Sesuai Request -->
-                                    <button @click="scrap.loadScrapData" class="px-3 py-1.5 bg-white border border-slate-200 text-slate-600 rounded-xl text-[11px] font-black uppercase tracking-wider hover:bg-slate-50 shadow-sm transition flex items-center gap-1.5">
-                                        <i class="fa-solid fa-rotate-right" :class="scrap.loading.value ? 'animate-spin' : ''"></i> 
-                                        <span>Refresh</span>
-                                    </button>
+                                    <div class="flex items-center gap-2 self-end sm:self-auto">
+                                        <button @click="scrap.exportScrapExcel" 
+                                            class="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 border border-emerald-600 text-white rounded-xl text-[11px] font-black uppercase tracking-wider shadow-sm transition flex items-center gap-1.5 active:scale-95">
+                                            <i class="fa-solid fa-file-excel text-xs"></i>
+                                            <span>Export Excel</span>
+                                        </button>
+
+                                        <button @click="scrap.loadScrapData" :disabled="scrap.loading.value"
+                                            class="px-3 py-1.5 bg-white border border-slate-200 text-slate-600 rounded-xl text-[11px] font-black uppercase tracking-wider hover:bg-slate-50 shadow-sm transition flex items-center gap-1.5 active:scale-95">
+                                            <i class="fa-solid fa-rotate-right" :class="scrap.loading.value ? 'animate-spin' : ''"></i> 
+                                            <span>Refresh</span>
+                                        </button>
+                                    </div>
                                 </div>
                                 
                                 <div class="overflow-x-auto max-h-[500px] custom-scrollbar">
                                     <table class="w-full text-left border-collapse whitespace-nowrap">
                                         <thead class="bg-slate-900 text-white sticky top-0 z-10">
                                             <tr>
+                                                <th class="px-6 py-4 text-[9px] font-black uppercase tracking-widest">Tanggal Input Data</th>
                                                 <th class="px-6 py-4 text-[9px] font-black uppercase tracking-widest">Nama Barang</th>
                                                 <th class="px-6 py-4 text-[9px] font-black uppercase tracking-widest">Periode Pakai</th>
                                                 <th class="px-6 py-4 text-[9px] font-black uppercase tracking-widest">Tgl Tukar</th>
@@ -1847,7 +1878,10 @@
                                             </tr>
                                         </thead>
                                         <tbody class="divide-y divide-slate-100 text-xs font-bold text-slate-600">
-                                            <tr v-for="row in scrap.scrapList.value" :key="row.id" class="hover:bg-slate-50/80 transition-colors">
+                                            <tr v-for="row in scrap.filteredScrapList.value" :key="row.id" class="hover:bg-slate-50/80 transition-colors">
+                                                <td class="px-6 py-4 font-mono text-[11px] text-indigo-500">
+                                                    {{ row.created_at ? new Date(row.created_at).toLocaleString("id-ID") : '-' }}
+                                                </td>
                                                 <td class="px-6 py-4 font-black text-slate-800 uppercase">{{ row.nama_barang }}</td>
                                                 <td class="px-6 py-4 text-[11px] font-medium text-slate-500">
                                                     <span v-if="row.tgl_awal_pakai && row.tgl_akhir_pakai">
@@ -1865,7 +1899,7 @@
                                                 <td class="px-6 py-4 text-[10px] font-black uppercase tracking-wide text-slate-400">{{ row.created_by }}</td>
                                                 
                                                 <td v-if="userData.role === 'ADMIN'" class="px-6 py-3 text-center space-x-1">
-                                                    <button @click="scrap.editRow(row)" 
+                                                    <button @click="showScrapInput = true; scrap.editRow(row)" 
                                                         class="p-2 bg-amber-50 text-amber-600 hover:bg-amber-500 hover:text-white rounded-lg text-xs transition duration-200" title="Edit">
                                                         <i class="fa-solid fa-pen-to-square"></i>
                                                     </button>
@@ -1875,9 +1909,9 @@
                                                     </button>
                                                 </td>
                                             </tr>
-                                            <tr v-if="scrap.scrapList.value.length === 0">
-                                                <td :colspan="userData.role === 'ADMIN' ? 7 : 6" class="text-center py-12 text-slate-400 uppercase tracking-widest text-xs">
-                                                    Belum ada rekap data scrap
+                                            <tr v-if="scrap.filteredScrapList.value.length === 0">
+                                                <td :colspan="userData.role === 'ADMIN' ? 8 : 7" class="text-center py-12 text-slate-400 uppercase tracking-widest text-xs">
+                                                    Tidak ada data rekap scrap yang cocok dengan filter
                                                 </td>
                                             </tr>
                                         </tbody>
