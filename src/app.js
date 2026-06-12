@@ -1060,7 +1060,10 @@ createApp({
                 exportInventoryExcel();
             } else if (page.value === 'riwayat') {
                 exportDashboardExcel();
-            } else {
+            } else if (page.value === 'scrap_monitoring') {
+                scrap.exportScrapExcel();
+            }
+            else {
                 alert("Halaman tidak support export");
             }
         };
