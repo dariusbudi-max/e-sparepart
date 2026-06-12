@@ -43,10 +43,27 @@ export const useUploadPhoto = (deps) => {
         isUploading.value = true;
 
         try {
-            const url = await uploadPhoto(file, formItem.value.kode);
+            const targetKode = formItem.value.kode;
+            const url = await uploadPhoto(file, targetKode);
+
             formItem.value.foto = url;
-            showToast("Upload berhasil", "success");
-            await loadInventory();
+
+            if (deps.inventory && deps.inventory.value) {
+                const item = deps.inventory.value.find(i => i.kode === targetKode);
+                if (item) {
+                    item.foto = url;
+                }
+            }
+
+            if (deps.isServerMode && deps.isServerMode.value && deps.serverResults) {
+                const serverItem = deps.serverResults.value.find(i => i.kode === targetKode);
+                if (serverItem) {
+                    serverItem.foto = url;
+                }
+            }
+
+            await loadInventory(true);
+            showToast("Foto berhasil diunggah", "success");
         } catch (err) {
             showToast(err.message, "error");
         } finally {
