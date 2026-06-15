@@ -89,20 +89,39 @@ export const toggleStatusService = async (kode, currentStatus) => {
     return data.status;
 };
 
-export const searchInventory = async (q, onlyAvailable = false) => {
+export const searchInventory = async (q, { onlyAvailable = false, stock = "all", category = "all", location = "", page = 0, pageSize = 100 } = {}) => {
+    const from = page * pageSize;
+    const to = from + pageSize - 1;
+
     let query = supabaseClient
         .from("inventory")
-        .select("*")
-        .or(`nama.ilike.%${q}%,kode.ilike.%${q}%,lokasi.ilike.%${q}%`)
-        .limit(100); // Batasi hasil pencarian agar cepat
+        .select("*", { count: 'exact' });
 
-    if (onlyAvailable) {
-        query = query.gt("stok", 0); // Hanya yang stok > 0
+    if (q && q.trim() !== "") {
+        query = query.or(`nama.ilike.%${q}%,kode.ilike.%${q}%,lokasi.ilike.%${q}%`);
     }
 
-    const { data, error } = await query;
+    if (onlyAvailable || stock === "available") {
+        query = query.gt("stok", 0);
+    } else if (stock === "empty") {
+        query = query.lte("stok", 0);
+    }
+
+    if (category && category !== "all") {
+        query = query.eq("category", category);
+    }
+
+    if (location && location.length > 0) {
+        query = query.in("lokasi", location);
+    }
+
+    query = query
+        .order("nama", { ascending: true })
+        .range(from, to);
+
+    const { data, error, count } = await query;
     if (error) throw error;
-    return data || [];
+    return { data: data || [], total: count || 0 };
 };
 
 export const fetchAllInventory = async ({
@@ -162,6 +181,18 @@ export const fetchAllInventory = async ({
     }
 
     return allData;
+};
+
+export const deleteItemService = async (kode) => {
+    if (!kode) throw new Error("Kode barang tidak valid");
+
+    const { error } = await supabaseClient
+        .from("inventory")
+        .delete()
+        .eq("kode", kode);
+
+    if (error) throw error;
+    return true;
 };
 
 export const updatePhoto = async (kode, foto) => {
