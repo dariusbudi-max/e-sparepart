@@ -1,11 +1,12 @@
-const { ref, computed } = Vue;
+const { ref, computed, watch } = Vue;
 import {
 	upsertItem,
 	fetchInventory,
 	toggleStatusService,
 	searchInventory,
 	updateLocation,
-	fetchAllInventory
+	fetchAllInventory,
+	deleteItemService
 } from "../services/inventoryService.js";
 
 export function useInventory({ showToast, userRole, userData }) {
@@ -16,6 +17,8 @@ export function useInventory({ showToast, userRole, userData }) {
 	const currentPage = ref(0);
 	const hasMore = ref(true);
 	const pageSize = 300;
+	const currentSearchPage = ref(0);
+	const hasMoreSearch = ref(true);
 
 	const inventorySearch = ref("");
 	const filterLocation = ref("");
@@ -194,46 +197,75 @@ export function useInventory({ showToast, userRole, userData }) {
 	});
 
 	const publicInventory = computed(() => {
-		// Jika sedang mencari (server mode), gunakan serverResults
-		// Jika tidak, gunakan data inventory lokal yang sudah ter-load
 		const sourceData = isServerMode.value ? serverResults.value : inventory.value;
 
 		return applyFilters(sourceData, {
 			statusOnly: true,
 			search: inventorySearch.value,
 			category: categoryFilter.value,
+			location: filterLocation.value,
 			stock: stockFilter.value
 		});
 	});
 
-	const handleSearch = async (query) => {
+	const handleSearch = async (query, isLoadMore = false) => {
 		const currentId = ++lastSearchId;
 		const safeQuery = String(query || "").toLowerCase().trim();
 
-		if (!safeQuery) {
+		if (!safeQuery && categoryFilter.value === "all" && stockFilter.value === "all") {
 			isServerMode.value = false;
 			serverResults.value = [];
+			currentSearchPage.value = 0;
+			hasMoreSearch.value = true;
 			return;
 		}
 
 		isServerMode.value = true;
-		isSearching.value = true;
+
+		if (!isLoadMore) {
+			currentSearchPage.value = 0;
+			hasMoreSearch.value = true;
+			isSearching.value = true;
+		}
+
+		if (!hasMoreSearch.value && isLoadMore) return;
 
 		try {
-			// Cek jika userRole bukan ADMIN, maka aktifkan filter stok > 0
 			const onlyAvailable = userRole.value !== 'ADMIN';
+			const pageSize = 100;
 
-			const data = await searchInventory(safeQuery, onlyAvailable);
+			const { data, total } = await searchInventory(safeQuery, {
+				onlyAvailable: onlyAvailable,
+				stock: stockFilter.value,
+				category: categoryFilter.value,
+				page: currentSearchPage.value,
+				pageSize: pageSize
+			});
 
 			if (currentId !== lastSearchId) return;
 
-			serverResults.value = data;
+			if (isLoadMore) {
+				serverResults.value = [...serverResults.value, ...data];
+			} else {
+				serverResults.value = data;
+			}
+
+			hasMoreSearch.value = serverResults.value.length < total;
+			currentSearchPage.value++;
+
 		} catch (err) {
-			if (currentId === lastSearchId) serverResults.value = [];
+			console.error("Search Error:", err);
+			if (currentId === lastSearchId && !isLoadMore) serverResults.value = [];
 		} finally {
 			if (currentId === lastSearchId) isSearching.value = false;
 		}
 	};
+
+	watch([categoryFilter, stockFilter], () => {
+		currentSearchPage.value = 0;
+		hasMoreSearch.value = true;
+		handleSearch(inventorySearch.value, false);
+	});
 
 	const sortBy = (key) => {
 		if (sortKey.value === key) {
@@ -273,6 +305,30 @@ export function useInventory({ showToast, userRole, userData }) {
 		return [...new Set(areas)].sort();
 	});
 
+	const deleteItem = async (kode, nama) => {
+		const confirmDelete = confirm(`Apakah Anda yakin ingin menghapus data "${nama}" (${kode}) secara permanen? Tindakan ini tidak dapat dibatalkan.`);
+		if (!confirmDelete) return false;
+
+		loading.value = true;
+		try {
+			await deleteItemService(kode);
+
+			inventory.value = inventory.value.filter(item => item.kode !== kode);
+
+			if (isServerMode.value) {
+				serverResults.value = serverResults.value.filter(item => item.kode !== kode);
+			}
+
+			showToast("Data barang berhasil dihapus", "success");
+			return true;
+		} catch (err) {
+			showToast(err.message || "Gagal menghapus data", "error");
+			return false;
+		} finally {
+			loading.value = false;
+		}
+	};
+
 	const getExportInventory = async () => {
 		try {
 
@@ -295,8 +351,8 @@ export function useInventory({ showToast, userRole, userData }) {
 	};
 
 	return {
-		inventory, isInventoryReady, loading, isSearching, inventorySearch,
-		filterLocation, categoryFilter, stockFilter, finalInventory, hasMore,
+		inventory, isInventoryReady, loading, isSearching, inventorySearch, currentSearchPage, hasMoreSearch,
+		filterLocation, categoryFilter, stockFilter, finalInventory, hasMore, deleteItem,
 		publicInventory, categoryOptions, uniqueLocations, loadInventory, serverResults,
 		saveItem, saveNewLocation, toggleStatus, handleSearch, sortBy, getExportInventory,
 		resetAllFilters, sortKey, sortOrder, isServerMode
