@@ -2331,11 +2331,18 @@
                                                             title="Edit Data">
                                                             <i class="fa-solid fa-pen-nib"></i>
                                                         </button>
+                                                        
                                                         <button @click="toggleStatus(item)"
                                                             :class="item.status === 'AKTIF' ? 'text-emerald-500 hover:bg-emerald-50 border-slate-200 hover:border-emerald-200' : 'text-slate-400 hover:bg-slate-100 border-slate-200'"
                                                             class="w-9 h-9 flex items-center justify-center bg-white border rounded-xl transition-all shadow-sm active:scale-95"
                                                             :title="item.status === 'AKTIF' ? 'Non-aktifkan' : 'Aktifkan'">
                                                             <i class="fa-solid fa-power-off"></i>
+                                                        </button>
+
+                                                        <button @click="removeItem(item)"
+                                                            class="w-9 h-9 flex items-center justify-center bg-white border border-slate-200 text-rose-500 hover:bg-rose-50 hover:text-rose-600 hover:border-rose-200 rounded-xl transition-all shadow-sm active:scale-95"
+                                                            title="Hapus Data Permanen">
+                                                            <i class="fa-solid fa-trash-can"></i>
                                                         </button>
                                                     </template>
 
