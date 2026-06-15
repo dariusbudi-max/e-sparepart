@@ -437,13 +437,36 @@ createApp({
             publicInventory,
             categoryOptions,
             uniqueLocations,
-            getExportInventory
+            getExportInventory,
+            deleteItem
         } = inventory;
+
+        const handleTableScroll = (event) => {
+            const { scrollTop, scrollHeight, clientHeight } = event.target;
+
+            if (scrollHeight - scrollTop <= clientHeight + 100) {
+                if (inventory.isServerMode.value) {
+                    if (!inventory.isSearching.value) {
+                        inventory.handleSearch(inventorySearch.value, true);
+                    }
+                } else {
+                    inventory.loadInventory();
+                }
+            }
+        };
+
+        const removeItem = async (item) => {
+            await inventory.deleteItem(item.kode, item.nama);
+        };
 
         watch(inventorySearch, (newVal) => {
             clearTimeout(searchTimer);
 
-            // Tunggu 500ms setelah ketikan terakhir sebelum menembak ke server
+            if (!newVal || newVal.trim() === "") {
+                inventory.handleSearch(newVal);
+                return;
+            }
+
             searchTimer = setTimeout(() => {
                 inventory.handleSearch(newVal);
             }, 500);
@@ -489,17 +512,6 @@ createApp({
                 }
             }
             showScanner.value = false;
-        };
-
-        const handleTableScroll = (event) => {
-            const { scrollTop, scrollHeight, clientHeight } = event.target;
-
-            // Jika sisa scroll kurang dari 100px, muat data baru
-            if (scrollHeight - scrollTop <= clientHeight + 100) {
-                if (!inventory.isServerMode.value) { // Jangan paginate jika sedang mode pencarian server
-                    inventory.loadInventory();
-                }
-            }
         };
 
         //===TRANSAKSI===//
@@ -1516,7 +1528,7 @@ createApp({
             // 3. INVENTORY & MASTER DATA
             loadInventory, inventory, inventorySearch, searchQuery, stockFilter, categoryOptions, categoryFilter,
             filterLocation, uniqueLocations, resetAllFilters, sortKey, sortOrder, isInventoryReady, searchCache,
-            finalInventory, isSearching, lastQuery, sortBy, handleTableScroll, getExportInventory, hasMore,
+            finalInventory, isSearching, lastQuery, sortBy, handleTableScroll, getExportInventory, hasMore, removeItem,
             searchInputRef, departments, fixDriveUrl, searchResults, handleSearch, publicInventory,
 
             // 4. ITEM CRUD & MODALS
