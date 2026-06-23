@@ -22,17 +22,27 @@ export const validateRows = async (rows, inventory) => {
 
         if (!item && cleanedTarget) {
             try {
-                const results = await searchInventory(cleanedTarget, false);
-                item = results.find((i) => cleanKode(i.kode) === cleanedTarget);
+                const { data = [] } = await searchInventory(cleanedTarget);
+
+                item = data.find(
+                    (i) => cleanKode(i.kode) === cleanedTarget
+                );
 
                 if (item) {
                     inventoryMap.set(cleanedTarget, item);
+
                     if (!virtualStockMap.has(cleanedTarget)) {
-                        virtualStockMap.set(cleanedTarget, Number(item.stok ?? 0));
+                        virtualStockMap.set(
+                            cleanedTarget,
+                            Number(item.stok ?? 0)
+                        );
                     }
                 }
             } catch (err) {
-                console.error(`Server validation error for kode ${cleanedTarget}:`, err);
+                console.error(
+                    `Server validation error for kode ${cleanedTarget}:`,
+                    err
+                );
             }
         }
 
@@ -44,7 +54,11 @@ export const validateRows = async (rows, inventory) => {
             error = "Kode kosong";
         } else if (!item) {
             error = `Kode [${row.kode}] tidak terdaftar`;
-        } else if (item.status !== "AKTIF") {
+        } else if (
+            String(item.status || "")
+                .trim()
+                .toUpperCase() !== "AKTIF"
+        ) {
             error = "Barang NONAKTIF";
         } else if (!Number.isFinite(inputQty)) {
             error = "Qty tidak valid";
