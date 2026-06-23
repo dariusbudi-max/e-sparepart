@@ -89,13 +89,26 @@ export const toggleStatusService = async (kode, currentStatus) => {
     return data.status;
 };
 
-export const searchInventory = async (q, { onlyAvailable = false, stock = "all", category = "all", location = "", page = 0, pageSize = 100 } = {}) => {
+export const searchInventory = async (q, options = {}) => {
+    if (typeof options !== "object" || options === null) {
+        options = {};
+    }
+
+    const {
+        onlyAvailable = false,
+        stock = "all",
+        category = "all",
+        location = "",
+        page = 0,
+        pageSize = 100
+    } = options;
+
     const from = page * pageSize;
     const to = from + pageSize - 1;
 
     let query = supabaseClient
         .from("inventory")
-        .select("*", { count: 'exact' });
+        .select("*", { count: "exact" });
 
     if (q && q.trim() !== "") {
         query = query.or(`nama.ilike.%${q}%,kode.ilike.%${q}%,lokasi.ilike.%${q}%`);
@@ -120,8 +133,13 @@ export const searchInventory = async (q, { onlyAvailable = false, stock = "all",
         .range(from, to);
 
     const { data, error, count } = await query;
+
     if (error) throw error;
-    return { data: data || [], total: count || 0 };
+
+    return {
+        data: data || [],
+        total: count || 0
+    };
 };
 
 export const fetchAllInventory = async ({
