@@ -545,8 +545,11 @@ createApp({
 
             if (!item) {
                 try {
-                    const results = await searchInventory(query, false);
-                    item = results.find(i => cleanKode(i.kode) === query);
+                    const { data = [] } = await searchInventory(query);
+
+                    item = data.find(
+                        i => cleanKode(i.kode) === query
+                    );
                 } catch (err) {
                     console.error(err);
                 }
@@ -625,8 +628,13 @@ createApp({
 
             if (!item) {
                 try {
-                    const results = await searchInventory(rawQuery, false);
-                    item = results.find(i => cleanKode(i.kode) === query && i.status === 'AKTIF');
+                    const { data = [] } = await searchInventory(rawQuery);
+
+                    item = data.find(
+                        i =>
+                            cleanKode(i.kode) === query &&
+                            i.status === "AKTIF"
+                    );
                 } catch (err) {
                     console.error("Search server error:", err);
                 }
