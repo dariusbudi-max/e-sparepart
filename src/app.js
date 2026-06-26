@@ -56,7 +56,7 @@ createApp({
 
         const newUser = reactive({ nama: '', username: '', password: '', role: 'VIEWER' });
         const showRegisterModal = ref(false);
-        const regData = ref({ nama: '', username: '', password: '' });
+        const regData = reactive({ nama: '', username: '', password: '' });
         const showProfileModal = ref(false);
         const loadingProfile = ref(false);
         const profileForm = reactive({ nama: '', password: '' });
@@ -129,6 +129,11 @@ createApp({
         });
         const showLocationModal = ref(false);
         const locationForm = ref({ kode: '', nama: '', foto: '', lokasi: '' });
+        const showImportModal = ref(false);
+        const importStep = ref(1);
+        const rawExcelInput = ref("");
+        const parsedItems = ref([]);
+        const isImporting = ref(false);
 
         const fileInput = ref(null);
         const isUploading = ref(false);
@@ -381,7 +386,7 @@ createApp({
         const {
             handleLogin, handleRegister, handleUpdateProfile, refreshSession, handleLogout
         } = useAuth({
-            loading, loadingProfile, userData, isLoggedIn, page, showToast, refreshAllData, ROLE_LANDING_PAGE
+            loading, loadingProfile, userData, isLoggedIn, page, showToast, refreshAllData, ROLE_LANDING_PAGE, showRegisterModal
         });
 
         ///===INVENTORY===///
@@ -391,9 +396,9 @@ createApp({
             userData
         });
 
-        const saveItem = async () => {
+        const saveItem = async (formItem, isEditMode) => {
             try {
-                await inventory.saveItem(formItem.value);
+                await inventory.saveItem(formItem, isEditMode);
                 showItemModal.value = false;
             } catch (err) {
                 console.error(err);
@@ -420,6 +425,90 @@ createApp({
             }
         };
 
+        const openImportExcelModal = () => {
+            rawExcelInput.value = "";
+            parsedItems.value = [];
+            importStep.value = 1;
+            isImporting.value = false;
+            showImportModal.value = true;
+        };
+
+        const processExcelRawInput = async () => {
+            const lines = rawExcelInput.value.split("\n");
+            const temporaryList = [];
+
+            for (let line of lines) {
+                if (!line.trim()) continue;
+
+                const columns = line.split("\t");
+
+                const kode = columns[0] ? columns[0].trim().toUpperCase() : "";
+                const nama = columns[1] ? columns[1].trim() : "";
+                const category = columns[2] ? columns[2].trim().toUpperCase() : "UNSET";
+                const satuan = columns[3] ? columns[3].trim().toUpperCase() : "PCS";
+                const lokasi = columns[4] ? columns[4].trim().toUpperCase() : "-";
+
+                if (kode && nama) {
+                    temporaryList.push({
+                        kode,
+                        nama,
+                        category,
+                        satuan,
+                        lokasi,
+                        stok: 0,
+                        min_stok: 0,
+                        status: "AKTIF"
+                    });
+                }
+            }
+
+            if (temporaryList.length === 0) {
+                showToast("Format data Excel tidak valid atau kosong!", "error");
+                return;
+            }
+
+            try {
+                inventory.loading.value = true;
+
+                const targetKodes = temporaryList.map(item => item.kode);
+                const existingKodes = await inventory.checkExistingCodes(targetKodes);
+
+                parsedItems.value = temporaryList.map(item => ({
+                    ...item,
+                    isDuplicate: existingKodes.includes(item.kode)
+                }));
+
+                importStep.value = 2;
+            } catch (err) {
+                showToast("Gagal melakukan pengecekan data ke database", "error");
+            } finally {
+                inventory.loading.value = false;
+            }
+        };
+
+        const validCount = computed(() => parsedItems.value.filter(i => !i.isDuplicate).length);
+        const duplicateCount = computed(() => parsedItems.value.filter(i => i.isDuplicate).length);
+
+        const executeBatchInsert = async () => {
+            const dataToSave = parsedItems.value.filter(item => !item.isDuplicate);
+            if (dataToSave.length === 0) return;
+
+            isImporting.value = true;
+            try {
+                const cleanData = dataToSave.map(({ isDuplicate, ...rest }) => rest);
+                const savedData = await inventory.saveBatchItem(cleanData);
+
+                showToast(`Berhasil menyimpan ${savedData.length} item baru!`, "success");
+                showImportModal.value = false;
+
+                inventory.loadInventory(true);
+            } catch (err) {
+                showToast(err.message || "Gagal menyimpan batch import", "error");
+            } finally {
+                isImporting.value = false;
+            }
+        };
+
         const {
             inventory: inventoryData,
             isInventoryReady,
@@ -436,7 +525,8 @@ createApp({
             finalInventory,
             publicInventory,
             categoryOptions,
-            uniqueLocations,
+            locations,
+            loadLocations,
             getExportInventory,
             deleteItem
         } = inventory;
@@ -446,7 +536,7 @@ createApp({
 
             if (scrollHeight - scrollTop <= clientHeight + 100) {
                 if (inventory.isServerMode.value) {
-                    if (!inventory.isSearching.value) {
+                    if (!inventory.isSearching.value && inventory.hasMoreSearch.value && !inventory.loading.value) {
                         inventory.handleSearch(inventorySearch.value, true);
                     }
                 } else {
@@ -1507,7 +1597,10 @@ createApp({
                 if (isLoggedIn.value) refreshSessionSafe();
             }, 30000);
 
-            inventory.loadInventory(true);
+            await Promise.all([
+                inventory.loadInventory(true),
+                inventory.loadLocations()
+            ]);
 
             const today = new Date().toISOString().split("T")[0];
             analyticsFilter.value.startDate = today;
@@ -1535,13 +1628,22 @@ createApp({
 
             // 3. INVENTORY & MASTER DATA
             loadInventory, inventory, inventorySearch, searchQuery, stockFilter, categoryOptions, categoryFilter,
-            filterLocation, uniqueLocations, resetAllFilters, sortKey, sortOrder, isInventoryReady, searchCache,
+            filterLocation, locations, loadLocations, resetAllFilters, sortKey, sortOrder, isInventoryReady, searchCache,
             finalInventory, isSearching, lastQuery, sortBy, handleTableScroll, getExportInventory, hasMore, removeItem,
             searchInputRef, departments, fixDriveUrl, searchResults, handleSearch, publicInventory,
 
             // 4. ITEM CRUD & MODALS
             formItem, isEditMode, openAddModal, editItem, saveItem, toggleStatus,
-            selectedItem, formInput, saveNewLocation, openUpdateLocation,
+            selectedItem, formInput, saveNewLocation, openUpdateLocation, showImportModal,
+            importStep,
+            rawExcelInput,
+            parsedItems,
+            isImporting,
+            openImportExcelModal,
+            processExcelRawInput,
+            executeBatchInsert,
+            validCount,
+            duplicateCount,
 
             // 5. TRANSACTION & CART (WMS)
             cart, inputQty, qtyInputRef, previewData, pasteData, tx, isSearchingServer, processing, importLoading,
