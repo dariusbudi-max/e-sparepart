@@ -273,7 +273,7 @@
                                 class="flex-1 py-4 bg-white border border-slate-200 hover:bg-slate-50 text-slate-600 rounded-[1.25rem] font-bold text-sm transition-all active:scale-95">
                                 Batal
                             </button>
-                            <button @click="handleRegister({ regData, showRegisterModal })"
+                            <button @click="handleRegister({ regData })"
                                 class="flex-[1.5] py-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-[1.25rem] font-bold text-sm shadow-xl shadow-indigo-100 transition-all active:scale-95 disabled:opacity-50 disabled:active:scale-100"
                                 :disabled="regData.password.length < 6 || loading">
                                 <span v-if="!loading">Kirim Request</span>
@@ -2178,7 +2178,7 @@
                                 <select v-model="filterLocation"
                                     class="w-full sm:w-auto appearance-none pl-10 pr-9 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-600 focus:bg-white outline-none cursor-pointer hover:border-indigo-300 transition-all shadow-inner">
                                     <option value="">Semua Lokasi</option>
-                                    <option v-for="loc in uniqueLocations" :key="loc" :value="loc">{{ loc }}</option>
+                                    <option v-for="loc in locations" :key="loc" :value="loc">{{ loc }}</option>
                                 </select>
                                 <i class="fa-solid fa-location-dot absolute left-4 top-1/2 -translate-y-1/2 text-amber-500 text-xs"></i>
                                 <i
@@ -2192,11 +2192,15 @@
                                 <i class="fa-solid fa-arrow-rotate-left"></i>
                             </button>
 
-                            <!-- Button Tambah Baru -->
+                            <button v-if="userData.role === 'ADMIN'" @click="openImportExcelModal"
+                                class="flex items-center justify-center sm:w-auto w-full px-4 py-2 bg-emerald-50 text-emerald-600 border border-emerald-200 rounded-xl text-xs font-black hover:bg-emerald-100 transition-all active:scale-95 gap-2">
+                                <i class="fa-solid fa-file-excel"></i>
+                                <span>Import</span>
+                            </button>
                             <button v-if="userData.role === 'ADMIN'" @click="openAddModal"
                                 class="flex items-center justify-center sm:w-auto w-full px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-black shadow-md shadow-indigo-100 transition-all active:scale-95 gap-2">
                                 <i class="fa-solid fa-plus"></i>
-                                <span>Tambah Baru</span>
+                                <span>Tambah</span>
                             </button>
                         </div>
                     </div>
@@ -2701,7 +2705,7 @@
                     </button>
                 </div>
 
-                <form @submit.prevent="saveItem(formItem, showItemModal)" class="p-8 overflow-y-auto custom-scrollbar">
+                <form @submit.prevent="saveItem(formItem, isEditMode)" class="p-8 overflow-y-auto custom-scrollbar">
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-10">
                         
                         <div class="space-y-5">
@@ -2833,6 +2837,124 @@
                         </button>
                     </div>
                 </form>
+            </div>
+        </div>
+
+        <div v-if="showImportModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4 animate-fade-in">
+            <div class="bg-white rounded-[2rem] shadow-2xl w-full max-w-4xl max-h-[85vh] flex flex-col overflow-hidden border border-slate-100">
+                
+                <!-- Header -->
+                <div class="p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-xl bg-emerald-500 flex items-center justify-center text-white shadow-md shadow-emerald-100">
+                            <i class="fa-solid fa-file-import text-sm"></i>
+                        </div>
+                        <div>
+                            <h3 class="text-sm font-black text-slate-800 uppercase tracking-wide">Import Massal via Excel</h3>
+                            <p class="text-xs text-slate-400 font-medium">Copy kolom di Excel lalu paste langsung ke area text box di bawah</p>
+                        </div>
+                    </div>
+                    <button @click="showImportModal = false" class="text-slate-400 hover:text-rose-500 transition-colors">
+                        <i class="fa-solid fa-circle-xmark text-xl"></i>
+                    </button>
+                </div>
+
+                <!-- Body -->
+                <div class="flex-1 p-6 overflow-y-auto space-y-4 custom-scrollbar">
+                    <!-- Info Petunjuk Struktur -->
+                    <div class="p-4 bg-indigo-50/50 border border-indigo-100 rounded-2xl flex items-start gap-3">
+                        <i class="fa-solid fa-circle-info text-indigo-500 mt-0.5 text-xs"></i>
+                        <div class="text-[11px] text-indigo-900 leading-relaxed">
+                            <span class="font-black">Urutan Struktur Kolom Excel:</span> 
+                            <code class="bg-indigo-100/80 px-1.5 py-0.5 rounded font-mono font-bold mx-1">KODE</code> → 
+                            <code class="bg-indigo-100/80 px-1.5 py-0.5 rounded font-mono font-bold mx-1">DESCRIPTION (NAMA)</code> → 
+                            <code class="bg-indigo-100/80 px-1.5 py-0.5 rounded font-mono font-bold mx-1">CATEGORY</code> →
+                            <code class="bg-indigo-100/80 px-1.5 py-0.5 rounded font-mono font-bold mx-1">SATUAN</code> → 
+                            <code class="bg-indigo-100/80 px-1.5 py-0.5 rounded font-mono font-bold mx-1">LOKASI</code>
+                            <p class="mt-1 text-slate-500 font-medium">Pastikan baris header data tidak ikut ter-copy.</p>
+                        </div>
+                    </div>
+
+                    <!-- Input Area Text Box -->
+                    <div v-if="importStep === 1" class="space-y-2">
+                        <label class="text-[11px] font-black text-slate-400 uppercase tracking-wider">Paste Data Excel Di Sini</label>
+                        <textarea v-model="rawExcelInput" placeholder="Contoh format paste:&#10;BRG001&#9;Baut M6 Baja&#9;FASTENER&#9;PCS&#10;BRG002&#9;Mur M6 Kuningan&#9;FASTENER&#9;PCS"
+                            class="w-full h-64 p-4 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-mono focus:bg-white focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none transition-all shadow-inner resize-none"></textarea>
+                    </div>
+
+                    <!-- Preview & Real-time Collision Checker (Step 2) -->
+                    <div v-if="importStep === 2" class="space-y-3">
+                        <div class="flex justify-between items-center">
+                            <label class="text-[11px] font-black text-slate-400 uppercase tracking-wider">Preview Hasil Validasi Data ({{ parsedItems.length }} Baris)</label>
+                            <div class="flex gap-4 text-xs font-bold">
+                                <span class="text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-lg"><i class="fa-solid fa-check"></i> {{ validCount }} Valid</span>
+                                <span class="text-rose-600 bg-rose-50 px-2 py-0.5 rounded-lg"><i class="fa-solid fa-triangle-exclamation"></i> {{ duplicateCount }} Duplikat</span>
+                            </div>
+                        </div>
+
+                        <div class="border border-slate-100 rounded-2xl overflow-hidden max-h-72 overflow-y-auto custom-scrollbar shadow-inner">
+                            <table class="w-full text-xs text-left border-collapse">
+                                <thead class="bg-slate-50 sticky top-0 border-b border-slate-100">
+                                    <tr>
+                                        <th class="px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-wider w-12 text-center">No</th>
+                                        <th class="px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-wider w-36">Kode</th>
+                                        <th class="px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-wider">Nama Barang (Description)</th>
+                                        <th class="px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-wider w-24">Kategori</th>
+                                        <th class="px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-wider w-20">Satuan</th>
+                                        <th class="px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-wider w-28">Lokasi</th>
+                                        <th class="px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-wider w-36 text-center">Status Check</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-slate-100">
+                                    <tr v-for="(item, idx) in parsedItems" :key="idx" :class="item.isDuplicate ? 'bg-rose-50/50' : 'hover:bg-slate-50/80'">
+                                        <td class="px-4 py-2.5 text-center text-slate-400 font-bold">{{ idx + 1 }}</td>
+                                        <td class="px-4 py-2.5"><span :class="item.isDuplicate ? 'text-rose-600 bg-rose-100/60' : 'text-indigo-600 bg-indigo-50'" class="font-mono font-black px-2 py-0.5 rounded-lg">{{ item.kode }}</span></td>
+                                        <td class="px-4 py-2.5 font-bold text-slate-700 whitespace-normal break-words">{{ item.nama }}</td>
+                                        <td class="px-4 py-2.5 text-slate-500 font-medium">{{ item.category }}</td>
+                                        <td class="px-4 py-2.5"><span class="bg-slate-100 px-1.5 py-0.5 rounded font-bold text-slate-500">{{ item.satuan }}</span></td>
+                                        <td class="px-4 py-2.5"> <span class="bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded-lg font-bold">{{ item.lokasi }}</span></td>
+                                        <td class="px-4 py-2.5 text-center">
+                                            <span v-if="item.isDuplicate" class="text-[10px] font-black text-rose-600 bg-rose-50 border border-rose-100 px-2 py-1 rounded-xl flex items-center justify-center gap-1">
+                                                <i class="fa-solid fa-circle-exclamation animate-pulse"></i> Kode Sudah Ada
+                                            </span>
+                                            <span v-else class="text-[10px] font-black text-emerald-600 bg-emerald-50 border border-emerald-100 px-2 py-1 rounded-xl flex items-center justify-center gap-1">
+                                                <i class="fa-solid fa-circle-check"></i> Siap Disimpan
+                                            </span>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Footer -->
+                <div class="p-4 border-t border-slate-100 bg-slate-50 flex items-center justify-between">
+                    <button v-if="importStep === 2" @click="importStep = 1" :disabled="isImporting"
+                        class="px-5 py-2 border border-slate-200 text-slate-500 rounded-xl text-xs font-black hover:bg-slate-100 active:scale-95 disabled:opacity-50 transition-all">
+                        Kembali Edit
+                    </button>
+                    <div v-else></div>
+
+                    <div class="flex items-center gap-2">
+                        <button @click="showImportModal = false" :disabled="isImporting"
+                            class="px-5 py-2 text-slate-400 hover:text-slate-600 rounded-xl text-xs font-black transition-all">
+                            Batal
+                        </button>
+                        
+                        <button v-if="importStep === 1" @click="processExcelRawInput" :disabled="!rawExcelInput.trim()"
+                            class="px-6 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-black shadow-md transition-all active:scale-95 disabled:opacity-50">
+                            Proses & Validasi Data
+                        </button>
+
+                        <button v-if="importStep === 2" @click="executeBatchInsert" :disabled="isImporting || validCount === 0"
+                            class="px-6 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-black shadow-md transition-all active:scale-95 disabled:opacity-45 flex items-center gap-2">
+                            <i v-if="isImporting" class="fa-solid fa-circle-notch animate-spin"></i>
+                            <span>Simpan {{ validCount }} Item Baru</span>
+                        </button>
+                    </div>
+                </div>
+
             </div>
         </div>
 
