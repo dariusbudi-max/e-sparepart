@@ -17,6 +17,7 @@ export function useAuth({
 	showToast,
 	refreshAllData,
 	ROLE_LANDING_PAGE,
+	showRegisterModal
 }) {
 	const handleLogin = async (loginData) => {
 		if (!loginData?.username || !loginData?.password) {
@@ -63,7 +64,7 @@ export function useAuth({
 		}
 	};
 
-	const handleRegister = async ({ regData, showRegisterModal }) => {
+	const handleRegister = async ({ regData }) => {
 		if (!regData || !regData.password) {
 			showToast("Data register tidak valid", "error");
 			return;
@@ -86,13 +87,14 @@ export function useAuth({
 
 			showToast("Pendaftaran berhasil! Menunggu approval.", "success");
 
-			if (showRegisterModal) {
-				showRegisterModal = false;
-			}
-
 			regData.nama = "";
 			regData.username = "";
 			regData.password = "";
+
+			showRegisterModal.value = false;
+
+			isLoggedIn.value = false;
+			page.value = "login";
 		} catch (err) {
 			showToast(err.message || "Register gagal", "error");
 		} finally {
