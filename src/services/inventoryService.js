@@ -90,10 +90,6 @@ export const toggleStatusService = async (kode, currentStatus) => {
 };
 
 export const searchInventory = async (q, options = {}) => {
-    if (typeof options !== "object" || options === null) {
-        options = {};
-    }
-
     const {
         onlyAvailable = false,
         stock = "all",
@@ -110,27 +106,30 @@ export const searchInventory = async (q, options = {}) => {
         .from("inventory")
         .select("*", { count: "exact" });
 
-    if (q && q.trim() !== "") {
+    if (q && q.trim()) {
         query = query.or(`nama.ilike.%${q}%,kode.ilike.%${q}%,lokasi.ilike.%${q}%`);
     }
 
-    if (onlyAvailable || stock === "available") {
-        query = query.gt("stok", 0);
-    } else if (stock === "empty") {
-        query = query.lte("stok", 0);
-    }
-
-    if (category && category !== "all") {
+    if (category !== "all") {
         query = query.eq("category", category);
     }
 
-    if (location && location.length > 0) {
-        query = query.in("lokasi", location);
+    if (location) {
+        query = query.ilike("lokasi", `${location}%`);
     }
 
-    query = query
-        .order("nama", { ascending: true })
-        .range(from, to);
+    if (onlyAvailable) {
+        query = query.gt("stok", 0).eq("status", "AKTIF");
+    } else {
+        if (stock === "available") {
+            query = query.gt("stok", 0);
+        }
+        if (stock === "empty") {
+            query = query.lte("stok", 0);
+        }
+    }
+
+    query = query.order("nama").range(from, to);
 
     const { data, error, count } = await query;
 
@@ -140,6 +139,36 @@ export const searchInventory = async (q, options = {}) => {
         data: data || [],
         total: count || 0
     };
+};
+
+export const fetchAllLocations = async () => {
+    const pageSize = 1000;
+    let from = 0;
+    let allLocations = [];
+    let hasMore = true;
+
+    while (hasMore) {
+        const { data, error } = await supabaseClient
+            .from("inventory")
+            .select("lokasi")
+            .range(from, from + pageSize - 1);
+
+        if (error) throw error;
+        if (!data.length) break;
+
+        allLocations.push(...data);
+        from += pageSize;
+        hasMore = data.length === pageSize;
+    }
+
+    return [...new Set(
+        allLocations
+            .map(item => {
+                const loc = String(item.lokasi || "").trim();
+                return loc.includes("-") ? loc.split("-")[0].trim() : loc;
+            })
+            .filter(Boolean)
+    )].sort();
 };
 
 export const fetchAllInventory = async ({
@@ -211,6 +240,28 @@ export const deleteItemService = async (kode) => {
 
     if (error) throw error;
     return true;
+};
+
+export const checkExistingItemsByCodes = async (kodesArray = []) => {
+    if (kodesArray.length === 0) return [];
+
+    const { data, error } = await supabaseClient
+        .from("inventory")
+        .select("kode")
+        .in("kode", kodesArray);
+
+    if (error) throw error;
+    return data.map(item => item.kode.toUpperCase());
+};
+
+export const insertBatchInventory = async (itemsArray = []) => {
+    const { data, error } = await supabaseClient
+        .from("inventory")
+        .insert(itemsArray)
+        .select();
+
+    if (error) throw error;
+    return data;
 };
 
 export const updatePhoto = async (kode, foto) => {
