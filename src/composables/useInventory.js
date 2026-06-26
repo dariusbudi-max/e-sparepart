@@ -6,7 +6,8 @@ import {
 	searchInventory,
 	updateLocation,
 	fetchAllInventory,
-	deleteItemService
+	fetchAllLocations,
+	deleteItemService, checkExistingItemsByCodes, insertBatchInventory
 } from "../services/inventoryService.js";
 
 export function useInventory({ showToast, userRole, userData }) {
@@ -19,7 +20,7 @@ export function useInventory({ showToast, userRole, userData }) {
 	const pageSize = 300;
 	const currentSearchPage = ref(0);
 	const hasMoreSearch = ref(true);
-
+	const locations = ref([]);
 	const inventorySearch = ref("");
 	const filterLocation = ref("");
 	const categoryFilter = ref("all");
@@ -54,7 +55,7 @@ export function useInventory({ showToast, userRole, userData }) {
 			if (isRefresh) {
 				inventory.value = data;
 			} else {
-				inventory.value = [...inventory.value, ...data];
+				inventory.value.push(...data);
 			}
 
 			// Cek apakah masih ada data selanjutnya
@@ -69,12 +70,30 @@ export function useInventory({ showToast, userRole, userData }) {
 		}
 	};
 
-	const saveItem = async (formItem) => {
+	const loadLocations = async () => {
+		try {
+			locations.value = await fetchAllLocations();
+		} catch (err) {
+			console.error(err);
+		}
+	};
+
+	const saveItem = async (formItem, isEditMode = false) => {
 		loading.value = true;
 		try {
-			const data = await upsertItem(formItem);
+			if (!isEditMode) {
+				const formattedCode = formItem.kode.trim().toUpperCase();
+				const existingCodes = await checkExistingItemsByCodes([formattedCode]);
 
+				if (existingCodes.length > 0) {
+					showToast(`Kode barang "${formattedCode}" sudah terdaftar di database!`, "error");
+					return null;
+				}
+			}
+
+			const data = await upsertItem(formItem);
 			const index = inventory.value.findIndex(i => i.kode === data.kode);
+
 			if (index !== -1) {
 				inventory.value[index] = data;
 			} else {
@@ -212,7 +231,7 @@ export function useInventory({ showToast, userRole, userData }) {
 		const currentId = ++lastSearchId;
 		const safeQuery = String(query || "").toLowerCase().trim();
 
-		if (!safeQuery && categoryFilter.value === "all" && stockFilter.value === "all") {
+		if (!safeQuery && !filterLocation.value && categoryFilter.value === "all" && stockFilter.value === "all") {
 			isServerMode.value = false;
 			serverResults.value = [];
 			currentSearchPage.value = 0;
@@ -238,6 +257,7 @@ export function useInventory({ showToast, userRole, userData }) {
 				onlyAvailable: onlyAvailable,
 				stock: stockFilter.value,
 				category: categoryFilter.value,
+				location: filterLocation.value,
 				page: currentSearchPage.value,
 				pageSize: pageSize
 			});
@@ -261,11 +281,14 @@ export function useInventory({ showToast, userRole, userData }) {
 		}
 	};
 
-	watch([categoryFilter, stockFilter], () => {
-		currentSearchPage.value = 0;
-		hasMoreSearch.value = true;
-		handleSearch(inventorySearch.value, false);
-	});
+	watch(
+		[categoryFilter, stockFilter, filterLocation],
+		() => {
+			currentSearchPage.value = 0;
+			hasMoreSearch.value = true;
+			handleSearch(inventorySearch.value, false);
+		}
+	);
 
 	const sortBy = (key) => {
 		if (sortKey.value === key) {
@@ -294,17 +317,6 @@ export function useInventory({ showToast, userRole, userData }) {
 		return [...new Set(source.map(i => i?.category).filter(Boolean))].sort();
 	});
 
-	const uniqueLocations = computed(() => {
-		const source = inventory.value;
-		const areas = source
-			.map(item => {
-				const loc = String(item?.lokasi || "");
-				return loc.includes("-") ? loc.split("-")[0].trim() : loc.trim();
-			})
-			.filter(Boolean);
-		return [...new Set(areas)].sort();
-	});
-
 	const deleteItem = async (kode, nama) => {
 		const confirmDelete = confirm(`Apakah Anda yakin ingin menghapus data "${nama}" (${kode}) secara permanen? Tindakan ini tidak dapat dibatalkan.`);
 		if (!confirmDelete) return false;
@@ -326,6 +338,24 @@ export function useInventory({ showToast, userRole, userData }) {
 			return false;
 		} finally {
 			loading.value = false;
+		}
+	};
+
+	const checkExistingCodes = async (kodes) => {
+		try {
+			return await checkExistingItemsByCodes(kodes);
+		} catch (err) {
+			console.error("Collision Check Error: ", err);
+			throw err;
+		}
+	};
+
+	const saveBatchItem = async (cleanItems) => {
+		try {
+			return await insertBatchInventory(cleanItems);
+		} catch (err) {
+			console.error("Batch Saving Error: ", err);
+			throw err;
 		}
 	};
 
@@ -352,8 +382,8 @@ export function useInventory({ showToast, userRole, userData }) {
 
 	return {
 		inventory, isInventoryReady, loading, isSearching, inventorySearch, currentSearchPage, hasMoreSearch,
-		filterLocation, categoryFilter, stockFilter, finalInventory, hasMore, deleteItem,
-		publicInventory, categoryOptions, uniqueLocations, loadInventory, serverResults,
+		filterLocation, categoryFilter, stockFilter, finalInventory, hasMore, deleteItem, checkExistingCodes, saveBatchItem,
+		publicInventory, categoryOptions, locations, loadLocations, loadInventory, serverResults,
 		saveItem, saveNewLocation, toggleStatus, handleSearch, sortBy, getExportInventory,
 		resetAllFilters, sortKey, sortOrder, isServerMode
 	};
