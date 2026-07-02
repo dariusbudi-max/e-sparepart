@@ -5,13 +5,16 @@ import { useAuth } from "./composables/useAuth.js";
 import { useUsers } from "./composables/useUsers.js";
 
 import { useInventory } from "./composables/useInventory.js";
-import { searchInventory, updatePhoto } from "./services/inventoryService.js";
+import { searchInventory } from "./services/inventoryService.js";
+import { fetchPhotos, deletePhoto, setCoverPhoto, updatePhotoOrder } from "./services/inventoryPhotoService.js";
 
 import { useScrapMonitoring } from "./composables/useScrapMonitoring.js";
 
+import { createWatermarkedImage } from "./utils/photoProcessor.js";
 import { fixDriveUrl } from "./utils/imageUtils.js";
 import { useUploadPhoto } from "./composables/useUploadPhoto.js";
 import { useCamera } from "./composables/useCamera.js";
+import { deleteFromDrive } from "./services/driveService.js";
 
 import { useTransaction } from "./composables/useTransaction.js";
 import { useImportTx } from "./composables/useImportTx.js";
@@ -52,15 +55,12 @@ createApp({
         const loginData = ref({ username: '', password: '' });
         const userData = ref({ username: '', nama: '', role: '', canPreviewPhoto: false });
         const isAdminView = ref(false);
-
-
         const newUser = reactive({ nama: '', username: '', password: '', role: 'VIEWER' });
         const showRegisterModal = ref(false);
         const regData = reactive({ nama: '', username: '', password: '' });
         const showProfileModal = ref(false);
         const loadingProfile = ref(false);
         const profileForm = reactive({ nama: '', password: '' });
-
 
         const lastQuery = ref('');
         const searchCache = ref({});
@@ -87,8 +87,16 @@ createApp({
         });
 
         const photoPreview = ref(null);
-        const previewImage = ref(null);
+        const previewSource = ref(null);
         const showImportMode = ref(false);
+        const previewGallery = ref({
+            show: false,
+            photos: [],
+            current: 0
+        });
+        const photoUrlInput = ref("");
+        const isDragOver = ref(false);
+        const dragCounter = ref(0);
 
         const showImport = ref(false);
         const csvPreview = ref([]);
@@ -118,17 +126,18 @@ createApp({
         const showItemModal = ref(false);
         const isEditMode = ref(false);
         const formItem = ref({
-            kode: '',
-            nama: '',
-            satuan: '',
-            lokasi: '',
-            category: '',
-            foto: '',
+            kode: "",
+            nama: "",
+            satuan: "",
+            lokasi: "",
+            category: "",
+            photos: [],
+            selectedPhoto: null,
             min_stok: 0,
-            status: 'AKTIF'
+            status: "AKTIF"
         });
         const showLocationModal = ref(false);
-        const locationForm = ref({ kode: '', nama: '', foto: '', lokasi: '' });
+        const locationForm = ref({ kode: '', nama: '', lokasi: '' });
         const showImportModal = ref(false);
         const importStep = ref(1);
         const rawExcelInput = ref("");
@@ -138,7 +147,6 @@ createApp({
         const fileInput = ref(null);
         const isUploading = ref(false);
         const showPhotoModal = ref(false);
-        let streamInstance = null;
 
         const userRole = ref('ADMIN');
 
@@ -179,21 +187,29 @@ createApp({
 
         const openAddModal = () => {
             isEditMode.value = false;
-            formItem.value = { kode: '', nama: '', satuan: '', lokasi: '', category: '', foto: '', min_stok: 0, status: 'AKTIF' };
+            formItem.value = { kode: '', nama: '', satuan: '', lokasi: '', category: '', photos: [], selectedPhoto: null, min_stok: 0, status: 'AKTIF' };
             showItemModal.value = true;
         };
 
         const editItem = (item) => {
             isEditMode.value = true;
             formItem.value = {
-                kode: item.kode || '',
-                nama: item.nama || '',
-                satuan: item.satuan || '',
-                lokasi: item.lokasi || '',
-                category: item.category || '',
-                min_stok: item.min_stok || 0,
-                foto: item.foto || '',
-                status: item.status || 'AKTIF'
+                kode: item.kode,
+                nama: item.nama,
+                satuan: item.satuan,
+                lokasi: item.lokasi,
+                category: item.category,
+                min_stok: item.min_stok,
+                status: item.status,
+
+                photos: item.inventory_photos
+                    ? [...item.inventory_photos]
+                    : [],
+
+                selectedPhoto: item.inventory_photos?.find(x => x.is_cover)
+                    || item.inventory_photos?.[0]
+                    || null
+
             };
             showItemModal.value = true;
         };
@@ -373,8 +389,6 @@ createApp({
         };
 
 
-
-
         // MIGRASI KE SUPABASE
         const {
             adminUsers, isSubmitting, userSearchQuery, filteredAdminUsers,
@@ -396,9 +410,17 @@ createApp({
             userData
         });
 
-        const saveItem = async (formItem, isEditMode) => {
+        const saveItem = async () => {
             try {
-                await inventory.saveItem(formItem, isEditMode);
+                const data = await inventory.saveItem(formItem.value, isEditMode.value);
+
+                if (!isEditMode.value && data) {
+                    isEditMode.value = true;
+                    formItem.value.kode = data.kode;
+                    showToast("Barang berhasil dibuat. Sekarang Anda dapat menambahkan foto.", "success");
+                    return;
+                }
+
                 showItemModal.value = false;
             } catch (err) {
                 console.error(err);
@@ -815,199 +837,110 @@ createApp({
         });
 
 
-
         //===Photo Sparepart===//
         const {
             startCamera,
-            stopCamera: stopCameraCore,
-            takeSnapshot: takeSnapshotCore
+            stopCamera: stopCameraCore
         } = useCamera(videoFeed);
 
-        const { uploadPhoto, uploadBase64Photo, handleFileUpload } = useUploadPhoto({
+        const {
+            saveUploadedPhoto,
+            readFilePreview,
+            refreshPhotoList
+        } = useUploadPhoto({
             isUploading,
             formItem,
             loadInventory: inventory.loadInventory,
-            showToast,
-            inventory: inventory.inventory,
-            isServerMode: inventory.isServerMode,
-            serverResults: inventory.serverResults
+            showToast
         });
+
+        const canUploadPhoto = computed(() => {
+            return isEditMode.value && !!formItem.value.kode;
+        });
+
+        const refreshPhotos = async (kode) => {
+            const latest = await refreshPhotoList(kode);
+            const index = inventory.inventory.value.findIndex(i => i.kode === kode);
+
+            if (index >= 0) {
+                inventory.inventory.value[index] = {
+                    ...inventory.inventory.value[index],
+                    inventory_photos: [...latest]
+                };
+            }
+
+            return latest;
+        };
 
         const launchGallery = () => {
             if (fileInput.value) {
+                fileInput.value.value = "";
                 fileInput.value.click();
             }
         };
 
-        const closeModal = () => {
-            if (isCameraActive.value) {
-                stopCamera();
+        const handleGallerySelected = async (event) => {
+            const file = event.target.files?.[0];
+            if (!file) return;
+
+            if (!file.type.startsWith("image/")) {
+                showToast("File harus berupa gambar.", "error");
+                return;
             }
 
-            photoPreview.value = null;
-            isUploading.value = false;
+            await processImageFile(file);
+        };
 
-            if (fileInput.value) {
-                fileInput.value.value = "";
+        const handleUrlSelected = async () => {
+            let url = photoUrlInput.value.trim();
+
+            if (!url) {
+                showToast("Masukkan URL gambar yang valid", "error");
+                return;
             }
-
-            showItemModal.value = false;
-        };
-
-        const removePhoto = () => {
-            if (confirm("Hapus foto produk ini?")) {
-                formItem.value.foto = null;
-            }
-        };
-
-        const removePhotoStaff = () => {
-            if (confirm("Apakah Anda yakin ingin menghapus foto produk ini dari data sementara? (Jangan lupa klik 'Simpan Perubahan' setelah ini)")) {
-                formItem.value.foto = null;
-                showToast("Foto dihapus sementara. Klik 'Simpan Perubahan' untuk memperbarui database.", "success");
-            }
-        };
-
-        const openUpdateFoto = (item) => {
-            formItem.value = {
-                kode: item.kode,
-                nama: item.nama,
-                foto: item.foto
-            };
-            showPhotoModal.value = true;
-        };
-
-        const closePhotoModal = () => {
-            stopCamera();
-            photoPreview.value = null;
-            if (fileInput.value) {
-                fileInput.value.value = "";
-            }
-
-            showPhotoModal.value = false;
-            loading.value = false;
-        };
-
-        const savePhotoOnly = async () => {
-            loading.value = true;
-            try {
-                const targetKode = formItem.value.kode;
-                const newFotoUrl = formItem.value.foto;
-
-                await updatePhoto(targetKode, newFotoUrl);
-
-                const item = inventory.inventory.value.find(i => i.kode === targetKode);
-                if (item) {
-                    item.foto = newFotoUrl;
-                }
-
-                if (inventory.isServerMode?.value && inventory.serverResults?.value) {
-                    const serverItem = inventory.serverResults.value.find(i => i.kode === targetKode);
-                    if (serverItem) {
-                        serverItem.foto = newFotoUrl;
-                    }
-                }
-
-                await inventory.loadInventory(true);
-                showToast("Foto berhasil disimpan ke database", "success");
-                showPhotoModal.value = false;
-            } catch (err) {
-                showToast(err.message, "error");
-            } finally {
-                loading.value = false;
-            }
-        };
-
-        const confirmAndUploadPhoto = async () => {
-            if (isUploading.value) return;
-            if (!photoPreview.value) return;
-
-            isUploading.value = true;
 
             try {
-                showToast("Memulai proses upload...", "success");
+                showToast("Sedang memuat gambar dari URL...", "info");
+                url = url.includes("drive.google.com") ? fixDriveUrl(url) : `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`;
 
-                let rawBase64 = photoPreview.value;
-                if (rawBase64.includes(",")) {
-                    rawBase64 = rawBase64.split(",")[1];
-                }
+                const response = await fetch(url);
+                if (!response.ok) throw new Error("Gagal mengambil file gambar dari server asal.");
 
-                const targetKode = formItem.value.kode;
-                const url = await uploadBase64Photo(rawBase64, targetKode);
+                const blob = await response.blob();
+                if (!blob.type.startsWith("image/")) throw new Error("URL tidak mengarah ke file gambar.");
 
-                formItem.value.foto = url;
-                stopCamera();
-                photoPreview.value = null;
+                const rawBase64 = await readFilePreview(blob);
+                const img = new Image();
+                img.src = rawBase64;
 
-                const item = inventory.inventory.value.find(i => i.kode === targetKode);
-                if (item) {
-                    item.foto = url;
-                }
-
-                if (inventory.isServerMode?.value && inventory.serverResults?.value) {
-                    const serverItem = inventory.serverResults.value.find(i => i.kode === targetKode);
-                    if (serverItem) {
-                        serverItem.foto = url;
+                img.onload = async () => {
+                    try {
+                        photoPreview.value = await createWatermarkedImage(img, formItem.value.kode);
+                        previewSource.value = "url";
+                        photoUrlInput.value = "";
+                        showToast("Gambar URL berhasil dimuat dengan watermark", "success");
+                    } catch (err) {
+                        showToast(err.message, "error");
                     }
-                }
+                };
 
-                await inventory.loadInventory(true);
-                showToast("Foto produk berhasil diunggah dan database diperbarui", "success");
+                img.onerror = () => {
+                    showToast("Gagal merender file gambar.", "error");
+                };
             } catch (err) {
-                console.error("Upload Error:", err);
-                showToast("Gagal mengunggah foto: " + err.message, "error");
-            } finally {
-                isUploading.value = false;
+                showToast("Gagal memproses gambar URL: " + err.message, "error");
             }
         };
 
-        const handleTakePhoto = () => {
+        const handleTakePhoto = async () => {
             if (!videoFeed.value || videoFeed.value.readyState !== 4) {
                 showToast("Kamera belum siap", "error");
                 return;
             }
 
             try {
-                const video = videoFeed.value;
-                const canvas = document.createElement("canvas");
-                const size = Math.min(video.videoWidth, video.videoHeight);
-
-                canvas.width = size;
-                canvas.height = size;
-
-                const context = canvas.getContext("2d");
-                const sx = (video.videoWidth - size) / 2;
-                const sy = (video.videoHeight - size) / 2;
-
-                context.drawImage(video, sx, sy, size, size, 0, 0, size, size);
-
-                const kodeBarang = formItem.value.kode || "NO-KODE";
-                const textToRender = `Kode: ${kodeBarang}`;
-
-                context.font = "bold 20px Arial";
-                context.textAlign = "left";
-                context.textBaseline = "middle";
-
-                const textMetrics = context.measureText(textToRender);
-                const textWidth = textMetrics.width;
-
-                const paddingHorizontal = 15;
-                const boxWidth = textWidth + (paddingHorizontal * 2);
-                const boxHeight = 45;
-                const boxX = 10;
-                const boxY = size - boxHeight - 15;
-
-                context.fillStyle = "rgba(0, 0, 0, 0.65)";
-                context.fillRect(boxX, boxY, boxWidth, boxHeight);
-
-                context.fillStyle = "#FFFFFF";
-                const textX = boxX + paddingHorizontal;
-                const textY = boxY + (boxHeight / 2);
-
-                context.fillText(textToRender, textX, textY);
-
-                const base64Data = canvas.toDataURL("image/jpeg", 0.95);
-
-                photoPreview.value = base64Data;
+                photoPreview.value = await createWatermarkedImage(videoFeed.value, formItem.value.kode);
+                previewSource.value = "camera";
                 stopCamera();
                 showToast("Foto berhasil diambil! Silakan tinjau.", "success");
             } catch (err) {
@@ -1015,20 +948,192 @@ createApp({
             }
         };
 
-        const cancelPreview = () => {
+        const removePhoto = async (photo) => {
+            if (!confirm("Hapus foto ini?")) return;
+
+            try {
+                if (photo.drive_file_id) {
+                    await deleteFromDrive(photo.drive_file_id);
+                }
+
+                await deletePhoto(photo.id);
+                const latest = await refreshPhotos(formItem.value.kode);
+                showToast("Foto berhasil dihapus", "success");
+                return latest;
+            } catch (err) {
+                showToast(err.message, "error");
+            }
+        };
+
+        const openUpdateFoto = async (item) => {
+
+            const photos = await fetchPhotos(item.kode);
+
+            formItem.value = {
+
+                kode: item.kode,
+                nama: item.nama,
+                satuan: item.satuan || "",
+                lokasi: item.lokasi || "",
+                category: item.category || "",
+                min_stok: item.min_stok || 0,
+                status: item.status || "AKTIF",
+
+                photos,
+
+                selectedPhoto:
+                    photos.find(p => p.is_cover) ||
+                    photos[0] ||
+                    null
+
+            };
+
+            showPhotoModal.value = true;
+
+        };
+
+        const handleDrop = async (e) => {
+            e.preventDefault();
+
+            dragCounter.value = 0;
+            isDragOver.value = false;
+
+            const file = e.dataTransfer.files?.[0];
+
+            if (!file) return;
+
+            await processImageFile(file);
+        };
+
+        const handleDragOver = (e) => {
+            e.preventDefault();
+        };
+
+        const handleDragEnter = (e) => {
+            e.preventDefault();
+
+            dragCounter.value++;
+
+            isDragOver.value = true;
+        };
+
+        const handleDragLeave = (e) => {
+            e.preventDefault();
+
+            dragCounter.value--;
+
+            if (dragCounter.value <= 0) {
+                dragCounter.value = 0;
+                isDragOver.value = false;
+            }
+        };
+
+        const processImageFile = async (file) => {
+            try {
+                const rawBase64 = await readFilePreview(file);
+                const img = new Image();
+                img.src = rawBase64;
+
+                img.onload = async () => {
+                    try {
+                        photoPreview.value = await createWatermarkedImage(img, formItem.value.kode);
+                        previewSource.value = "gallery";
+                        showToast("Gambar berhasil diproses", "success");
+                    } catch (err) {
+                        showToast(err.message, "error");
+                    }
+                };
+
+                img.onerror = () => {
+                    showToast("Gagal membaca gambar.", "error");
+                };
+            } catch (err) {
+                showToast("Gagal memproses file: " + err.message, "error");
+            }
+        };
+
+        const confirmAndUploadPhoto = async () => {
+            if (isUploading.value) return;
+
+            if (!photoPreview.value) {
+                showToast("Belum ada foto yang akan diupload.", "error");
+                return;
+            }
+
+            try {
+                const base64Clean = photoPreview.value.includes(",")
+                    ? photoPreview.value.split(",")[1]
+                    : photoPreview.value;
+
+                const latest = await saveUploadedPhoto({
+                    base64: base64Clean
+                });
+
+                const index = inventory.inventory.value.findIndex(
+                    i => i.kode === formItem.value.kode
+                );
+
+                if (index >= 0) {
+                    inventory.inventory.value[index] = {
+                        ...inventory.inventory.value[index],
+                        inventory_photos: [...latest]
+                    };
+                }
+
+                photoPreview.value = null;
+                previewSource.value = null;
+                photoUrlInput.value = "";
+
+                if (fileInput.value) fileInput.value.value = "";
+
+                stopCamera();
+            } catch (err) {
+                console.error(err);
+                showToast("Proses upload gagal.", "error");
+            }
+        };
+
+        const resetPhotoState = () => {
+            stopCamera();
             photoPreview.value = null;
-            startLiveCamera();
+            previewSource.value = null;
+            photoUrlInput.value = "";
+            isUploading.value = false;
+            if (fileInput.value) fileInput.value.value = "";
+        };
+
+        const closePhotoModal = () => {
+            resetPhotoState();
+            showPhotoModal.value = false;
+        };
+
+        const closeModal = () => {
+            resetPhotoState();
+            showItemModal.value = false;
+        };
+
+        const cancelPreview = async () => {
+            photoPreview.value = null;
+            if (fileInput.value) fileInput.value.value = "";
+
+            if (previewSource.value === "camera") {
+                previewSource.value = null;
+                await nextTick();
+                await startLiveCamera();
+                return;
+            }
+
+            previewSource.value = null;
         };
 
         const startLiveCamera = async () => {
             isCameraActive.value = true;
 
-            await nextTick();
-
-            await new Promise(r => setTimeout(r, 200));
+            await (typeof nextTick !== 'undefined' ? nextTick() : Vue.nextTick());
 
             try {
                 await startCamera();
+                previewSource.value = "camera";
             } catch (err) {
                 showToast("Gagal membuka kamera", "error");
                 isCameraActive.value = false;
@@ -1044,9 +1149,81 @@ createApp({
             }
         };
 
-        const takeSnapshot = () => {
-            return takeSnapshotCore();
+        const selectPhoto = (photo) => {
+            formItem.value.selectedPhoto = photo;
         };
+
+        const makeCover = async (photo) => {
+
+            try {
+
+                await setCoverPhoto(formItem.value.kode, photo.id);
+
+                await refreshPhotos(formItem.value.kode);
+
+                showToast("Foto utama berhasil diperbarui", "success");
+
+            } catch (err) {
+
+                showToast(err.message, "error");
+
+            }
+
+        };
+
+        const openPreviewGallery = async (photos = [], kode = null) => {
+
+            let list = photos;
+
+            if (kode) {
+
+                list = await fetchPhotos(kode);
+
+            }
+
+            if (!list.length) return;
+
+            previewGallery.value = {
+
+                show: true,
+
+                photos: list.map(p => ({ ...p })),
+
+                current:
+                    list.findIndex(p => p.is_cover) >= 0
+                        ? list.findIndex(p => p.is_cover)
+                        : 0
+
+            };
+
+        };
+
+        const closePreviewGallery = () => {
+            previewGallery.value.show = false;
+        };
+
+        const nextPreview = () => {
+            if (!previewGallery.value.photos.length) return;
+
+            previewGallery.value.current =
+                (previewGallery.value.current + 1) %
+                previewGallery.value.photos.length;
+        };
+
+        const prevPreview = () => {
+            if (!previewGallery.value.photos.length) return;
+
+            previewGallery.value.current =
+                (previewGallery.value.current - 1 +
+                    previewGallery.value.photos.length) %
+                previewGallery.value.photos.length;
+        };
+
+        const currentPreviewPhoto = computed(() => {
+            return previewGallery.value.photos[
+                previewGallery.value.current
+            ];
+        });
 
         const scrap = useScrapMonitoring({
             supabaseClient,
@@ -1069,9 +1246,6 @@ createApp({
                 })
             );
         });
-
-
-
 
 
         ///===ACCESSORIS===///
@@ -1653,9 +1827,13 @@ createApp({
 
             // 6. CAMERA, SCANNER & MEDIA
             isStockInsufficientUI, getMasterStockUI, isCameraActive, videoFeed, fileInput, startScanner, stopScanner, handleScan,
-            openScanner, scannerActive, handleTakePhoto, scanner, importer, useTransaction, focusSearch, closeScanner, handleFileUpload,
-            launchGallery, previewImage, openUpdateFoto, savePhotoOnly, startLiveCamera, stopCamera, takeSnapshot, uploadPhoto, uploadBase64Photo,
-            removePhoto, isUploading, toggleUser, photoPreview, confirmAndUploadPhoto, cancelPreview, removePhotoStaff,
+            openScanner, scannerActive, handleTakePhoto, scanner, importer, useTransaction, focusSearch, closeScanner,
+            launchGallery, openUpdateFoto, startLiveCamera, stopCamera, handleGallerySelected,
+            removePhoto, isUploading, toggleUser, photoPreview, confirmAndUploadPhoto, cancelPreview, selectPhoto,
+            makeCover, previewGallery, openPreviewGallery, closePreviewGallery, nextPreview, prevPreview, currentPreviewPhoto, canUploadPhoto,
+            refreshPhotos, photoUrlInput, handleUrlSelected, resetPhotoState, handleDrop, handleDragOver, handleDragLeave, isDragOver,
+            handleDragEnter, dragCounter,
+
 
             // 7. SPP (SURAT PERMOHONAN PEMBELIAN) & RESERVASI
             summarySppItems, inputKodeManual, tambahSemuaKeSpp, tambahItemManualByKode, kosongkanSpp, usageMap,
