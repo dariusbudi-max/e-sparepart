@@ -1,4 +1,4 @@
-const GAS_URL = "https://script.google.com/macros/s/AKfycbzZseOoD_W66OnQEyidErLCATN3RkCJHCJHowtQ9fYFNI2OkSNUyPSN9H0XXm60zpMp/exec";
+const GAS_URL = "https://script.google.com/macros/s/AKfycbwL23B6aZIDNFaPRgxAaGCGOW_vSFFr8-12j7TAcBhE1SV5ZQKj2b3_DiJyCh0CY6rj/exec";
 
 export const callAPI = async (action, payload = {}, overrideToken = null) => {
     try {
