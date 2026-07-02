@@ -6,7 +6,15 @@ export const fetchInventory = async (page = 0, pageSize = 300) => {
 
     const { data, error, count } = await supabaseClient
         .from("inventory")
-        .select("*", { count: 'exact' })
+        .select(`
+            *,
+            inventory_photos (
+                id,
+                photo_url,
+                is_cover,
+                sort_order
+            )
+        `, { count: "exact" })
         .order("nama", { ascending: true })
         .range(from, to);
 
@@ -15,19 +23,35 @@ export const fetchInventory = async (page = 0, pageSize = 300) => {
 };
 
 export const upsertItem = async (payload) => {
+
     const cleanPayload = {
-        ...payload,
-        status: (payload.status || "AKTIF").toString().trim().toUpperCase(),
+
+        kode: payload.kode,
+        nama: payload.nama,
+        satuan: payload.satuan,
+        lokasi: payload.lokasi,
+        category: payload.category,
+        min_stok: payload.min_stok,
+        status: (payload.status || "AKTIF")
+            .toString()
+            .trim()
+            .toUpperCase()
+
     };
 
     const { data, error } = await supabaseClient
         .from("inventory")
-        .upsert(cleanPayload, { onConflict: "kode" })
+        .upsert(cleanPayload, {
+            onConflict: "kode"
+        })
         .select()
         .single();
 
-    if (error) throw error;
+    if (error)
+        throw error;
+
     return data;
+
 };
 
 export const updateLocation = async (kode, lokasiBaru, username = "SYSTEM") => {
@@ -104,7 +128,15 @@ export const searchInventory = async (q, options = {}) => {
 
     let query = supabaseClient
         .from("inventory")
-        .select("*", { count: "exact" });
+        .select(`
+            *,
+            inventory_photos(
+                id,
+                photo_url,
+                is_cover,
+                sort_order
+            )
+        `, { count: "exact" });
 
     if (q && q.trim()) {
         query = query.or(`nama.ilike.%${q}%,kode.ilike.%${q}%,lokasi.ilike.%${q}%`);
@@ -121,18 +153,13 @@ export const searchInventory = async (q, options = {}) => {
     if (onlyAvailable) {
         query = query.gt("stok", 0).eq("status", "AKTIF");
     } else {
-        if (stock === "available") {
-            query = query.gt("stok", 0);
-        }
-        if (stock === "empty") {
-            query = query.lte("stok", 0);
-        }
+        if (stock === "available") query = query.gt("stok", 0);
+        if (stock === "empty") query = query.lte("stok", 0);
     }
 
     query = query.order("nama").range(from, to);
 
     const { data, error, count } = await query;
-
     if (error) throw error;
 
     return {
@@ -186,7 +213,15 @@ export const fetchAllInventory = async ({
     while (hasMore) {
         let query = supabaseClient
             .from("inventory")
-            .select("*")
+            .select(`
+                *,
+                inventory_photos(
+                    id,
+                    photo_url,
+                    is_cover,
+                    sort_order
+                )
+            `)
             .order("nama", { ascending: true })
             .range(from, from + pageSize - 1);
 
@@ -262,14 +297,4 @@ export const insertBatchInventory = async (itemsArray = []) => {
 
     if (error) throw error;
     return data;
-};
-
-export const updatePhoto = async (kode, foto) => {
-    if (!kode) throw new Error("Kode barang kosong");
-    const { error } = await supabaseClient
-        .from("inventory")
-        .update({ foto })
-        .eq("kode", kode);
-    if (error) throw error;
-    return true;
 };
