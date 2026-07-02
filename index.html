@@ -1544,10 +1544,12 @@
                                                 </span>
                                             </td>
                                             <td v-if="userData.role === 'ADMIN' || userData.can_preview_photo" class="px-5 py-4 text-center">
-                                                <div v-if="item.foto" @click="previewImage = fixDriveUrl(item.foto)" class="w-16 h-14 mx-auto rounded-lg overflow-hidden bg-slate-100 cursor-pointer hover:shadow-md transition border border-slate-200">
-                                                    <img :src="fixDriveUrl(item.foto)" class="w-full h-full object-cover">
+                                                <div @click="openPreviewGallery(item.inventory_photos || [], item.kode)" class="w-12 h-12 rounded-2xl bg-slate-100 border-2 border-white shadow-sm overflow-hidden cursor-pointer hover:scale-105 hover:shadow-md transition-all relative group-hover:border-indigo-100 mx-auto">
+                                                    <img v-if="(item.inventory_photos || []).length" :src="fixDriveUrl((item.inventory_photos.find(p => p.is_cover) || item.inventory_photos[0]).photo_url)" class="w-full h-full object-cover" />
+                                                    <div v-else class="w-full h-full flex items-center justify-center text-[9px] text-slate-400">
+                                                        No IMG
+                                                    </div>
                                                 </div>
-                                                <div v-else class="text-[10px] text-slate-400 italic">No Image</div>
                                             </td>
                                         </tr>
                                     </tbody>
@@ -2146,59 +2148,41 @@
                     </div>
                 </main>
 
-                <main v-if="page === 'master_barang' && ['ADMIN', 'STAFF'].includes(userData.role)"
-                    class="flex-1 flex flex-col h-screen overflow-hidden bg-slate-50">
-
-                    <div
-                        class="py-2.5 px-4 md:px-6 bg-white border-b border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-3 z-20 shadow-sm relative">
-                        
+                <main v-if="page === 'master_barang' && ['ADMIN', 'STAFF'].includes(userData.role)" class="flex-1 flex flex-col h-screen overflow-hidden bg-slate-50">
+                    <div class="py-2.5 px-4 md:px-6 bg-white border-b border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-3 z-20 shadow-sm relative">
                         <div class="flex-shrink-0">
                             <p class="text-xs text-slate-400 font-bold uppercase tracking-wider">
                                 {{ userData.role === 'ADMIN' ? 'Kelola Kode Barang' : 'Lihat stok & perbarui lokasi/foto' }}
                             </p>
                         </div>
 
-                        <div
-                            class="flex-1 flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full md:w-auto md:justify-end">
-                            
-                            <!-- Input Search -->
+                        <div class="flex-1 flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full md:w-auto md:justify-end">
                             <div class="relative w-full sm:w-auto sm:min-w-[280px] group">
-                                <i
-                                    class="fa-solid fa-search absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-indigo-600 transition-colors text-xs"></i>
-                                <input v-model="inventorySearch" type="text" placeholder="Cari Barang..."
-                                    class="w-full pl-10 pr-9 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium focus:bg-white focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none transition-all shadow-inner">
-                                <button v-if="inventorySearch" @click="inventorySearch = ''"
-                                    class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-300 hover:text-rose-500 transition-colors">
+                                <i class="fa-solid fa-search absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-indigo-600 transition-colors text-xs"></i>
+                                <input v-model="inventorySearch" type="text" placeholder="Cari Barang..." class="w-full pl-10 pr-9 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium focus:bg-white focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none transition-all shadow-inner">
+                                <button v-if="inventorySearch" @click="inventorySearch = ''" class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-300 hover:text-rose-500 transition-colors">
                                     <i class="fa-solid fa-circle-xmark text-base"></i>
                                 </button>
                             </div>
 
-                            <!-- Select Filter Lokasi -->
                             <div class="relative w-full sm:w-auto">
-                                <select v-model="filterLocation"
-                                    class="w-full sm:w-auto appearance-none pl-10 pr-9 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-600 focus:bg-white outline-none cursor-pointer hover:border-indigo-300 transition-all shadow-inner">
+                                <select v-model="filterLocation" class="w-full sm:w-auto appearance-none pl-10 pr-9 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-600 focus:bg-white outline-none cursor-pointer hover:border-indigo-300 transition-all shadow-inner">
                                     <option value="">Semua Lokasi</option>
                                     <option v-for="loc in locations" :key="loc" :value="loc">{{ loc }}</option>
                                 </select>
                                 <i class="fa-solid fa-location-dot absolute left-4 top-1/2 -translate-y-1/2 text-amber-500 text-xs"></i>
-                                <i
-                                    class="fa-solid fa-chevron-down absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-[9px] pointer-events-none"></i>
+                                <i class="fa-solid fa-chevron-down absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-[9px] pointer-events-none"></i>
                             </div>
 
-                            <!-- Button Reset Filter -->
-                            <button v-if="sortKey || filterLocation || inventorySearch" @click="resetAllFilters"
-                                class="flex items-center justify-center sm:w-auto w-full px-3.5 py-2 bg-rose-50 text-rose-600 border border-rose-100 rounded-xl text-xs font-bold hover:bg-rose-100 transition-all active:scale-95 shadow-sm"
-                                title="Reset Filter">
+                            <button v-if="sortKey || filterLocation || inventorySearch" @click="resetAllFilters" class="flex items-center justify-center sm:w-auto w-full px-3.5 py-2 bg-rose-50 text-rose-600 border border-rose-100 rounded-xl text-xs font-bold hover:bg-rose-100 transition-all active:scale-95 shadow-sm" title="Reset Filter">
                                 <i class="fa-solid fa-arrow-rotate-left"></i>
                             </button>
 
-                            <button v-if="userData.role === 'ADMIN'" @click="openImportExcelModal"
-                                class="flex items-center justify-center sm:w-auto w-full px-4 py-2 bg-emerald-50 text-emerald-600 border border-emerald-200 rounded-xl text-xs font-black hover:bg-emerald-100 transition-all active:scale-95 gap-2">
+                            <button v-if="userData.role === 'ADMIN'" @click="openImportExcelModal" class="flex items-center justify-center sm:w-auto w-full px-4 py-2 bg-emerald-50 text-emerald-600 border border-emerald-200 rounded-xl text-xs font-black hover:bg-emerald-100 transition-all active:scale-95 gap-2">
                                 <i class="fa-solid fa-file-excel"></i>
                                 <span>Import</span>
                             </button>
-                            <button v-if="userData.role === 'ADMIN'" @click="openAddModal"
-                                class="flex items-center justify-center sm:w-auto w-full px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-black shadow-md shadow-indigo-100 transition-all active:scale-95 gap-2">
+                            <button v-if="userData.role === 'ADMIN'" @click="openAddModal" class="flex items-center justify-center sm:w-auto w-full px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-black shadow-md shadow-indigo-100 transition-all active:scale-95 gap-2">
                                 <i class="fa-solid fa-plus"></i>
                                 <span>Tambah</span>
                             </button>
@@ -2206,157 +2190,103 @@
                     </div>
 
                     <div class="flex-1 p-2 md:p-4 lg:p-6 overflow-hidden flex flex-col">
-                        <div
-                            class="bg-white border border-slate-100 rounded-[2rem] shadow-xl shadow-slate-200/40 flex-1 flex flex-col overflow-hidden">
+                        <div class="bg-white border border-slate-100 rounded-[2rem] shadow-xl shadow-slate-200/40 flex-1 flex flex-col overflow-hidden">
                             <div class="overflow-x-auto overflow-y-auto flex-1 custom-scrollbar" @scroll="handleTableScroll">
                                 <table class="w-full text-left border-collapse whitespace-nowrap min-w-[900px]">
                                     <thead class="sticky top-0 bg-white/90 backdrop-blur-md z-10 shadow-sm border-b-2 border-slate-100">
                                         <tr>
-                                            <th
-                                                class="px-5 py-4 text-[11px] font-black text-slate-400 uppercase tracking-widest w-16 text-center">
-                                                Foto</th>
-
-                                            <th @click="sortBy('kode')"
-                                                class="px-5 py-4 text-[11px] font-black text-slate-400 uppercase tracking-widest cursor-pointer hover:text-indigo-600 transition-colors group">
+                                            <th class="px-5 py-4 text-[11px] font-black text-slate-400 uppercase tracking-widest w-16 text-center">Foto</th>
+                                            <th @click="sortBy('kode')" class="px-5 py-4 text-[11px] font-black text-slate-400 uppercase tracking-widest cursor-pointer hover:text-indigo-600 transition-colors group">
                                                 <div class="flex items-center gap-2">Kode
-                                                    <i v-if="sortKey === 'kode'" class="fa-solid"
-                                                        :class="sortOrder === 1 ? 'fa-sort-up text-indigo-500' : 'fa-sort-down text-indigo-500'"></i>
+                                                    <i v-if="sortKey === 'kode'" class="fa-solid" :class="sortOrder === 1 ? 'fa-sort-up text-indigo-500' : 'fa-sort-down text-indigo-500'"></i>
                                                     <i v-else class="fa-solid fa-sort text-slate-200 group-hover:text-indigo-300"></i>
                                                 </div>
                                             </th>
-
                                             <th @click="sortBy('nama')" class="px-5 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest cursor-pointer hover:text-indigo-600 w-[500px] min-w-[500px]">
-                                                <div class="flex items-center gap-2">
-                                                    NAMA BARANG
+                                                <div class="flex items-center gap-2">NAMA BARANG
                                                     <i v-if="sortKey === 'nama'" class="fa-solid" :class="sortOrder === 1 ? 'fa-sort-up text-indigo-500' : 'fa-sort-down text-indigo-500'"></i>
                                                     <i v-else class="fa-solid fa-sort text-slate-200 group-hover:text-indigo-300"></i>
                                                 </div>
                                             </th>
-
-                                            <th @click="sortBy('satuan')"
-                                                class="px-5 py-4 text-[11px] font-black text-slate-400 uppercase tracking-widest cursor-pointer hover:text-indigo-600 transition-colors group">
+                                            <th @click="sortBy('satuan')" class="px-5 py-4 text-[11px] font-black text-slate-400 uppercase tracking-widest cursor-pointer hover:text-indigo-600 transition-colors group">
                                                 <div class="flex items-center gap-2">Satuan
-                                                    <i v-if="sortKey === 'satuan'" class="fa-solid"
-                                                        :class="sortOrder === 1 ? 'fa-sort-up text-indigo-500' : 'fa-sort-down text-indigo-500'"></i>
+                                                    <i v-if="sortKey === 'satuan'" class="fa-solid" :class="sortOrder === 1 ? 'fa-sort-up text-indigo-500' : 'fa-sort-down text-indigo-500'"></i>
                                                     <i v-else class="fa-solid fa-sort text-slate-200 group-hover:text-indigo-300"></i>
                                                 </div>
                                             </th>
-
-                                            <th @click="sortBy('lokasi')"
-                                                class="px-5 py-4 text-[11px] font-black text-slate-400 uppercase tracking-widest cursor-pointer hover:text-indigo-600 transition-colors group">
+                                            <th @click="sortBy('lokasi')" class="px-5 py-4 text-[11px] font-black text-slate-400 uppercase tracking-widest cursor-pointer hover:text-indigo-600 transition-colors group">
                                                 <div class="flex items-center gap-2">Lokasi
-                                                    <i v-if="sortKey === 'lokasi'" class="fa-solid"
-                                                        :class="sortOrder === 1 ? 'fa-sort-up text-indigo-500' : 'fa-sort-down text-indigo-500'"></i>
+                                                    <i v-if="sortKey === 'lokasi'" class="fa-solid" :class="sortOrder === 1 ? 'fa-sort-up text-indigo-500' : 'fa-sort-down text-indigo-500'"></i>
                                                     <i v-else class="fa-solid fa-sort text-slate-200 group-hover:text-indigo-300"></i>
                                                 </div>
                                             </th>
-
-                                            <th @click="sortBy('stok')"
-                                                class="px-5 py-4 text-[11px] font-black text-slate-400 uppercase tracking-widest cursor-pointer hover:text-indigo-600 transition-colors group">
+                                            <th @click="sortBy('stok')" class="px-5 py-4 text-[11px] font-black text-slate-400 uppercase tracking-widest cursor-pointer hover:text-indigo-600 transition-colors group">
                                                 <div class="flex items-center gap-2">Stok
-                                                    <i v-if="sortKey === 'stok'" class="fa-solid"
-                                                        :class="sortOrder === 1 ? 'fa-sort-up text-indigo-500' : 'fa-sort-down text-indigo-500'"></i>
+                                                    <i v-if="sortKey === 'stok'" class="fa-solid" :class="sortOrder === 1 ? 'fa-sort-up text-indigo-500' : 'fa-sort-down text-indigo-500'"></i>
                                                     <i v-else class="fa-solid fa-sort text-slate-200 group-hover:text-indigo-300"></i>
                                                 </div>
                                             </th>
-
-                                            <th @click="sortBy('min_stok')"
-                                                class="px-5 py-4 text-[11px] font-black text-slate-400 uppercase tracking-widest cursor-pointer hover:text-indigo-600 transition-colors group">
+                                            <th @click="sortBy('min_stok')" class="px-5 py-4 text-[11px] font-black text-slate-400 uppercase tracking-widest cursor-pointer hover:text-indigo-600 transition-colors group">
                                                 <div class="flex items-center gap-2">Min. Stok
-                                                    <i v-if="sortKey === 'min_stok'" class="fa-solid"
-                                                        :class="sortOrder === 1 ? 'fa-sort-up text-indigo-500' : 'fa-sort-down text-indigo-500'"></i>
+                                                    <i v-if="sortKey === 'min_stok'" class="fa-solid" :class="sortOrder === 1 ? 'fa-sort-up text-indigo-500' : 'fa-sort-down text-indigo-500'"></i>
                                                     <i v-else class="fa-solid fa-sort text-slate-200 group-hover:text-indigo-300"></i>
                                                 </div>
                                             </th>
-
-                                            <th
-                                                class="px-5 py-4 text-[11px] font-black text-slate-400 uppercase tracking-widest text-right">
-                                                Aksi</th>
+                                            <th class="px-5 py-4 text-[11px] font-black text-slate-400 uppercase tracking-widest text-right">Aksi</th>
                                         </tr>
                                     </thead>
 
                                     <tbody class="divide-y divide-slate-100">
-                                        <tr v-for="item in finalInventory" :key="item.kode"
-                                            class="hover:bg-indigo-50/40 transition-colors group">
-
+                                        <tr v-for="item in finalInventory" :key="item.kode" class="hover:bg-indigo-50/40 transition-colors group">
                                             <td class="px-5 py-3">
-                                                <div @click="previewImage = fixDriveUrl(item.foto)"
-                                                    class="w-12 h-12 rounded-2xl bg-slate-100 border-2 border-white shadow-sm overflow-hidden cursor-pointer hover:scale-105 hover:shadow-md transition-all relative group-hover:border-indigo-100 mx-auto">
-                                                    <img :src="fixDriveUrl(item.foto)" class="w-full h-full object-cover">
+                                                <div @click="openPreviewGallery(item.inventory_photos || [], item.kode)" class="w-12 h-12 rounded-2xl bg-slate-100 border-2 border-white shadow-sm overflow-hidden cursor-pointer hover:scale-105 hover:shadow-md transition-all relative group-hover:border-indigo-100 mx-auto">
+                                                    <img v-if="(item.inventory_photos || []).length" :src="fixDriveUrl((item.inventory_photos.find(p => p.is_cover) || item.inventory_photos[0]).photo_url)" class="w-full h-full object-cover" />
+                                                    <div v-else class="text-[10px] text-slate-400 italic">No Image</div>
                                                 </div>
                                             </td>
-
                                             <td class="px-5 py-3">
-                                                <span class="text-xs font-black text-indigo-600 bg-indigo-50 px-3 py-1.5 rounded-xl">{{
-                                                    item.kode }}</span>
+                                                <span class="text-xs font-black text-indigo-600 bg-indigo-50 px-3 py-1.5 rounded-xl">{{ item.kode }}</span>
                                             </td>
-
                                             <td class="px-5 py-4 w-[500px] min-w-[500px]">
                                                 <div class="flex flex-col">
-                                                    <span class="font-bold text-slate-700 text-[13px] leading-relaxed whitespace-normal break-words block">
-                                                        {{ item.nama }}
-                                                    </span>
+                                                    <span class="font-bold text-slate-700 text-[13px] leading-relaxed whitespace-normal break-words block">{{ item.nama }}</span>
                                                 </div>
                                             </td>
-
                                             <td class="px-5 py-3">
-                                                <span class="text-xs font-bold text-slate-500 bg-slate-100 px-2.5 py-1 rounded-lg">{{
-                                                    item.satuan }}</span>
+                                                <span class="text-xs font-bold text-slate-500 bg-slate-100 px-2.5 py-1 rounded-lg">{{ item.satuan }}</span>
                                             </td>
-
                                             <td class="px-5 py-3">
-                                                <span
-                                                    class="px-3 py-1.5 bg-amber-50 text-amber-600 text-[11px] font-black rounded-xl border border-amber-100 flex items-center gap-1.5 w-max">
+                                                <span class="px-3 py-1.5 bg-amber-50 text-amber-600 text-[11px] font-black rounded-xl border border-amber-100 flex items-center gap-1.5 w-max">
                                                     <i class="fa-solid fa-location-dot"></i> {{ item.lokasi }}
                                                 </span>
                                             </td>
-
                                             <td class="px-5 py-3">
                                                 <div class="flex items-center gap-2">
-                                                    <span class="text-base font-black px-3 py-1.5 rounded-xl"
-                                                        :class="Number(item.stok) <= Number(item.min_stok) ? 'text-rose-600 bg-rose-50 border border-rose-200 shadow-sm' : 'text-slate-800 bg-slate-50'">
-                                                        {{ item.stok }}
-                                                    </span>
-                                                    <i v-if="Number(item.stok) <= Number(item.min_stok)"
-                                                        class="fa-solid fa-triangle-exclamation text-rose-500 animate-pulse text-sm"
-                                                        title="Stok Menipis"></i>
+                                                    <span class="text-base font-black px-3 py-1.5 rounded-xl" :class="Number(item.stok) <= Number(item.min_stok) ? 'text-rose-600 bg-rose-50 border border-rose-200 shadow-sm' : 'text-slate-800 bg-slate-50'">{{ item.stok }}</span>
+                                                    <i v-if="Number(item.stok) <= Number(item.min_stok)" class="fa-solid fa-triangle-exclamation text-rose-500 animate-pulse text-sm" title="Stok Menipis"></i>
                                                 </div>
                                             </td>
-
                                             <td class="px-5 py-3">
                                                 <span class="text-xs font-bold text-slate-400">{{ item.min_stok }}</span>
                                             </td>
-
                                             <td class="px-5 py-3">
                                                 <div class="flex items-center justify-end gap-2">
                                                     <template v-if="userData.role === 'ADMIN'">
-                                                        <button @click="editItem(item)"
-                                                            class="w-9 h-9 flex items-center justify-center bg-white border border-slate-200 text-slate-500 hover:bg-indigo-50 hover:text-indigo-600 hover:border-indigo-200 rounded-xl transition-all shadow-sm active:scale-95"
-                                                            title="Edit Data">
+                                                        <button @click="editItem(item)" class="w-9 h-9 flex items-center justify-center bg-white border border-slate-200 text-slate-500 hover:bg-indigo-50 hover:text-indigo-600 hover:border-indigo-200 rounded-xl transition-all shadow-sm active:scale-95" title="Edit Data">
                                                             <i class="fa-solid fa-pen-nib"></i>
                                                         </button>
-                                                        
-                                                        <button @click="toggleStatus(item)"
-                                                            :class="item.status === 'AKTIF' ? 'text-emerald-500 hover:bg-emerald-50 border-slate-200 hover:border-emerald-200' : 'text-slate-400 hover:bg-slate-100 border-slate-200'"
-                                                            class="w-9 h-9 flex items-center justify-center bg-white border rounded-xl transition-all shadow-sm active:scale-95"
-                                                            :title="item.status === 'AKTIF' ? 'Non-aktifkan' : 'Aktifkan'">
+                                                        <button @click="toggleStatus(item)" :class="item.status === 'AKTIF' ? 'text-emerald-500 hover:bg-emerald-50 border-slate-200 hover:border-emerald-200' : 'text-slate-400 hover:bg-slate-100 border-slate-200'" class="w-9 h-9 flex items-center justify-center bg-white border rounded-xl transition-all shadow-sm active:scale-95" :title="item.status === 'AKTIF' ? 'Non-aktifkan' : 'Aktifkan'">
                                                             <i class="fa-solid fa-power-off"></i>
                                                         </button>
-
-                                                        <button @click="removeItem(item)"
-                                                            class="w-9 h-9 flex items-center justify-center bg-white border border-slate-200 text-rose-500 hover:bg-rose-50 hover:text-rose-600 hover:border-rose-200 rounded-xl transition-all shadow-sm active:scale-95"
-                                                            title="Hapus Data Permanen">
+                                                        <button @click="removeItem(item)" class="w-9 h-9 flex items-center justify-center bg-white border border-slate-200 text-rose-500 hover:bg-rose-50 hover:text-rose-600 hover:border-rose-200 rounded-xl transition-all shadow-sm active:scale-95" title="Hapus Data Permanen">
                                                             <i class="fa-solid fa-trash-can"></i>
                                                         </button>
                                                     </template>
-
                                                     <template v-if="userData.role === 'STAFF'">
-                                                        <button @click="openUpdateLocation(item)"
-                                                            class="px-4 py-2 bg-emerald-500 text-white rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-emerald-600 transition-all flex items-center gap-2 shadow-md shadow-emerald-200/50 active:scale-95">
+                                                        <button @click="openUpdateLocation(item)" class="px-4 py-2 bg-emerald-500 text-white rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-emerald-600 transition-all flex items-center gap-2 shadow-md shadow-emerald-200/50 active:scale-95">
                                                             <i class="fa-solid fa-location-arrow"></i>
                                                         </button>
-                                                        <button @click="openUpdateFoto(item)"
-                                                            class="px-4 py-2 bg-amber-500 text-white rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-amber-600 transition-all flex items-center gap-2 shadow-md shadow-amber-200/50 active:scale-95">
+                                                        <button @click="openUpdateFoto(item)" class="px-4 py-2 bg-amber-500 text-white rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-amber-600 transition-all flex items-center gap-2 shadow-md shadow-amber-200/50 active:scale-95">
                                                             <i class="fa-solid fa-camera"></i>
                                                         </button>
                                                     </template>
@@ -2377,8 +2307,7 @@
                                     --- Semua data telah dimuat ---
                                 </div>
 
-                                <div v-if="finalInventory.length === 0 && !loading"
-                                    class="flex flex-col items-center justify-center py-20 text-slate-400">
+                                <div v-if="finalInventory.length === 0 && !loading" class="flex flex-col items-center justify-center py-20 text-slate-400">
                                     <div class="w-24 h-24 mb-6 rounded-full bg-slate-50 flex items-center justify-center">
                                         <i class="fa-solid fa-box-open text-4xl text-slate-300"></i>
                                     </div>
@@ -2687,39 +2616,39 @@
             </div>
         </div>
 
-        <div v-if="showItemModal" class="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm transition-all">
-            <div class="bg-white w-full max-w-2xl rounded-[2.5rem] shadow-2xl overflow-hidden flex flex-col max-h-[95vh] animate-in fade-in zoom-in duration-300">
+        <div v-if="showItemModal" class="fixed inset-0 z-[100] flex items-center justify-center p-2 sm:p-4 bg-slate-900/60 backdrop-blur-sm transition-all">
+            <div class="bg-white w-full max-w-3xl rounded-[2rem] md:rounded-[2.5rem] shadow-2xl overflow-hidden flex flex-col max-h-[95vh] md:max-h-[90vh] animate-in fade-in zoom-in duration-300">
                 
-                <div class="px-8 py-6 bg-slate-50 border-b border-slate-100 flex justify-between items-center">
+                <div class="px-5 py-4 md:px-8 md:py-6 bg-slate-50 border-b border-slate-100 flex justify-between items-center">
                     <div>
-                        <h3 class="text-xl font-black text-slate-800 tracking-tight">
+                        <h3 class="text-base md:text-xl font-black text-slate-800 tracking-tight">
                             {{ isEditMode ? 'Perbarui Data Barang' : 'Registrasi Barang Baru' }}
                         </h3>
-                        <div class="flex items-center gap-2 mt-1">
+                        <div class="flex items-center gap-2 mt-0.5 md:mt-1">
                             <span class="inline-block w-2 h-2 rounded-full bg-indigo-500 animate-pulse"></span>
-                            <p class="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Sistem Inventaris Real-time</p>
+                            <p class="text-[9px] md:text-[10px] text-slate-400 font-bold uppercase tracking-widest">Sistem Inventaris Real-time</p>
                         </div>
                     </div>
                     <button @click="closeModal" class="text-slate-300 hover:text-rose-500 transition-all transform hover:rotate-90">
-                        <i class="fa-solid fa-circle-xmark text-3xl"></i>
+                        <i class="fa-solid fa-circle-xmark text-2xl md:text-3xl"></i>
                     </button>
                 </div>
 
-                <form @submit.prevent="saveItem(formItem, isEditMode)" class="p-8 overflow-y-auto custom-scrollbar">
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-10">
+                <form @submit.prevent="saveItem" class="p-5 md:p-8 overflow-y-auto custom-scrollbar flex-1">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8">
                         
-                        <div class="space-y-5">
-                            <div class="grid grid-cols-2 gap-4">
+                        <div class="space-y-4 md:space-y-5">
+                            <div class="grid grid-cols-2 gap-3 md:gap-4">
                                 <div class="group">
                                     <label class="block text-[10px] font-black text-slate-400 uppercase mb-1.5 ml-1">ID Unik / Kode</label>
                                     <input v-model="formItem.kode" :disabled="isEditMode" type="text" required 
-                                        class="w-full px-4 py-3.5 rounded-2xl border border-slate-200 focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none text-sm font-mono disabled:bg-slate-50 transition-all"
+                                        class="w-full px-3 py-2.5 md:px-4 md:py-3.5 rounded-xl md:rounded-2xl border border-slate-200 focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none text-xs md:text-sm font-mono disabled:bg-slate-50 transition-all"
                                         placeholder="BRG-001">
                                 </div>
                                 <div>
                                     <label class="block text-[10px] font-black text-slate-400 uppercase mb-1.5 ml-1">Category</label>
                                     <input v-model="formItem.category" type="text" 
-                                        class="w-full px-4 py-3.5 rounded-2xl border border-slate-200 focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none text-sm transition-all"
+                                        class="w-full px-3 py-2.5 md:px-4 md:py-3.5 rounded-xl md:rounded-2xl border border-slate-200 focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none text-xs md:text-sm transition-all"
                                         placeholder="Elektronik">
                                 </div>
                             </div>
@@ -2727,111 +2656,185 @@
                             <div>
                                 <label class="block text-[10px] font-black text-slate-400 uppercase mb-1.5 ml-1">Nama Deskripsi Barang</label>
                                 <input v-model="formItem.nama" type="text" required 
-                                    class="w-full px-4 py-3.5 rounded-2xl border border-slate-200 focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none text-sm transition-all"
+                                    class="w-full px-3 py-2.5 md:px-4 md:py-3.5 rounded-xl md:rounded-2xl border border-slate-200 focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none text-xs md:text-sm transition-all"
                                     placeholder="Contoh: Lampu LED Phillips 10W">
                             </div>
 
-                            <div class="grid grid-cols-2 gap-4">
+                            <div class="grid grid-cols-2 gap-3 md:gap-4">
                                 <div>
                                     <label class="block text-[10px] font-black text-slate-400 uppercase mb-1.5 ml-1">Satuan</label>
                                     <input v-model="formItem.satuan" type="text" required 
-                                        class="w-full px-4 py-3.5 rounded-2xl border border-slate-200 focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none text-sm transition-all"
+                                        class="w-full px-3 py-2.5 md:px-4 md:py-3.5 rounded-xl md:rounded-2xl border border-slate-200 focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none text-xs md:text-sm transition-all"
                                         placeholder="PCS / Box">
                                 </div>
                                 <div>
                                     <label class="block text-[10px] font-black text-slate-400 uppercase mb-1.5 ml-1">Posisi Rak</label>
                                     <input v-model="formItem.lokasi" type="text" required 
-                                        class="w-full px-4 py-3.5 rounded-2xl border border-slate-200 focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none text-sm transition-all"
+                                        class="w-full px-3 py-2.5 md:px-4 md:py-3.5 rounded-xl md:rounded-2xl border border-slate-200 focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none text-xs md:text-sm transition-all"
                                         placeholder="A-1-2">
                                 </div>
                             </div>
 
-                            <div class="p-5 bg-rose-50 rounded-[2rem] border border-rose-100 shadow-sm">
+                            <div class="p-4 md:p-5 bg-rose-50 rounded-2xl md:rounded-[2rem] border border-rose-100 shadow-sm">
                                 <div class="flex items-center justify-between mb-2">
                                     <label class="block text-[10px] font-black text-rose-500 uppercase tracking-wider ml-1">Ambang Batas Minimum</label>
                                     <i class="fa-solid fa-bell text-rose-300 text-xs animate-bounce"></i>
                                 </div>
                                 <input v-model.number="formItem.min_stok" type="number" 
-                                    class="w-full px-4 py-3 rounded-xl border-2 border-rose-200 focus:border-rose-500 outline-none text-xl font-black text-rose-600 bg-white/80 backdrop-blur-sm transition-all">
-                                <p class="text-[9px] text-rose-400 mt-2 italic font-medium">*Sistem akan memberi peringatan jika stok di bawah angka ini.</p>
+                                    class="w-full px-4 py-2.5 md:py-3 rounded-xl border-2 border-rose-200 focus:border-rose-500 outline-none text-lg md:text-xl font-black text-rose-600 bg-white/80 backdrop-blur-sm transition-all">
+                                <p class="text-[9px] text-rose-400 mt-1.5 italic font-medium">*Sistem memberi peringatan jika stok di bawah angka ini.</p>
+                            </div>
+
+                            <div v-if="!isCameraActive && !photoPreview" class="space-y-2.5 p-4 bg-slate-50 rounded-2xl border border-slate-200/60">
+                                <label class="block text-[10px] font-black text-slate-400 uppercase tracking-wider">Sumber Media Input</label>
+                                <div class="flex gap-2">
+                                    <input v-model="photoUrlInput" type="url" placeholder="Paste URL gambar (https://...)..."
+                                        class="flex-1 px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-medium focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none transition-all shadow-inner">
+                                    <button type="button" @click="handleUrlSelected" :disabled="!photoUrlInput.trim()"
+                                        class="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white rounded-xl text-xs font-bold transition-all active:scale-95 flex items-center gap-1">
+                                        <i class="fa-solid fa-link text-[10px]"></i>
+                                        <span>Muat</span>
+                                    </button>
+                                </div>
+                                
+                                <div v-if="canUploadPhoto && (formItem.photos?.length || 0) < 5" class="pt-1.5 flex items-center gap-2 border-t border-slate-200/60">
+                                    <span class="text-[9px] font-bold text-slate-400 uppercase mr-1">Atau ambil via:</span>
+                                    
+                                    <button type="button" @click="launchGallery" 
+                                        class="flex items-center gap-1.5 px-2.5 py-1.5 bg-white hover:bg-indigo-50 border border-slate-200 hover:border-indigo-300 rounded-lg text-[10px] font-bold text-slate-600 hover:text-indigo-600 transition-all shadow-sm">
+                                        <i class="fa-solid fa-images text-slate-400 text-[11px]"></i>
+                                        <span>Buka Galeri</span>
+                                    </button>
+                                    <input type="file" ref="fileInput" accept="image/*" @change="handleGallerySelected" class="hidden">
+
+                                    <button type="button" @click="startLiveCamera" 
+                                        class="flex items-center gap-1.5 px-2.5 py-1.5 bg-white hover:bg-indigo-50 border border-slate-200 hover:border-indigo-300 rounded-lg text-[10px] font-bold text-slate-600 hover:text-indigo-600 transition-all shadow-sm">
+                                        <i class="fa-solid fa-camera text-slate-400 text-[11px]"></i>
+                                        <span>Kamera HP</span>
+                                    </button>
+                                </div>
+                                
+                                <div v-if="!canUploadPhoto" class="pt-1.5 border-t border-slate-200/60">
+                                    <p class="text-[9px] font-bold text-amber-600"><i class="fa-solid fa-triangle-exclamation mr-1"></i>Simpan data barang terlebih dahulu sebelum mengisi foto.</p>
+                                </div>
                             </div>
                         </div>
 
-                        <div class="space-y-6">
-                            <label class="block text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Visual Produk</label>
-                            
-                            <div class="relative aspect-square w-full bg-slate-900 rounded-[3rem] overflow-hidden border-4 border-slate-50 shadow-2xl group transition-all duration-500">
-                                
-                                <video v-show="isCameraActive && !photoPreview" ref="videoFeed" autoplay playsinline 
-                                    class="absolute inset-0 w-full h-full object-cover aspect-square"></video>
-                                
-                                <div v-if="isUploading" class="absolute inset-0 z-30 bg-slate-900/90 backdrop-blur-md flex flex-col items-center justify-center">
-                                    <div class="relative flex items-center justify-center mb-4">
-                                        <div class="absolute w-16 h-16 border-4 border-indigo-500/20 border-t-indigo-500 rounded-full animate-spin"></div>
-                                        <i class="fa-solid fa-cloud-arrow-up text-xl text-indigo-400"></i>
-                                    </div>
-                                    <p class="text-[10px] font-black text-indigo-300 uppercase tracking-[0.2em] animate-pulse">Mengunggah ke Cloud...</p>
-                                </div>
-
-                                <div v-if="photoPreview" class="absolute inset-0 z-20 bg-slate-950 flex flex-col items-center justify-center animate-in fade-in duration-300">
-                                    <img :src="photoPreview" class="w-full h-full object-cover aspect-square brightness-95">
-                                    
-                                    <span class="absolute top-4 left-4 bg-amber-500 text-slate-950 px-3 py-1 rounded-full text-[9px] font-black tracking-widest uppercase shadow-md">
-                                        <i class="fa-solid fa-eye mr-1"></i> Preview Mode
+                        <div class="space-y-4 md:space-y-5 flex flex-col justify-between">
+                            <div class="space-y-3">
+                                <div class="flex items-center justify-between ml-1">
+                                    <label class="block text-[10px] font-black text-slate-400 uppercase tracking-widest">Visual Produk Multi-Foto</label>
+                                    <span class="text-[9px] font-bold text-indigo-500 bg-indigo-50 px-2 py-0.5 rounded-md">
+                                        {{ formItem.photos?.length || 0 }} / 5 Terunggah
                                     </span>
+                                </div>
 
-                                    <div class="absolute bottom-6 inset-x-0 flex justify-center gap-3 px-6 animate-in slide-in-from-bottom duration-300">
-                                        <button type="button" @click="cancelPreview" class="bg-rose-600 text-white px-5 py-3 rounded-full text-[10px] font-black shadow-xl hover:bg-rose-700 active:scale-95 transition-all uppercase tracking-wider">
-                                            <i class="fa-solid fa-rotate-left mr-1.5"></i> Ulangi
-                                        </button>
-                                        <button type="button" @click="confirmAndUploadPhoto" class="bg-indigo-500 text-white px-6 py-3 rounded-full text-[10px] font-black shadow-xl hover:bg-indigo-600 active:scale-95 transition-all uppercase tracking-wider border-2 border-white/20">
-                                            <i class="fa-solid fa-cloud-arrow-up mr-1.5"></i> Upload ke Drive
-                                        </button>
+                                <div v-if="!isCameraActive && !photoPreview && canUploadPhoto && (formItem.photos?.length || 0) < 5"
+                                    @dragenter.prevent="handleDragEnter"
+                                    @dragover.prevent="handleDragOver"
+                                    @dragleave.prevent="handleDragLeave"
+                                    @drop.prevent="handleDrop"
+                                    :class="isDragOver ? 'border-indigo-500 bg-indigo-50/40 ring-4 ring-indigo-500/10 scale-[0.99]' : 'border-slate-200 bg-slate-50/50 hover:bg-slate-50 hover:border-slate-300'"
+                                    class="w-full max-w-[320px] md:max-w-none mx-auto border-2 border-dashed rounded-2xl p-5 text-center cursor-pointer transition-all duration-200 flex flex-col items-center justify-center gap-1.5 min-h-[90px]"
+                                    @click="launchGallery"
+                                >
+                                    <div class="w-8 h-8 rounded-full bg-indigo-50 flex items-center justify-center text-indigo-500" :class="isDragOver ? 'animate-bounce' : ''">
+                                        <i class="fa-solid fa-cloud-arrow-up text-sm"></i>
+                                    </div>
+                                    <div>
+                                        <p class="text-[11px] font-black text-slate-700 uppercase tracking-wide">
+                                            {{ isDragOver ? 'Lepaskan Gambar Sekarang' : 'Drag & Drop Gambar di Sini' }}
+                                        </p>
+                                        <p class="text-[9px] text-slate-400 font-medium mt-0.5">atau klik untuk telusuri file dari galeri</p>
                                     </div>
                                 </div>
                                 
-                                <div v-if="!isCameraActive && !photoPreview && formItem.foto" class="relative h-full w-full bg-white flex items-center justify-center animate-in fade-in duration-500">
-                                    <img :src="fixDriveUrl(formItem.foto)" class="w-full h-full object-cover aspect-square p-2">
-                                    <div class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                                        <button type="button" @click="removePhoto" class="bg-rose-500 text-white px-4 py-2 rounded-full text-[10px] font-bold shadow-xl transform translate-y-4 group-hover:translate-y-0 transition-all">
-                                            <i class="fa-solid fa-trash-can mr-2"></i>HAPUS FOTO
-                                        </button>
-                                    </div>
-                                </div>
-
-                                <div v-if="!isCameraActive && !photoPreview && !formItem.foto" class="h-full flex flex-col items-center justify-center text-slate-500 bg-gradient-to-br from-slate-800 to-slate-950">
-                                    <div class="w-16 h-16 bg-slate-800 rounded-full flex items-center justify-center mb-3 shadow-inner">
-                                        <i class="fa-solid fa-image text-2xl opacity-20"></i>
-                                    </div>
-                                    <p class="text-[9px] font-black uppercase tracking-widest opacity-30">Belum Ada Media</p>
-                                </div>
-
-                                <div v-if="!photoPreview" class="absolute bottom-6 inset-x-0 flex justify-center gap-3 z-20 px-6">
-                                    <button v-if="!isCameraActive && !isUploading" type="button" @click="startLiveCamera" 
-                                        class="bg-white/10 hover:bg-white/20 backdrop-blur-xl border border-white/20 text-white px-6 py-3 rounded-full text-[10px] font-black shadow-2xl transition-all active:scale-90">
-                                        <i class="fa-solid fa-camera-retro mr-2 text-indigo-400"></i>AMBIL FOTO
-                                    </button>
+                                <div class="relative aspect-square w-full max-w-[320px] md:max-w-none mx-auto bg-slate-950 rounded-[2rem] md:rounded-[2.5rem] overflow-hidden border-4 border-slate-50 shadow-lg group transition-all duration-300">
                                     
-                                    <template v-if="isCameraActive">
-                                        <button type="button" @click="handleTakePhoto" class="bg-emerald-500 text-white w-14 h-14 rounded-full shadow-2xl flex items-center justify-center active:scale-75 transition-all border-4 border-white">
-                                            <i class="fa-solid fa-camera text-xl"></i>
+                                    <video v-show="isCameraActive && !photoPreview" ref="videoFeed" autoplay playsinline 
+                                        class="absolute inset-0 w-full h-full object-cover aspect-square"></video>
+                                    
+                                    <div v-if="isUploading" class="absolute inset-0 z-30 bg-slate-900/80 backdrop-blur-sm flex flex-col items-center justify-center">
+                                        <div class="relative flex items-center justify-center mb-3">
+                                            <div class="absolute w-12 h-12 border-4 border-indigo-500/20 border-t-indigo-500 rounded-full animate-spin"></div>
+                                            <i class="fa-solid fa-cloud-arrow-up text-lg text-indigo-400"></i>
+                                        </div>
+                                        <p class="text-[9px] font-black text-indigo-300 uppercase tracking-widest animate-pulse">Mengunggah...</p>
+                                    </div>
+
+                                    <div v-if="photoPreview" class="absolute inset-0 z-20 bg-slate-950 flex flex-col items-center justify-center">
+                                        <img :src="photoPreview" class="w-full h-full object-cover aspect-square brightness-95">
+                                        <span class="absolute top-4 left-4 bg-amber-500 text-slate-950 px-3 py-1 rounded-full text-[9px] font-black tracking-widest uppercase shadow-md">
+                                            <i class="fa-solid fa-eye mr-1"></i> Preview Capture
+                                        </span>
+                                        <div class="absolute bottom-4 inset-x-0 flex justify-center gap-2 px-4">
+                                            <button type="button" @click="cancelPreview" class="bg-rose-600 text-white px-3.5 py-2 rounded-xl text-[10px] font-black shadow-lg hover:bg-rose-700 active:scale-95 transition-all uppercase tracking-wider">
+                                                <i class="fa-solid fa-rotate-left mr-1"></i> Ulangi
+                                            </button>
+                                            <button type="button" @click="confirmAndUploadPhoto" class="bg-indigo-500 text-white px-4 py-2.5 rounded-xl text-[10px] font-black shadow-lg hover:bg-indigo-600 active:scale-95 transition-all uppercase tracking-wider">
+                                                <i class="fa-solid fa-cloud-arrow-up mr-1"></i> Simpan Foto
+                                            </button>
+                                        </div>
+                                    </div>
+                                    
+                                    <div v-if="!isCameraActive && !photoPreview && formItem.selectedPhoto" class="relative h-full w-full bg-white flex items-center justify-center">
+                                        <img :src="fixDriveUrl(formItem.selectedPhoto?.photo_url)" class="w-full h-full object-cover aspect-square">
+                                        
+                                        <span v-if="formItem.selectedPhoto?.is_cover === true" class="absolute top-4 left-4 bg-emerald-500 text-white px-3 py-1 rounded-full text-[9px] font-black tracking-widest uppercase shadow-md">
+                                            <i class="fa-solid fa-star mr-1"></i> Foto Utama
+                                        </span>
+
+                                        <div class="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent p-4 flex justify-between items-center opacity-100 md:opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                                            <button v-if="!formItem.selectedPhoto?.is_cover" type="button" @click="makeCover(formItem.selectedPhoto)"
+                                                class="bg-emerald-500 hover:bg-emerald-600 text-white px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all active:scale-95">
+                                                <i class="fa-solid fa-star mr-1"></i> Set Utama
+                                            </button>
+                                            <div v-else></div>
+                                            <button type="button" @click="removePhoto(formItem.selectedPhoto)" 
+                                                class="bg-rose-600 hover:bg-rose-700 text-white px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all active:scale-95">
+                                                <i class="fa-solid fa-trash-can mr-1"></i> Hapus
+                                                </button>
+                                        </div>
+                                    </div>
+
+                                    <div v-if="!isCameraActive && !photoPreview && !formItem.selectedPhoto" class="h-full flex flex-col items-center justify-center text-slate-500 bg-gradient-to-br from-slate-800 to-slate-950">
+                                        <div class="w-12 h-12 bg-slate-800 rounded-full flex items-center justify-center mb-2 shadow-inner">
+                                            <i class="fa-solid fa-images text-lg opacity-30 text-slate-400"></i>
+                                        </div>
+                                        <p class="text-[9px] font-black uppercase tracking-widest opacity-40">Belum Ada Foto Produk</p>
+                                    </div>
+
+                                    <div v-if="isCameraActive && !photoPreview" class="absolute bottom-4 inset-x-0 flex justify-center gap-2 z-20">
+                                        <button type="button" @click="handleTakePhoto" class="bg-emerald-500 text-white w-11 h-11 rounded-full shadow-xl flex items-center justify-center active:scale-75 transition-all border-4 border-white">
+                                            <i class="fa-solid fa-camera text-sm"></i>
                                         </button>
-                                        <button type="button" @click="stopCamera" class="bg-white/10 text-white w-14 h-14 backdrop-blur-md rounded-full flex items-center justify-center border border-white/20 active:scale-75 transition-all">
-                                            <i class="fa-solid fa-xmark text-xl"></i>
+                                        <button type="button" @click="stopCamera" class="bg-white/20 text-white w-11 h-11 backdrop-blur-md rounded-full flex items-center justify-center border border-white/20 active:scale-75 transition-all">
+                                            <i class="fa-solid fa-xmark text-sm"></i>
                                         </button>
-                                    </template>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="grid grid-cols-5 gap-2 items-center w-full max-w-[320px] md:max-w-none mx-auto pt-2">
+                                <div v-for="photo in formItem.photos" :key="photo.id" @click="selectPhoto(photo)"
+                                    :class="[formItem.selectedPhoto?.id === photo.id ? 'border-indigo-500 ring-2 ring-indigo-500/20 scale-95' : 'border-slate-200 hover:border-slate-400']"
+                                    class="relative aspect-square rounded-xl bg-white border-2 overflow-hidden p-0.5 cursor-pointer transition-all duration-200">
+                                    <img :src="fixDriveUrl(photo.photo_url)" class="w-full h-full object-cover rounded-lg">
+                                    <div v-if="photo.is_cover" class="absolute bottom-0 inset-x-0 bg-emerald-500 text-white text-[7px] font-black text-center py-0.5 uppercase tracking-tighter">
+                                        Utama
+                                    </div>
                                 </div>
                             </div>
                         </div>
                     </div>
 
-                    <div class="mt-12 pt-8 border-t border-slate-100 flex flex-col sm:flex-row gap-4">
+                    <div class="mt-8 md:mt-12 pt-4 md:pt-6 border-t border-slate-100 flex flex-col sm:flex-row gap-3">
                         <button type="button" @click="closeModal" 
-                            class="flex-1 px-8 py-4 rounded-2xl border border-slate-200 text-slate-400 font-black uppercase text-[11px] tracking-widest hover:bg-slate-50 transition-all">
+                            class="order-2 sm:order-1 flex-1 px-6 py-3.5 rounded-xl md:rounded-2xl border border-slate-200 text-slate-400 font-black uppercase text-[10px] md:text-[11px] tracking-widest hover:bg-slate-50 transition-all">
                             Batal
                         </button>
                         <button type="submit" :disabled="isUploading || loading" 
-                            class="flex-[2.5] px-8 py-4 rounded-2xl bg-indigo-600 text-white font-black uppercase text-[11px] tracking-[0.2em] shadow-2xl shadow-indigo-200 hover:bg-indigo-700 active:scale-95 disabled:opacity-50 transition-all">
+                            class="order-1 sm:order-2 flex-[2.5] px-6 py-3.5 rounded-xl md:rounded-2xl bg-indigo-600 text-white font-black uppercase text-[10px] md:text-[11px] tracking-[0.15em] shadow-xl shadow-indigo-200 hover:bg-indigo-700 active:scale-95 disabled:opacity-50 transition-all">
                             <span v-if="loading"><i class="fa-solid fa-spinner animate-spin mr-2"></i>Sinkronisasi...</span>
                             <span v-else><i class="fa-solid fa-cloud-arrow-up mr-2"></i>Simpan Ke Database</span>
                         </button>
@@ -2993,28 +2996,37 @@
         <div v-if="showPhotoModal" class="fixed inset-0 z-[100] flex items-center justify-center p-4">
             <div class="absolute inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity" @click="closePhotoModal"></div>
             
-            <div class="bg-white w-full max-w-lg rounded-[2.5rem] overflow-hidden shadow-2xl relative z-10 transform transition-all border border-white/20">
+            <div class="bg-white w-full max-w-lg rounded-[2.5rem] overflow-hidden shadow-2xl relative z-10 transform transition-all border border-slate-100 flex flex-col max-h-[95vh] animate-in fade-in zoom-in-95 duration-200">
                 
-                <div class="p-6 bg-gradient-to-r from-slate-50 to-white border-b border-slate-100 flex items-center justify-between">
-                    <div>
-                        <h3 class="text-xl font-black text-slate-800">Perbarui Foto</h3>
-                        <div class="flex items-center gap-2 mt-1">
-                            <span class="px-2 py-0.5 bg-indigo-100 text-indigo-600 text-[10px] font-black rounded-md">{{ formItem.kode }}</span>
-                            <span class="text-xs text-slate-400 font-bold uppercase tracking-wide">{{ formItem.nama }}</span>
+                <div class="px-6 py-5 bg-slate-50 border-b border-slate-100 flex items-start justify-between gap-4">
+                    <div class="flex-1 min-w-0">
+                        <div class="flex items-center gap-2 mb-1.5 flex-wrap">
+                            <h3 class="text-lg font-black text-slate-800 tracking-tight">Perbarui Media Foto</h3>
+                            <span class="px-2.5 py-0.5 bg-indigo-50 border border-indigo-100 text-indigo-600 text-[10px] font-black rounded-lg uppercase tracking-wider">
+                                {{ formItem.kode }}
+                            </span>
+                        </div>
+                        <div class="flex items-center justify-between gap-2">
+                            <p class="text-xs text-slate-500 font-bold truncate pr-2 uppercase">{{ formItem.nama }}</p>
+                            <span class="flex-shrink-0 bg-slate-200/70 text-slate-700 px-2.5 py-0.5 rounded-full text-[9px] font-black tracking-wider">
+                                {{ formItem.photos?.length || 0 }}/5 FOTO
+                            </span>
                         </div>
                     </div>
-                    <button @click="closePhotoModal" class="w-10 h-10 flex items-center justify-center rounded-full hover:bg-rose-50 hover:text-rose-500 text-slate-300 transition-colors">
-                        <i class="fa-solid fa-xmark text-lg"></i>
+                    <button @click="closePhotoModal" class="text-slate-300 hover:text-rose-500 transition-all transform hover:rotate-90 flex-shrink-0 mt-1">
+                        <i class="fa-solid fa-circle-xmark text-2xl"></i>
                     </button>
                 </div>
 
-                <div class="p-8">
-                    <div class="relative aspect-square rounded-[2rem] bg-slate-900 border-4 border-slate-50 overflow-hidden mb-8 shadow-2xl group">
-    
+                <div class="p-6 overflow-y-auto custom-scrollbar flex-1 space-y-5">
+                    
+                    <div class="relative aspect-square rounded-[2.5rem] bg-slate-950 border-4 border-slate-50 overflow-hidden shadow-xl group">
+                        
                         <div v-if="photoPreview" class="absolute inset-0 z-20 bg-slate-950 flex flex-col items-center justify-center animate-in fade-in duration-300">
-                            <img :src="photoPreview" class="w-full h-full object-contain">
-                            <span class="absolute top-4 left-4 bg-amber-500 text-slate-950 px-3 py-1 rounded-full text-[9px] font-black tracking-widest uppercase shadow-md">
-                                <i class="fa-solid fa-eye mr-1"></i> Mode Pratinjau
+                            <img :src="photoPreview" class="w-full h-full object-cover">
+                            <span class="absolute top-4 left-4 bg-amber-500 text-slate-950 px-3 py-1 rounded-full text-[9px] font-black tracking-widest uppercase shadow-md flex items-center gap-1.5">
+                                <span class="w-1.5 h-1.5 rounded-full bg-slate-950 animate-pulse"></span>
+                                <i class="fa-solid fa-eye"></i> Mode Pratinjau
                             </span>
                         </div>
 
@@ -3022,75 +3034,122 @@
                             class="w-full h-full object-cover"></video>
 
                         <div v-if="!isCameraActive && !photoPreview" class="relative w-full h-full bg-slate-900 flex items-center justify-center">
-                            <img :src="fixDriveUrl(formItem.foto)" 
-                                class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-                                onerror="this.src='https://via.placeholder.com/500?text=Belum+Ada+Foto'">
-                            
-                            <div v-if="formItem.foto" class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center z-10">
-                                <button type="button" @click="removePhotoStaff" class="bg-rose-500 text-white px-5 py-2.5 rounded-full text-[10px] font-black tracking-wider uppercase shadow-xl transform translate-y-4 group-hover:translate-y-0 transition-all duration-300">
-                                    <i class="fa-solid fa-trash-can mr-2"></i>Hapus Foto Produk
-                                </button>
-                            </div>
+                            <template v-if="formItem.selectedPhoto">
+                                <img :src="fixDriveUrl(formItem.selectedPhoto.photo_url)" class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105">
+                                
+                                <span v-if="formItem.selectedPhoto.is_cover" class="absolute top-4 left-4 bg-emerald-500 text-white px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-wider shadow flex items-center gap-1">
+                                    <i class="fa-solid fa-star"></i> Cover Utama
+                                </span>
+
+                                <div class="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent p-5 flex justify-between items-center opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-10">
+                                    <button v-if="!formItem.selectedPhoto.is_cover" @click="makeCover(formItem.selectedPhoto)" type="button" class="bg-emerald-500 hover:bg-emerald-600 text-white px-4 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all active:scale-95 shadow-lg shadow-emerald-500/20">
+                                        <i class="fa-solid fa-star mr-1"></i> Set Cover
+                                    </button>
+                                    <div v-else></div>
+
+                                    <button @click="removePhoto(formItem.selectedPhoto)" type="button" class="bg-rose-600 hover:bg-rose-700 text-white px-4 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all active:scale-95 shadow-lg shadow-rose-600/20">
+                                        <i class="fa-solid fa-trash-can mr-1"></i> Hapus Foto
+                                    </button>
+                                </div>
+                            </template>
+
+                            <template v-else>
+                                <div class="flex flex-col items-center text-slate-500">
+                                    <div class="w-16 h-16 bg-slate-800 rounded-full flex items-center justify-center mb-3 shadow-inner">
+                                        <i class="fa-solid fa-images text-2xl opacity-30"></i>
+                                    </div>
+                                    <p class="text-[10px] font-black uppercase tracking-widest opacity-40">Belum ada media foto</p>
+                                </div>
+                            </template>
                         </div>
 
-                        <div v-if="isUploading" class="absolute inset-0 bg-indigo-600/90 backdrop-blur-sm flex flex-col items-center justify-center text-white z-30">
-                            <div class="relative">
-                                <i class="fa-solid fa-cloud-arrow-up text-5xl animate-bounce"></i>
-                                <div class="absolute -bottom-2 left-1/2 -translate-x-1/2 w-8 h-1 bg-white/30 rounded-full blur-sm"></div>
+                        <div v-if="isUploading" class="absolute inset-0 bg-slate-900/90 backdrop-blur-md flex flex-col items-center justify-center text-white z-30 animate-in fade-in">
+                            <div class="relative flex items-center justify-center mb-4">
+                                <div class="absolute w-16 h-16 border-4 border-indigo-500/20 border-t-indigo-500 rounded-full animate-spin"></div>
+                                <i class="fa-solid fa-cloud-arrow-up text-xl text-indigo-400"></i>
                             </div>
-                            <p class="font-black text-sm uppercase tracking-[0.2em] mt-6">Mengunggah ke Drive...</p>
+                            <p class="font-black text-[10px] uppercase tracking-[0.2em] text-indigo-300 animate-pulse">Mengunggah ke Drive...</p>
                         </div>
 
-                        <div v-if="isCameraActive && !photoPreview" class="absolute inset-0 z-10 pointer-events-none border-[40px] border-black/20 flex items-center justify-center">
-                            <div class="w-full h-[2px] bg-indigo-400 shadow-[0_0_20px_rgba(129,140,248,1)] animate-scanner"></div>
+                        <div v-if="isCameraActive && !photoPreview" class="absolute inset-0 z-10 pointer-events-none border-[30px] border-black/20 flex items-center justify-center">
+                            <div class="w-full h-[2px] bg-indigo-500 shadow-[0_0_15px_rgba(99,102,241,1)] animate-pulse"></div>
                         </div>
                     </div>
 
-                    <div class="space-y-4">
-                        
-                        <div v-if="!isCameraActive && !photoPreview" class="grid grid-cols-2 gap-4">
-                            <button @click="startLiveCamera" class="flex items-center justify-center gap-3 p-4 bg-slate-900 text-white rounded-2xl font-bold hover:bg-slate-800 transition-all active:scale-95">
-                                <i class="fa-solid fa-camera"></i> Kamera
+                    <div v-if="!isCameraActive && !photoPreview && formItem.photos && formItem.photos.length > 0">
+                        <p class="text-[10px] font-black text-slate-400 uppercase tracking-wider mb-2 ml-1">Pilih Gambar Untuk Mengelola :</p>
+                        <div class="grid grid-cols-5 gap-2.5">
+                            <div v-for="photo in formItem.photos" :key="photo.id" @click="selectPhoto(photo)"
+                                :class="[formItem.selectedPhoto?.id === photo.id ? 'ring-4 ring-indigo-500 border-transparent scale-95' : 'border-slate-200 hover:border-indigo-300']"
+                                class="relative aspect-square rounded-2xl border bg-slate-50 overflow-hidden cursor-pointer transition-all shadow-sm">
+                                
+                                <img :src="fixDriveUrl(photo.photo_url)" class="w-full h-full object-cover">
+
+                                <div v-if="photo.is_cover" class="absolute bottom-0 inset-x-0 bg-emerald-500 text-white text-[8px] text-center font-black py-0.5 tracking-wider uppercase">
+                                    Cover
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div v-if="!isCameraActive && !photoPreview" class="space-y-3 p-4 bg-slate-50 rounded-2xl border border-slate-200/60">
+                        <label class="block text-[10px] font-black text-slate-400 uppercase tracking-wider">Atau Upload Melalui Link URL Internet</label>
+                        <div class="flex gap-2">
+                            <input v-model="photoUrlInput" type="url" placeholder="Paste URL gambar (https://example.com/image.jpg)..."
+                                class="flex-1 px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-medium focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none transition-all shadow-inner">
+                            <button type="button" @click="handleUrlSelected" :disabled="!photoUrlInput.trim()"
+                                class="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white rounded-xl text-xs font-bold transition-all active:scale-95 flex items-center gap-1.5">
+                                <i class="fa-solid fa-link"></i>
+                                <span>Muat</span>
                             </button>
-                            <button @click="launchGallery" class="flex items-center justify-center gap-3 p-4 bg-white border-2 border-slate-100 text-slate-600 rounded-2xl font-bold hover:border-indigo-200 hover:text-indigo-600 transition-all active:scale-95">
-                                <i class="fa-solid fa-image"></i> Galeri
+                        </div>
+                    </div>
+
+                    <div class="space-y-3">
+                        <div v-if="!isCameraActive && !photoPreview && formItem.photos.length < 5" class="grid grid-cols-2 gap-3.5">
+                            <button @click="startLiveCamera" class="flex items-center justify-center gap-2.5 p-3.5 bg-slate-900 text-white rounded-2xl text-xs font-black uppercase tracking-wider hover:bg-slate-800 transition-all active:scale-95 shadow-md">
+                                <i class="fa-solid fa-camera text-indigo-400"></i> Ambil Foto
+                            </button>
+                            <button @click="launchGallery" class="flex items-center justify-center gap-2.5 p-3.5 bg-white border-2 border-slate-200 text-slate-600 rounded-2xl text-xs font-black uppercase tracking-wider hover:border-indigo-500 hover:text-indigo-600 transition-all active:scale-95 shadow-sm">
+                                <i class="fa-solid fa-image text-slate-400"></i> Pilih Galeri
                             </button>
                         </div>
 
-                        <button v-if="isCameraActive && !photoPreview" @click="handleTakePhoto" 
-                                class="w-full py-5 bg-rose-500 text-white rounded-3xl font-black uppercase tracking-widest shadow-lg shadow-rose-200 flex items-center justify-center gap-4 active:scale-95 transition-all">
-                            <div class="w-4 h-4 bg-white rounded-full animate-ping"></div>
-                            Ambil Foto
-                        </button>
+                        <div v-if="isCameraActive && !photoPreview" class="flex gap-2">
+                            <button @click="handleTakePhoto" class="flex-1 py-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl font-black uppercase text-xs tracking-widest shadow-lg shadow-indigo-100 flex items-center justify-center gap-2 active:scale-95 transition-all">
+                                <i class="fa-solid fa-circle-dot animate-pulse"></i> Tangkap Gambar
+                            </button>
+                            <button @click="stopCamera" class="px-5 py-4 bg-rose-50 text-rose-600 border border-rose-100 rounded-2xl text-xs font-black uppercase hover:bg-rose-100 transition-all active:scale-95">
+                                Batal
+                            </button>
+                        </div>
 
                         <div v-if="photoPreview" class="grid grid-cols-3 gap-3">
-                            <button @click="cancelPreview" 
-                                    class="col-span-1 py-4 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-2xl font-black uppercase text-xs tracking-wider transition-all text-center">
+                            <button @click="cancelPreview" class="col-span-1 py-4 bg-rose-50 border border-rose-100 hover:bg-rose-100 text-rose-600 rounded-2xl font-black uppercase text-xs tracking-wider transition-all text-center active:scale-95">
                                 <i class="fa-solid fa-rotate-left mr-1"></i> Ulang
                             </button>
-                            <button @click="confirmAndUploadPhoto" 
-                                    class="col-span-2 py-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl font-black uppercase text-xs tracking-widest shadow-lg shadow-indigo-100 transition-all">
-                                <i class="fa-solid fa-cloud-arrow-up mr-1.5"></i> Upload ke Drive
+                            <button @click="confirmAndUploadPhoto" class="col-span-2 py-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl font-black uppercase text-xs tracking-widest shadow-lg shadow-indigo-100 transition-all active:scale-95 flex items-center justify-center gap-2">
+                                <i class="fa-solid fa-cloud-arrow-up"></i> Upload Ke Drive
                             </button>
                         </div>
 
-                        <button v-if="!isCameraActive && !photoPreview" 
-                                @click="savePhotoOnly" 
-                                :disabled="loading"
-                                class="w-full py-5 bg-emerald-500 hover:bg-emerald-600 disabled:bg-slate-300 text-white rounded-3xl font-black uppercase tracking-[0.1em] shadow-xl shadow-emerald-100 flex items-center justify-center gap-3 transition-all active:scale-95">
-                            <i v-if="!loading" class="fa-solid fa-check-double text-xl"></i>
-                            <i v-else class="fa-solid fa-circle-notch animate-spin text-xl"></i>
-                            <span>{{ loading ? 'Menyimpan ke Database...' : 'Simpan Perubahan' }}</span>
+                        <button v-if="!isCameraActive && !photoPreview"
+                                @click="closePhotoModal"
+                                class="w-full py-4 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-2xl font-black uppercase text-xs tracking-[0.15em] flex items-center justify-center gap-2 transition-all active:scale-95">
+                            <i class="fa-solid fa-circle-check text-emerald-500 text-sm"></i>
+                            <span>Selesai & Keluar</span>
                         </button>
                     </div>
                 </div>
 
-                <div class="bg-slate-50 p-4 text-center">
-                    <p class="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Pastikan foto terlihat jelas & terang</p>
+                <div class="bg-slate-50 px-6 py-4 text-center border-t border-slate-100">
+                    <p class="text-[9px] text-slate-400 font-bold uppercase tracking-widest leading-relaxed">
+                        * Maksimal berkas limit 5 foto • Gambar berlabel <span class="text-emerald-600 font-black">Cover</span> otomatis dijadikan visual utama pencarian barang.
+                    </p>
                 </div>
             </div>
             
-            <input type="file" ref="fileInput" class="hidden" accept="image/*" @change="handleFileUpload">
+            <input type="file" ref="fileInput" class="hidden" accept="image/*" @change="handleGallerySelected">
         </div>
 
         <div v-if="showScanner" class="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-sm">
@@ -3418,20 +3477,36 @@
         </transition>
 
         <transition name="fade-scale">
-            <div v-if="previewImage" 
-                class="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-900/80 backdrop-blur-md"
-                @click="previewImage = null">
+            <div v-if="previewGallery.show" class="fixed inset-0 z-[9999] bg-slate-950/90 backdrop-blur-md flex items-center justify-center" @click="closePreviewGallery">
                 
-                <button @click="previewImage = null" 
-                        class="absolute top-6 right-6 md:top-8 md:right-8 w-12 h-12 flex items-center justify-center bg-white/10 hover:bg-rose-500 text-white/70 hover:text-white rounded-full backdrop-blur-sm border border-white/20 transition-all duration-300 shadow-2xl z-10">
-                    <i class="fa-solid fa-xmark text-xl"></i>
+                <button @click.stop="closePreviewGallery" class="absolute top-6 right-6 w-12 h-12 rounded-full bg-white/10 hover:bg-rose-500 text-white transition flex items-center justify-center">
+                    <i class="fa-solid fa-xmark"></i>
                 </button>
 
-                <div class="relative max-w-4xl w-[90%] md:w-auto p-2 bg-white/5 rounded-3xl shadow-2xl border border-white/10" @click.stop>
-                    <img :src="previewImage" 
-                        class="w-full h-auto max-h-[80vh] md:max-h-[85vh] object-contain rounded-2xl shadow-inner"
-                        alt="Preview Foto Barang">
+                <button v-if="previewGallery.photos.length > 1" @click.stop="prevPreview" class="absolute left-5 md:left-10 w-12 h-12 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center">
+                    <i class="fa-solid fa-chevron-left"></i>
+                </button>
+
+                <button v-if="previewGallery.photos.length > 1" @click.stop="nextPreview" class="absolute right-5 md:right-10 w-12 h-12 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center">
+                    <i class="fa-solid fa-chevron-right"></i>
+                </button>
+
+                <div class="w-[92%] max-w-6xl" @click.stop>
+                    <img :src="fixDriveUrl(currentPreviewPhoto.photo_url)" class="w-full max-h-[80vh] object-contain rounded-3xl shadow-2xl mx-auto">
+
+                    <div class="flex justify-center gap-3 mt-5 flex-wrap">
+                        <div v-for="(photo, index) in previewGallery.photos" :key="photo.id" @click="previewGallery.current = index"
+                            :class="[previewGallery.current === index ? 'ring-4 ring-indigo-500 scale-95' : 'opacity-70 hover:opacity-100']"
+                            class="w-20 h-20 rounded-xl overflow-hidden cursor-pointer transition">
+                            <img :src="fixDriveUrl(photo.photo_url)" class="w-full h-full object-cover">
+                        </div>
+                    </div>
+
+                    <div class="text-center mt-4 text-slate-300 text-sm font-semibold select-none">
+                        {{ previewGallery.current + 1 }} / {{ previewGallery.photos.length }}
+                    </div>
                 </div>
+
             </div>
         </transition>
 
