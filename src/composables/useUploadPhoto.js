@@ -1,80 +1,73 @@
 import { compressImage } from "../utils/imageUtils.js";
 import { uploadToDrive } from "../services/driveService.js";
-import { updatePhoto } from "../services/inventoryService.js";
+import { addPhoto, fetchPhotos } from "../services/inventoryPhotoService.js";
 
 export const useUploadPhoto = (deps) => {
-    const {
-        isUploading,
-        formItem,
-        loadInventory,
-        showToast
-    } = deps;
+    const { isUploading, formItem, showToast, loadInventory } = deps;
 
-    const generateFilename = (kode) => {
-        return `IMG_${kode}_${Date.now()}.jpg`;
+    const generateFilename = (kode) => `IMG_${kode}_${Date.now()}.jpg`;
+
+    const refreshPhotoList = async (kode) => {
+        const latest = await fetchPhotos(kode);
+        formItem.value.photos = latest;
+        formItem.value.selectedPhoto = latest.find(p => p.is_cover) || latest[0] || null;
+        return latest;
     };
 
-    const savePhoto = async (base64, kode) => {
+    const uploadBase64 = async (base64, kode) => {
         const filename = generateFilename(kode);
-        const url = await uploadToDrive(base64, filename);
-        await updatePhoto(kode, url);
-        return url;
+        return await uploadToDrive(base64, filename);
     };
 
-    const uploadPhoto = async (file, kode) => {
-        if (!file) {
-            throw new Error("File kosong");
-        }
+    const uploadFile = async (file, kode) => {
         const base64 = await compressImage(file);
-        return await savePhoto(base64, kode);
+        return await uploadBase64(base64, kode);
     };
 
-    const uploadBase64Photo = async (base64, kode) => {
-        if (!base64) {
-            throw new Error("Gambar kosong");
-        }
-        return await savePhoto(base64, kode);
-    };
-
-    const handleFileUpload = async (event) => {
-        const file = event.target.files?.[0];
-        if (!file) return;
-
+    const saveUploadedPhoto = async ({ file = null, base64 = null }) => {
+        if (isUploading.value) return;
         isUploading.value = true;
 
         try {
-            const targetKode = formItem.value.kode;
-            const url = await uploadPhoto(file, targetKode);
+            const kode = formItem.value.kode;
+            if (!kode) throw new Error("Barang harus disimpan terlebih dahulu.");
 
-            formItem.value.foto = url;
+            let driveFile = null;
 
-            if (deps.inventory && deps.inventory.value) {
-                const item = deps.inventory.value.find(i => i.kode === targetKode);
-                if (item) {
-                    item.foto = url;
-                }
+            if (file) {
+                driveFile = await uploadFile(file, kode);
+            } else if (base64) {
+                driveFile = await uploadBase64(base64, kode);
             }
 
-            if (deps.isServerMode && deps.isServerMode.value && deps.serverResults) {
-                const serverItem = deps.serverResults.value.find(i => i.kode === targetKode);
-                if (serverItem) {
-                    serverItem.foto = url;
-                }
+            if (!driveFile) {
+                throw new Error("Tidak ada gambar untuk diupload");
             }
 
-            await loadInventory(true);
-            showToast("Foto berhasil diunggah", "success");
+            await addPhoto(kode, driveFile.url, driveFile.fileId);
+            const latest = await refreshPhotoList(kode);
+            showToast("Foto berhasil ditambahkan", "success");
+            return latest;
         } catch (err) {
             showToast(err.message, "error");
+            throw err;
         } finally {
             isUploading.value = false;
-            event.target.value = "";
         }
     };
 
+    const readFilePreview = (file) => {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result);
+            reader.onerror = reject;
+            reader.readAsDataURL(file);
+        });
+    };
+
     return {
-        uploadPhoto,
-        uploadBase64Photo,
-        handleFileUpload
+        saveUploadedPhoto,
+        readFilePreview,
+        refreshPhotoList
     };
 };
