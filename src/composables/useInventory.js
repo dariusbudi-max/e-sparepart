@@ -95,7 +95,12 @@ export function useInventory({ showToast, userRole, userData }) {
 			const index = inventory.value.findIndex(i => i.kode === data.kode);
 
 			if (index !== -1) {
-				inventory.value[index] = data;
+
+				inventory.value[index] = {
+					...inventory.value[index],   // pertahankan inventory_photos
+					...data
+				};
+
 			} else {
 				inventory.value.unshift(data);
 			}
@@ -103,7 +108,10 @@ export function useInventory({ showToast, userRole, userData }) {
 			if (isServerMode.value) {
 				const serverIndex = serverResults.value.findIndex(i => i.kode === data.kode);
 				if (serverIndex !== -1) {
-					serverResults.value[serverIndex] = data;
+					serverResults.value[serverIndex] = {
+						...serverResults.value[serverIndex],
+						...data
+					};
 				} else {
 					serverResults.value.unshift(data);
 				}
