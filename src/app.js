@@ -7,6 +7,7 @@ import { useUsers } from "./composables/useUsers.js";
 import { useInventory } from "./composables/useInventory.js";
 import { searchInventory } from "./services/inventoryService.js";
 import { fetchPhotos, deletePhoto, setCoverPhoto, updatePhotoOrder } from "./services/inventoryPhotoService.js";
+import { useCatalog } from "./composables/useCatalog.js";
 
 import { useScrapMonitoring } from "./composables/useScrapMonitoring.js";
 
@@ -119,7 +120,6 @@ createApp({
         const searchInputRef = ref(null);
         const showScrapInput = ref(false);
 
-
         const isRefreshing = ref(false);
         const pivotRawTx = ref([]);
 
@@ -149,6 +149,13 @@ createApp({
         const showPhotoModal = ref(false);
 
         const userRole = ref('ADMIN');
+
+        const showAddFolderModal = ref(false);
+        const newFolderName = ref("");
+        const showAssignModal = ref(false);
+        const selectedItemForFolder = ref(null);
+        const selectedTargetFolderId = ref("");
+        const showFolderMenu = ref(false);
 
         const sortKey = ref('');
         const sortOrder = ref(1);
@@ -553,17 +560,26 @@ createApp({
             deleteItem
         } = inventory;
 
-        const handleTableScroll = (event) => {
-            const { scrollTop, scrollHeight, clientHeight } = event.target;
+        const handleTableScroll = async (event) => {
+            const target = event.target;
+            const reachedBottom = target.scrollTop + target.clientHeight >= target.scrollHeight - 150;
+            if (!reachedBottom) return;
 
-            if (scrollHeight - scrollTop <= clientHeight + 100) {
+            if (page.value === "catalog_menu") {
+                if (catalog.loading.value || !catalog.hasMore.value) return;
+                await catalog.loadItems(true);
+                return;
+            }
+
+            if (["master_barang", "inventory"].includes(page.value)) {
                 if (inventory.isServerMode.value) {
-                    if (!inventory.isSearching.value && inventory.hasMoreSearch.value && !inventory.loading.value) {
-                        inventory.handleSearch(inventorySearch.value, true);
-                    }
+                    if (inventory.loading.value || inventory.isSearching.value || !inventory.hasMoreSearch.value) return;
+                    await inventory.handleSearch(inventorySearch.value, true);
                 } else {
-                    inventory.loadInventory();
+                    if (inventory.loading.value || !inventory.hasMore.value) return;
+                    await inventory.loadInventory();
                 }
+                return;
             }
         };
 
@@ -625,6 +641,59 @@ createApp({
             }
             showScanner.value = false;
         };
+
+        const catalog = useCatalog({
+            showToast,
+            inventory
+        });
+
+        const getItemCoverPhoto = (item) => {
+            if (item.inventory_photos && item.inventory_photos.length > 0) {
+                const cover = item.inventory_photos.find(p => p.is_cover);
+                return cover ? cover.photo_url : item.inventory_photos[0].photo_url;
+            }
+            return item.foto || "";
+        };
+
+        const handleCreateFolder = async () => {
+            if (!newFolderName.value.trim()) return;
+            await catalog.addFolder(newFolderName.value);
+            newFolderName.value = "";
+            showAddFolderModal.value = false;
+        };
+
+        const openAssignFolderModal = (item) => {
+            selectedItemForFolder.value = item;
+            selectedTargetFolderId.value = item.folder_id || "";
+            showAssignModal.value = true;
+        };
+
+        const executeAssignFolder = async () => {
+            if (!selectedItemForFolder.value) return;
+            const target = selectedTargetFolderId.value === "" ? null : selectedTargetFolderId.value;
+            await catalog.moveItemsToFolder([selectedItemForFolder.value.kode], target);
+            showAssignModal.value = false;
+        };
+
+        const openCatalogMenu = async () => {
+            page.value = "catalog_menu";
+            await catalog.loadFolders();
+            if (catalog.catalogItems.value.length === 0) {
+                await catalog.loadFolderContent(null);
+            }
+        };
+
+        watch(page, async (newPage) => {
+            if (newPage !== "catalog_menu") return;
+
+            await catalog.loadFolders();
+            await catalog.loadFolderContent(
+                catalog.activeFolderId?.value || null,
+                true
+            );
+        });
+
+
 
         //===TRANSAKSI===//
         const tx = useTransaction(inventory, userData, showToast, {
@@ -858,20 +927,6 @@ createApp({
             return isEditMode.value && !!formItem.value.kode;
         });
 
-        const refreshPhotos = async (kode) => {
-            const latest = await refreshPhotoList(kode);
-            const index = inventory.inventory.value.findIndex(i => i.kode === kode);
-
-            if (index >= 0) {
-                inventory.inventory.value[index] = {
-                    ...inventory.inventory.value[index],
-                    inventory_photos: [...latest]
-                };
-            }
-
-            return latest;
-        };
-
         const launchGallery = () => {
             if (fileInput.value) {
                 fileInput.value.value = "";
@@ -950,17 +1005,13 @@ createApp({
 
         const removePhoto = async (photo) => {
             if (!confirm("Hapus foto ini?")) return;
-
             try {
-                if (photo.drive_file_id) {
-                    await deleteFromDrive(photo.drive_file_id);
-                }
-
+                if (photo.drive_file_id) await deleteFromDrive(photo.drive_file_id);
                 await deletePhoto(photo.id);
-                const latest = await refreshPhotos(formItem.value.kode);
+                await refreshPhotos(formItem.value.kode);
                 showToast("Foto berhasil dihapus", "success");
-                return latest;
             } catch (err) {
+                console.error("DELETE PHOTO ERROR:", err);
                 showToast(err.message, "error");
             }
         };
@@ -1069,27 +1120,48 @@ createApp({
                     base64: base64Clean
                 });
 
-                const index = inventory.inventory.value.findIndex(
-                    i => i.kode === formItem.value.kode
-                );
-
-                if (index >= 0) {
-                    inventory.inventory.value[index] = {
-                        ...inventory.inventory.value[index],
-                        inventory_photos: [...latest]
-                    };
-                }
+                await refreshPhotos(formItem.value.kode);
 
                 photoPreview.value = null;
                 previewSource.value = null;
                 photoUrlInput.value = "";
 
-                if (fileInput.value) fileInput.value.value = "";
+                if (fileInput.value) {
+                    fileInput.value.value = "";
+                }
 
                 stopCamera();
             } catch (err) {
                 console.error(err);
                 showToast("Proses upload gagal.", "error");
+            }
+        };
+
+        const refreshPhotos = async (kode) => {
+            try {
+                const latest = await refreshPhotoList(kode);
+
+                const updatePhotoCache = (list) => {
+                    if (!Array.isArray(list)) return;
+
+                    const index = list.findIndex(item => item.kode === kode);
+
+                    if (index !== -1) {
+                        list[index] = {
+                            ...list[index],
+                            inventory_photos: [...latest]
+                        };
+                    }
+                };
+
+                updatePhotoCache(inventory.inventory.value);
+                updatePhotoCache(inventory.serverResults.value);
+                updatePhotoCache(catalog.catalogItems.value);
+
+                return latest;
+            } catch (err) {
+                console.error("Refresh Photos Error:", err);
+                throw err;
             }
         };
 
@@ -1773,7 +1845,8 @@ createApp({
 
             await Promise.all([
                 inventory.loadInventory(true),
-                inventory.loadLocations()
+                inventory.loadLocations(),
+                catalog.loadFolders()
             ]);
 
             const today = new Date().toISOString().split("T")[0];
@@ -1818,6 +1891,17 @@ createApp({
             executeBatchInsert,
             validCount,
             duplicateCount,
+            catalog,
+            showAddFolderModal,
+            newFolderName,
+            showAssignModal,
+            selectedItemForFolder,
+            selectedTargetFolderId,
+            getItemCoverPhoto,
+            handleCreateFolder,
+            openAssignFolderModal,
+            executeAssignFolder,
+            openCatalogMenu, showFolderMenu,
 
             // 5. TRANSACTION & CART (WMS)
             cart, inputQty, qtyInputRef, previewData, pasteData, tx, isSearchingServer, processing, importLoading,
