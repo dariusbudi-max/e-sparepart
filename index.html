@@ -357,12 +357,21 @@
                         <span>Bon Suku Cadang</span>
                     </button>
 
+                    <button @click="page = 'catalog_menu'; sidebarOpen = false"
+                        :class="page === 'catalog_menu' ? 'bg-gradient-to-r from-indigo-600/20 to-transparent text-indigo-400 border-indigo-500/30 shadow-[inset_2px_0_0_0_#6366f1]' : 'text-slate-400 hover:bg-slate-800/40 hover:text-indigo-300 border-transparent'"
+                        class="group w-full flex items-center gap-4 px-4 py-3 rounded-xl font-semibold transition-all duration-300 text-sm text-left border outline-none relative">
+                        
+                        <i class="fa-solid fa-folder-tree text-lg w-6 transition-transform group-hover:scale-110"
+                            :class="page === 'catalog_menu' ? 'text-indigo-500' : 'text-slate-500 group-hover:text-indigo-400'">
+                        </i>
+                        <span>Katalog Mesin</span>
+                    </button>
+
                     <button @click="page = 'scrap_monitoring'; loadScrapData(); sidebarOpen = false" 
                         :class="page === 'scrap_monitoring' ? 'bg-gradient-to-r from-teal-600/20 to-transparent text-teal-400 border-teal-500/30 shadow-[inset_2px_0_0_0_#14b8a6]' : 'text-slate-400 hover:bg-slate-800/40 hover:text-teal-300 border-transparent'" 
                         class="group w-full flex items-center gap-4 px-4 py-3 rounded-xl font-semibold transition-all duration-300 text-sm text-left border outline-none relative">
                         <i class="fa-solid fa-recycle text-lg w-6 transition-transform group-hover:scale-110" :class="page === 'scrap_monitoring' ? 'text-teal-500' : 'text-slate-500 group-hover:text-teal-400'"></i> 
                         <span>Barang Bekas / Scrap</span>
-                        <span :class="page === 'scrap_monitoring' ? 'bg-teal-500 text-white' : 'bg-teal-500/20 text-teal-400 border-teal-500/20'" class="ml-auto text-[9px] px-2 py-0.5 rounded-md font-black border group-hover:bg-teal-500/30 transition-colors">MONITOR</span>
                     </button>
 
                     <button v-if="['ADMIN', 'STAFF', 'MANAGER'].includes(userData.role)"
@@ -371,7 +380,6 @@
                         class="group w-full flex items-center gap-4 px-4 py-3 rounded-xl font-semibold transition-all duration-300 text-sm text-left border outline-none relative">
                         <i class="fa-solid fa-file-signature text-lg w-6 transition-transform group-hover:scale-110" :class="page === 'spp' ? 'text-fuchsia-500' : 'text-slate-500 group-hover:text-fuchsia-400'"></i> 
                         <span>SPP</span>
-                        <span :class="page === 'spp' ? 'bg-fuchsia-500 text-white' : 'bg-fuchsia-500/20 text-fuchsia-400 border-fuchsia-500/20'" class="ml-auto text-[9px] px-2 py-0.5 rounded-md font-black border group-hover:bg-fuchsia-500/30 transition-colors">NEW</span>
                     </button>
 
                     <div class="my-2 border-t border-slate-700/50 mx-2 flex items-center justify-center">
@@ -450,6 +458,7 @@
                             'fa-cart-flatbed text-emerald-500': page === 'transaksi',
                             'fa-boxes-stacked text-amber-500': page === 'inventory',
                             'fa-file-invoice text-indigo-500': page === 'reservasi',
+                            'fa-folder-tree text-indigo-500': page === 'catalog_menu',
                             'fa-recycle text-teal-500': page === 'scrap_monitoring',
                             'fa-file-signature text-fuchsia-500': page === 'spp',
                             'fa-database text-cyan-500': page === 'master_barang',
@@ -459,6 +468,7 @@
                         <h1 class="font-black text-xs uppercase tracking-tight truncate max-w-[180px]">
                             {{ 
                                 page === 'master_barang' ? 'Master Data' :
+                                page === 'catalog_menu' ? 'Katalog Mesin' :
                                 page === 'scrap_monitoring' ? 'Barang Bekas' :
                                 page === 'cancel_tx' ? 'Pembatalan' :
                                 page === 'user_management' ? 'User Manager' : 
@@ -497,6 +507,7 @@
                                     'fa-cart-flatbed text-emerald-500': page === 'transaksi',
                                     'fa-boxes-stacked text-amber-500': page === 'inventory',
                                     'fa-file-invoice text-indigo-500': page === 'reservasi',
+                                    'fa-folder-tree text-indigo-500': page === 'catalog_menu',
                                     'fa-recycle text-teal-500': page === 'scrap_monitoring',
                                     'fa-file-signature text-fuchsia-500': page === 'spp',
                                     'fa-database text-cyan-500': page === 'master_barang',
@@ -506,6 +517,7 @@
                                 <span class="font-black text-[11px] uppercase text-slate-700 tracking-tight select-none">
                                     {{ 
                                         page === 'master_barang' ? 'Master Data Barang' :
+                                        page === 'catalog_menu' ? 'Katalog Mesin' :
                                         page === 'scrap_monitoring' ? 'Barang Bekas / Scrap' :
                                         page === 'cancel_tx' ? 'Pembatalan Transaksi' :
                                         page === 'user_management' ? 'Management User' : 
@@ -1695,17 +1707,274 @@
                     </div>
                 </main>
 
-                <main v-if="page === 'scrap_monitoring'" class="flex-1 flex flex-col overflow-hidden bg-slate-50/50">
-                    <div class="px-4 py-3 md:px-6 border-b bg-white shadow-sm z-10 flex justify-between items-center gap-4">
+                <main v-if="page === 'catalog_menu'" class="flex-1 flex flex-col h-screen overflow-hidden bg-slate-50/60 text-slate-700 font-sans">
+    
+                    <div class="h-16 px-3.5 md:px-6 bg-white border-b border-slate-200/80 flex items-center justify-between gap-2.5 shrink-0 shadow-sm/40">
+                        <div class="flex items-center gap-2 md:gap-3 shrink-0">
+                            <button 
+                                @click.stop="showFolderMenu = !showFolderMenu"
+                                class="md:hidden w-9 h-9 flex items-center justify-center rounded-xl bg-slate-100 hover:bg-slate-200/70 active:scale-95 text-slate-600 transition-all"
+                                title="Buka Menu Folder">
+                                <i class="fa-solid fa-folder-tree text-base text-blue-600"></i>
+                            </button>
+
+                            <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-500 text-white hidden md:flex items-center justify-center shrink-0 shadow-sm shadow-blue-500/20">
+                                <i class="fa-solid fa-cloud text-base"></i>
+                            </div>
+                            <div>
+                                <h1 class="text-sm md:text-base font-bold text-slate-800 leading-tight truncate max-w-[120px] sm:max-w-none">Drive Katalog</h1>                                
+                            </div>
+                        </div>
+
+                        <div class="flex items-center gap-2 flex-1 max-w-xl justify-end">
+                            <div class="relative w-full group">
+                                <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-blue-600 transition-colors text-xs md:text-sm"></i>
+                                <input
+                                    v-model="catalog.catalogSearch.value"
+                                    type="text"
+                                    placeholder="Cari di Drive..."
+                                    class="w-full pl-9 pr-8 md:pl-10 md:pr-9 py-2 bg-slate-100/90 hover:bg-slate-100 focus:bg-white border border-transparent focus:border-blue-500 rounded-full text-xs md:text-sm outline-none transition-all shadow-inner/5 placeholder:text-slate-400"
+                                >
+                                <button
+                                    v-if="catalog.catalogSearch.value"
+                                    @click="catalog.catalogSearch.value = ''"
+                                    class="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 hover:bg-slate-200 w-5 h-5 rounded-full flex items-center justify-center transition-all"
+                                    title="Hapus">
+                                    <i class="fa-solid fa-xmark text-xs"></i>
+                                </button>
+                            </div>
+
+                            <button v-if="userData.role === 'ADMIN'" @click="showAddFolderModal = true"
+                                class="px-3 md:px-5 py-2 bg-blue-600 hover:bg-blue-700 active:scale-95 text-white rounded-full text-xs md:text-sm font-semibold shadow-sm hover:shadow-md flex items-center gap-1.5 shrink-0 transition-all">
+                                <i class="fa-solid fa-plus text-xs md:text-sm"></i>
+                                <span class="sm:hidden">Baru</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="flex-1 flex overflow-hidden relative" @click="showFolderMenu = false">
+                        
+                        <aside class="w-60 border-r border-slate-200/80 p-3 hidden md:flex flex-col gap-1 shrink-0 bg-white">
+                            <button @click="catalog.loadFolderContent(null)"
+                                :class="catalog.selectedFolderId.value === null ? 'bg-blue-50/90 text-blue-700 font-semibold shadow-sm/50' : 'text-slate-600 hover:bg-slate-100/70 font-medium'"
+                                class="w-full px-3.5 py-2.5 rounded-xl text-xs md:text-sm text-left flex items-center justify-between transition-all group">
+                                <div class="flex items-center gap-2.5 truncate">
+                                    <i class="fa-solid fa-box-archive text-slate-400 group-hover:text-slate-600 transition-colors"></i>
+                                    <span class="truncate">Semua Item (Tanpa Folder)</span>
+                                </div>
+                            </button>
+
+                            <div class="my-2 border-t border-slate-100"></div>
+                            <div class="px-3 flex items-center justify-between mb-1">
+                                <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Folder Root</span>
+                            </div>
+
+                            <div class="flex-1 overflow-y-auto space-y-0.5 pr-1 custom-scrollbar">
+                                <div v-for="f in catalog.folders.value" :key="f.id"
+                                    :class="catalog.selectedFolderId.value === f.id ? 'bg-blue-50/90 text-blue-700 font-semibold shadow-sm/50' : 'text-slate-600 hover:bg-slate-100/70 font-medium'"
+                                    class="w-full px-3.5 py-2 rounded-xl text-xs md:text-sm text-left flex items-center justify-between transition-all group">
+                                    
+                                    <div @click="catalog.loadFolderContent(f.id)" class="flex-1 flex items-center gap-2.5 cursor-pointer truncate">
+                                        <i class="fa-solid fa-folder text-amber-400 text-sm"></i>
+                                        <span class="truncate">{{ f.nama }}</span>
+                                    </div>
+
+                                    <button v-if="userData.role === 'ADMIN'" @click.stop="catalog.removeFolder(f.id, f.nama)"
+                                        class="text-slate-400 hover:text-red-600 p-1 rounded-lg hover:bg-slate-200/60 opacity-0 group-hover:opacity-100 transition-all">
+                                        <i class="fa-solid fa-trash-can text-xs"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        </aside>
+
+                        <transition 
+                            enter-active-class="transition-all duration-300 ease-out"
+                            enter-from-class="-translate-x-full opacity-0"
+                            enter-to-class="translate-x-0 opacity-100"
+                            leave-active-class="transition-all duration-200 ease-in"
+                            leave-from-class="translate-x-0 opacity-100"
+                            leave-to-class="-translate-x-full opacity-0">
+                            <aside v-if="showFolderMenu" @click.stop 
+                                class="md:hidden absolute inset-y-0 left-0 z-30 w-72 bg-white shadow-2xl border-r border-slate-200 p-4 flex flex-col gap-1">
+                                <button @click="catalog.loadFolderContent(null); showFolderMenu = false"
+                                    :class="catalog.selectedFolderId.value === null ? 'bg-blue-50 text-blue-700 font-semibold' : 'text-slate-600 hover:bg-slate-100 font-medium'"
+                                    class="w-full px-3.5 py-2.5 rounded-xl text-xs flex items-center justify-between transition-all">
+                                    <div class="flex items-center gap-2.5 truncate">
+                                        <i class="fa-solid fa-box-archive text-slate-400"></i>
+                                        <span class="truncate">Semua Item (Tanpa Folder)</span>
+                                    </div>
+                                </button>
+
+                                <div class="my-2 border-t border-slate-100"></div>
+                                <span class="px-3 text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">Daftar Folder</span>
+
+                                <div class="flex-1 overflow-y-auto space-y-1 pr-1">
+                                    <div v-for="f in catalog.folders.value" :key="f.id"
+                                        :class="catalog.selectedFolderId.value === f.id ? 'bg-blue-50 text-blue-700 font-semibold' : 'text-slate-600 hover:bg-slate-100 font-medium'"
+                                        class="w-full px-3.5 py-2.5 rounded-xl text-xs text-left flex items-center justify-between transition-all group">
+                                        
+                                        <div @click="catalog.loadFolderContent(f.id); showFolderMenu = false" class="flex-1 flex items-center gap-2.5 cursor-pointer truncate">
+                                            <i class="fa-solid fa-folder text-amber-400 text-sm"></i>
+                                            <span class="truncate">{{ f.nama }}</span>
+                                        </div>
+
+                                        <button v-if="userData.role === 'ADMIN'" @click.stop="catalog.removeFolder(f.id, f.nama)"
+                                            class="text-slate-400 hover:text-red-600 p-1 rounded-md hover:bg-slate-200/50">
+                                            <i class="fa-solid fa-trash-can text-xs"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                            </aside>
+                        </transition>
+
+                        <div class="flex-1 flex flex-col overflow-hidden bg-slate-50/50 p-3 md:p-6">
+                            
+                            <div class="flex items-center justify-between pb-3 mb-3 border-b border-slate-200/80 gap-2 min-w-0">
+                                <div class="flex items-center gap-2 min-w-0 overflow-x-auto no-scrollbar py-0.5">
+                                    <button v-if="catalog.selectedFolderId.value !== null" 
+                                        @click="catalog.loadFolderContent(null)"
+                                        class="w-8 h-8 md:w-9 md:h-9 flex items-center justify-center rounded-xl bg-white border border-slate-200 hover:bg-slate-100 active:scale-95 text-slate-600 transition-all shrink-0 shadow-sm"
+                                        title="Kembali ke Semua Item">
+                                        <i class="fa-solid fa-arrow-left text-xs md:text-sm"></i>
+                                    </button>
+
+                                    <div class="flex items-center gap-1.5 min-w-0 text-xs md:text-sm font-semibold">
+                                        <button @click="catalog.loadFolderContent(null)" 
+                                            :class="catalog.selectedFolderId.value === null ? 'text-slate-800 pointer-events-none' : 'text-slate-500 hover:text-blue-600 cursor-pointer'"
+                                            class="truncate transition-colors flex items-center gap-1.5 shrink-0">
+                                            <i class="fa-solid fa-box-archive text-slate-400 text-xs md:text-sm"></i>
+                                            <span>Semua Item</span>
+                                        </button>
+
+                                        <template v-if="catalog.selectedFolderId.value !== null">
+                                            <i class="fa-solid fa-chevron-right text-[10px] text-slate-300 shrink-0"></i>
+                                            <div class="flex items-center gap-1.5 truncate text-slate-800 bg-amber-500/10 text-amber-700 px-2.5 py-1 rounded-lg border border-amber-500/20 font-medium">
+                                                <i class="fa-solid fa-folder-open text-amber-500 text-xs md:text-sm shrink-0"></i>
+                                                <span class="truncate max-w-[140px] sm:max-w-xs">{{ catalog.activeFolderObj.value.nama }}</span>
+                                            </div>
+                                        </template>
+                                    </div>
+
+                                    <span class="text-[10px] md:text-xs bg-slate-200/80 text-slate-600 px-2 py-0.5 rounded-full font-semibold shrink-0 ml-1">
+                                        {{ catalog.catalogItems.value.length }} Item
+                                    </span>
+                                </div>
+                            </div>
+
+                            <div class="flex-1 min-h-0 overflow-y-auto relative pr-1" @scroll="handleTableScroll">
+                                
+                                <div v-if="catalog.loading.value && catalog.catalogItems.value.length === 0" class="flex flex-col items-center justify-center h-full text-slate-400">
+                                    <i class="fa-solid fa-spinner fa-spin text-2xl mb-2 text-blue-600"></i>
+                                    <p class="text-xs md:text-sm">Memuat drive...</p>
+                                </div>
+
+                                <div v-else-if="catalog.catalogItems.value.length === 0 && catalog.folders.value.length === 0" class="flex flex-col items-center justify-center h-full text-slate-400">
+                                    <div class="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mb-3">
+                                        <i class="fa-solid fa-box-open text-2xl text-slate-300"></i>
+                                    </div>
+                                    <p class="text-sm font-medium text-slate-600">Tidak ada item di folder ini</p>
+                                    <p class="text-xs text-slate-400 mt-1">Pindahkan item dari master data ke folder ini.</p>
+                                </div>
+
+                                <div v-else class="space-y-5">
+                                    
+                                    <div v-if="catalog.selectedFolderId.value === null && catalog.folders.value.length > 0" class="space-y-2">
+                                        <h3 class="text-[11px] font-bold uppercase tracking-wider text-slate-400">Folder</h3>
+                                        <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-6 gap-2.5">
+                                            <div v-for="f in catalog.folders.value" :key="'grid-'+f.id"
+                                                @click="catalog.loadFolderContent(f.id)"
+                                                class="bg-white hover:bg-blue-50/40 border border-slate-200/80 hover:border-blue-300/80 rounded-2xl p-3 flex items-center justify-between gap-2 cursor-pointer transition-all shadow-sm hover:shadow active:scale-[0.98] group">
+                                                <div class="flex items-center gap-2.5 min-w-0">
+                                                    <i class="fa-solid fa-folder text-amber-400 text-lg md:text-xl shrink-0"></i>
+                                                    <span class="text-xs md:text-sm font-semibold text-slate-700 truncate group-hover:text-blue-700">{{ f.nama }}</span>
+                                                </div>
+                                                <button v-if="userData.role === 'ADMIN'" @click.stop="catalog.removeFolder(f.id, f.nama)"
+                                                    class="text-slate-300 hover:text-red-600 p-1 rounded-lg hover:bg-slate-100 opacity-0 group-hover:opacity-100 transition-all">
+                                                    <i class="fa-solid fa-trash-can text-xs"></i>
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div class="space-y-2">
+                                        <h3 v-if="catalog.selectedFolderId.value === null && catalog.folders.value.length > 0" class="text-[11px] font-bold uppercase tracking-wider text-slate-400">File & Item</h3>
+                                        
+                                        <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
+                                            <div v-for="item in catalog.catalogItems.value" :key="item.kode" class="bg-white hover:bg-slate-50/80 rounded-2xl border border-slate-200/80 p-2.5 flex flex-col hover:border-slate-300 transition-all shadow-sm group relative">
+                                                
+                                                <div @click="(userData.role==='ADMIN'||userData.can_preview_photo)&&openPreviewGallery(item.inventory_photos||[],item.kode)" 
+                                                    :class="(userData.role==='ADMIN'||userData.can_preview_photo)?'cursor-pointer hover:scale-[1.01]':'cursor-not-allowed'" 
+                                                    class="aspect-video rounded-xl bg-slate-100 overflow-hidden relative mb-2.5 border border-slate-100 flex items-center justify-center transition-all">
+                                                    <img v-if="(userData.role === 'ADMIN' || userData.can_preview_photo) && getItemCoverPhoto(item)" :src="fixDriveUrl(getItemCoverPhoto(item))" class="w-full h-full object-cover">
+                                                    <div v-else class="flex flex-col items-center text-slate-300">
+                                                        <i :class="(userData.role==='ADMIN'||userData.can_preview_photo)?'fa-image':'fa-lock'" class="fa-solid text-xl"></i>
+                                                        <span v-if="!(userData.role==='ADMIN'||userData.can_preview_photo)" class="text-[9px] mt-0.5">No Access</span>
+                                                    </div>
+                                                    <span v-if="(userData.role==='ADMIN'||userData.can_preview_photo)&&item.inventory_photos?.length" class="absolute bottom-1.5 right-1.5 bg-slate-900/60 backdrop-blur-sm text-white text-[9px] font-medium px-1.5 py-0.5 rounded-full">
+                                                        <i class="fa-solid fa-camera mr-0.5 text-[8px]"></i>
+                                                        {{ item.inventory_photos.length }}
+                                                    </span>
+                                                    <div v-if="item.inventory_photos?.length" class="absolute inset-0 bg-black/0 hover:bg-black/15 flex items-center justify-center transition">
+                                                        <i class="fa-solid fa-expand text-white opacity-0 group-hover:opacity-100 text-lg transition-opacity"></i>
+                                                    </div>
+                                                </div>
+
+                                                <div class="flex items-center justify-between gap-1.5 mb-1">
+                                                    <span class="text-[10px] font-mono font-medium text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded truncate">
+                                                        {{ item.kode }}
+                                                    </span>
+                                                    <button v-if="userData.role === 'ADMIN'" @click="openAssignFolderModal(item)" class="text-slate-400 hover:text-slate-700 p-1 rounded-full hover:bg-slate-100 transition-colors">
+                                                        <i class="fa-solid fa-ellipsis-vertical text-xs"></i>
+                                                    </button>
+                                                </div>
+
+                                                <h3 class="text-xs md:text-sm font-medium text-slate-800 line-clamp-1 leading-tight">
+                                                    {{ item.nama }}
+                                                </h3>
+
+                                                <div class="mt-1.5 text-[11px] text-slate-400 flex items-center gap-1">
+                                                    <i class="fa-solid fa-folder text-amber-400 text-xs"></i>
+                                                    <span class="truncate">{{ item.catalog_folder?.nama || "Tanpa Folder" }}</span>
+                                                </div>
+
+                                                <div class="mt-2 pt-1.5 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-400">
+                                                    <span class="truncate">
+                                                        <i class="fa-solid fa-location-dot text-slate-300 mr-1"></i>
+                                                        {{ item.lokasi || "-" }}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                </div>
+
+                                <div v-if="catalog.loading.value && catalog.catalogItems.value.length > 0" class="flex justify-center py-4 text-slate-400 text-xs">
+                                    <i class="fa-solid fa-spinner fa-spin mr-2"></i>
+                                    Memuat data berikutnya...
+                                </div>
+
+                            </div>
+                        </div>
+                    </div>
+                </main>
+
+                <main v-if="page === 'scrap_monitoring'" class="flex-1 flex flex-col h-screen overflow-hidden bg-slate-50">
+                    <div class="py-3 px-4 md:px-6 bg-white border-b border-slate-200/80 flex flex-row items-center justify-between gap-4 z-20 shadow-sm shrink-0">
                         <div class="min-w-0">
-                            <h2 class="text-sm md:text-base font-black text-slate-800 uppercase tracking-tight truncate">Monitoring Scrap</h2>
-                            <p class="hidden md:block text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">Pencatatan manual suku cadang bekas (Maks. 1000 Data)</p>
+                            <h2 class="text-sm md:text-base font-black text-slate-800 uppercase tracking-tight flex items-center gap-2">
+                                <i class="fa-solid fa-recycle text-teal-600"></i>
+                                <span>Monitoring Scrap</span>
+                            </h2>
+                            <p class="hidden md:block text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">
+                                Pencatatan manual suku cadang bekas (Maks. 1000 Data)
+                            </p>
                         </div>
                         
                         <div class="flex items-center gap-2 shrink-0">
                             <button @click="showScrapInput = !showScrapInput" 
-                                class="px-3.5 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center gap-1.5 shadow-sm border"
-                                :class="showScrapInput ? 'bg-rose-50 border-rose-200 text-rose-600 hover:bg-rose-100' : 'bg-teal-600 border-teal-600 text-white hover:bg-teal-700'">
+                                class="px-4 py-2 rounded-xl text-[11px] font-black uppercase tracking-wider transition-all flex items-center gap-2 shadow-sm border"
+                                :class="showScrapInput ? 'bg-rose-50 border-rose-200 text-rose-600 hover:bg-rose-100' : 'bg-teal-600 border-teal-600 text-white hover:bg-teal-700 active:scale-95'">
                                 <i class="fa-solid" :class="showScrapInput ? 'fa-xmark' : (scrap.isEditing.value ? 'fa-pen-to-square' : 'fa-plus')"></i>
                                 <span>
                                     {{ showScrapInput ? 'Tutup Input' : (scrap.isEditing.value ? 'Lihat Mode Edit' : 'Input Baru') }}
@@ -1714,206 +1983,227 @@
                         </div>
                     </div>
 
-                    <div class="flex-1 overflow-y-auto p-4 md:p-6 custom-scrollbar flex flex-col gap-6">
+                    <div class="flex-1 overflow-y-auto p-3 md:p-6 custom-scrollbar flex flex-col gap-5">
                         
-                        <div v-if="showScrapInput" class="w-full bg-white p-6 rounded-[2rem] border border-slate-200 shadow-sm h-fit space-y-4 animate-in fade-in slide-in-from-top-4 duration-300">
-                            <h3 class="font-black text-xs uppercase text-teal-600 tracking-wider mb-2 flex items-center justify-between">
-                                <span><i class="fa-solid fa-pen-to-square mr-1"></i> {{ scrap.isEditing.value ? 'Edit Rekor Data' : 'Input Catatan Manual' }}</span>
-                                <span v-if="scrap.isEditing.value" class="bg-amber-100 text-amber-700 px-2 py-0.5 rounded text-[9px]">MODE EDIT</span>
-                            </h3>
+                        <div v-if="showScrapInput" class="w-full bg-white p-5 md:p-6 rounded-2xl border border-slate-200 shadow-sm h-fit space-y-5 animate-in fade-in slide-in-from-top-4 duration-300">
+                            <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+                                <h3 class="font-black text-xs uppercase text-teal-600 tracking-wider flex items-center gap-2">
+                                    <i class="fa-solid" :class="scrap.isEditing.value ? 'fa-user-pen' : 'fa-file-circle-plus'"></i>
+                                    <span>{{ scrap.isEditing.value ? 'Edit Rekor Data' : 'Input Catatan Manual' }}</span>
+                                </h3>
+                                <span v-if="scrap.isEditing.value" class="bg-amber-50 border border-amber-200 text-amber-700 px-2.5 py-0.5 rounded-lg text-[9px] font-black tracking-wider uppercase animate-pulse">MODE EDIT</span>
+                            </div>
                             
-                            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                                 <div>
-                                    <label class="block text-[10px] font-black text-slate-400 uppercase mb-1 tracking-widest">Pilih Komoditas</label>
-                                    <select v-model="scrap.selectedItemType.value" 
-                                        class="w-full px-4 py-3 bg-slate-50 border-2 border-transparent rounded-xl font-bold text-slate-700 focus:border-teal-500 focus:bg-white transition-all outline-none text-sm shadow-inner">
-                                        <option v-for="opt in scrap.itemOptions" :key="opt" :value="opt">{{ opt }}</option>
-                                    </select>
+                                    <label class="block text-[10px] font-black text-slate-400 uppercase mb-1.5 ml-1 tracking-widest">Pilih Komoditas</label>
+                                    <div class="relative">
+                                        <select v-model="scrap.selectedItemType.value" 
+                                            class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-700 focus:bg-white focus:ring-4 focus:ring-teal-500/10 focus:border-teal-500 transition-all outline-none text-xs shadow-inner appearance-none cursor-pointer">
+                                            <option v-for="opt in scrap.itemOptions" :key="opt" :value="opt">{{ opt }}</option>
+                                        </select>
+                                        <i class="fa-solid fa-chevron-down absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none text-[10px]"></i>
+                                    </div>
                                 </div>
 
-                                <div v-if="scrap.selectedItemType.value === 'Input Manual'">
-                                    <label class="block text-[10px] font-black text-slate-400 uppercase mb-1 tracking-widest">Nama Barang</label>
+                                <div v-if="scrap.selectedItemType.value === 'Input Manual'" class="animate-in fade-in duration-200">
+                                    <label class="block text-[10px] font-black text-slate-400 uppercase mb-1.5 ml-1 tracking-widest">Nama Barang</label>
                                     <input v-model="scrap.form.value.nama_barang" type="text" placeholder="Masukkan nama barang bekas..."
-                                        class="w-full px-4 py-3 bg-slate-50 border-2 border-transparent rounded-xl font-bold text-slate-700 focus:border-teal-500 focus:bg-white transition-all outline-none text-sm shadow-inner">
+                                        class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-700 focus:bg-white focus:ring-4 focus:ring-teal-500/10 focus:border-teal-500 transition-all outline-none text-xs shadow-inner">
                                 </div>
 
                                 <div>
-                                    <label class="block text-[10px] font-black text-slate-400 uppercase mb-1 tracking-widest">Tanggal Penukaran <span class="text-rose-500">*</span></label>
+                                    <label class="block text-[10px] font-black text-slate-400 uppercase mb-1.5 ml-1 tracking-widest">Tanggal Penukaran <span class="text-rose-500">*</span></label>
                                     <input v-model="scrap.form.value.tgl_penukaran" type="date"
-                                        class="w-full px-4 py-3 bg-slate-50 border-2 border-transparent rounded-xl font-bold text-slate-700 focus:border-teal-500 focus:bg-white transition-all outline-none text-xs shadow-inner">
+                                        class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-700 focus:bg-white focus:ring-4 focus:ring-teal-500/10 focus:border-teal-500 transition-all outline-none text-xs shadow-inner">
                                 </div>
 
                                 <div class="grid grid-cols-3 gap-3">
                                     <div class="col-span-2">
-                                        <label class="block text-[10px] font-black text-slate-400 uppercase mb-1 tracking-widest">Department <span class="text-rose-500">*</span></label>
+                                        <label class="block text-[10px] font-black text-slate-400 uppercase mb-1.5 ml-1 tracking-widest">Department <span class="text-rose-500">*</span></label>
                                         <input v-model="scrap.form.value.department" list="scrapDeptList" placeholder="Pilih Dept..."
-                                            class="w-full px-4 py-3 bg-slate-50 border-2 border-transparent rounded-xl font-bold text-slate-700 focus:border-teal-500 focus:bg-white transition-all outline-none text-sm shadow-inner">
+                                            class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-700 focus:bg-white focus:ring-4 focus:ring-teal-500/10 focus:border-teal-500 transition-all outline-none text-xs shadow-inner">
                                         <datalist id="scrapDeptList">
                                             <option v-for="dept in scrap.departments.value" :key="dept" :value="dept">{{ dept }}</option>
                                         </datalist>
                                     </div>
-                                    <div class="col-span-1">
-                                        <label class="block text-[10px] font-black text-slate-400 uppercase mb-1 tracking-widest">Qty <span class="text-rose-500">*</span></label>
+                                    <div>
+                                        <label class="block text-[10px] font-black text-slate-400 uppercase mb-1.5 ml-1 tracking-widest">Qty <span class="text-rose-500">*</span></label>
                                         <input v-model.number="scrap.form.value.qty" type="number" min="1"
-                                            class="w-full px-4 py-3 bg-slate-50 border-2 border-transparent rounded-xl font-black text-center text-teal-600 focus:border-teal-500 focus:bg-white transition-all outline-none text-sm shadow-inner">
+                                            class="w-full px-2 py-3 bg-slate-50 border border-slate-200 rounded-xl font-black text-center text-teal-600 focus:bg-white focus:ring-4 focus:ring-teal-500/10 focus:border-teal-500 transition-all outline-none text-xs shadow-inner">
                                     </div>
                                 </div>
 
-                                <div class="grid grid-cols-2 gap-3" :class="!scrap.isDateRangeRequired.value ? 'lg:col-span-1 opacity-40' : 'lg:col-span-1'">
+                                <div class="grid grid-cols-2 gap-3 transition-opacity duration-200" :class="!scrap.isDateRangeRequired.value ? 'lg:col-span-1 opacity-35' : 'lg:col-span-1'">
                                     <div>
-                                        <label class="block text-[10px] font-black text-slate-400 uppercase mb-1 tracking-widest truncate">Tgl Awal Pakai</label>
+                                        <label class="block text-[10px] font-black text-slate-400 uppercase mb-1.5 ml-1 tracking-widest truncate">Tgl Awal Pakai</label>
                                         <input v-model="scrap.form.value.tgl_awal_pakai" type="date" :disabled="!scrap.isDateRangeRequired.value"
-                                            class="w-full px-4 py-3 bg-slate-50 border-2 border-transparent rounded-xl font-bold text-slate-700 focus:border-teal-500 focus:bg-white transition-all outline-none text-xs shadow-inner disabled:cursor-not-allowed">
+                                            class="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-700 focus:bg-white focus:ring-4 focus:ring-teal-500/10 focus:border-teal-500 transition-all outline-none text-xs shadow-inner disabled:cursor-not-allowed">
                                     </div>
                                     <div>
-                                        <label class="block text-[10px] font-black text-slate-400 uppercase mb-1 tracking-widest truncate">Tgl Akhir Pakai</label>
+                                        <label class="block text-[10px] font-black text-slate-400 uppercase mb-1.5 ml-1 tracking-widest truncate">Tgl Akhir Pakai</label>
                                         <input v-model="scrap.form.value.tgl_akhir_pakai" type="date" :disabled="!scrap.isDateRangeRequired.value"
-                                            class="w-full px-4 py-3 bg-slate-50 border-2 border-transparent rounded-xl font-bold text-slate-700 focus:border-teal-500 focus:bg-white transition-all outline-none text-xs shadow-inner disabled:cursor-not-allowed">
+                                            class="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-700 focus:bg-white focus:ring-4 focus:ring-teal-500/10 focus:border-teal-500 transition-all outline-none text-xs shadow-inner disabled:cursor-not-allowed">
                                     </div>
                                 </div>
                             </div>
 
-                            <div class="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+                            <div class="flex items-center justify-end gap-3 pt-4 border-t border-slate-100">
                                 <button type="button" @click="scrap.cancelEdit" :disabled="scrap.loading.value"
-                                    class="px-5 py-2.5 bg-slate-100 hover:bg-slate-200 disabled:opacity-50 text-slate-500 rounded-xl font-bold text-[10px] uppercase tracking-widest transition-all flex items-center gap-1.5">
+                                    class="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 disabled:opacity-50 text-slate-500 border border-slate-200 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all flex items-center gap-1.5 active:scale-95">
                                     <i class="fa-solid fa-arrow-rotate-left"></i>
                                     <span>{{ scrap.isEditing.value ? 'Batal Edit' : 'Reset Form' }}</span>
                                 </button>
                                 
                                 <button @click="scrap.submitScrap" 
                                     :disabled="scrap.loading.value || scrap.isFormInvalid.value"
-                                    class="px-6 py-2.5 bg-slate-900 text-white rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-teal-600 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-slate-900 transition-all shadow-md">
+                                    class="px-5 py-2.5 bg-slate-900 text-white rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-teal-600 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-slate-900 transition-all shadow-md active:scale-95">
                                     {{ scrap.isEditing.value ? 'Simpan Perubahan' : 'Simpan Scrap' }}
                                 </button>
                             </div>
                         </div>
 
-                        <div class="w-full space-y-6 transition-all duration-300">
+                        <div class="w-full space-y-5">
                             <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                                <div class="bg-white p-5 border border-slate-200 rounded-2xl flex items-center gap-4 shadow-sm">
-                                    <div class="w-10 h-10 bg-teal-50 text-teal-600 flex items-center justify-center rounded-xl text-lg shrink-0"><i class="fa-solid fa-boxes-packing"></i></div>
+                                <div class="bg-white p-4 border border-slate-200/80 rounded-2xl flex items-center gap-4 shadow-sm hover:shadow-md transition-shadow">
+                                    <div class="w-11 h-11 bg-teal-50 border border-teal-100 text-teal-600 flex items-center justify-center rounded-xl text-md shrink-0"><i class="fa-solid fa-boxes-packing"></i></div>
                                     <div class="min-w-0">
-                                        <p class="text-[9px] font-black text-slate-400 uppercase tracking-wider truncate">Total Qty Scrap</p>
-                                        <h4 class="text-xl font-black text-slate-800 truncate">{{ scrap.summary.value.totalQty }} pcs</h4>
+                                        <p class="text-[9px] font-black text-slate-400 uppercase tracking-widest truncate">Total Qty Scrap</p>
+                                        <h4 class="text-lg font-black text-slate-800 truncate">{{ scrap.summary.value.totalQty }} <span class="text-xs font-bold text-slate-400">PCS</span></h4>
                                     </div>
                                 </div>
-                                <div class="bg-white p-5 border border-slate-200 rounded-2xl flex items-center gap-4 shadow-sm">
-                                    <div class="w-10 h-10 bg-blue-50 text-blue-600 flex items-center justify-center rounded-xl text-lg shrink-0"><i class="fa-solid fa-list"></i></div>
+                                <div class="bg-white p-4 border border-slate-200/80 rounded-2xl flex items-center gap-4 shadow-sm hover:shadow-md transition-shadow">
+                                    <div class="w-11 h-11 bg-indigo-50 border border-indigo-100 text-indigo-600 flex items-center justify-center rounded-xl text-md shrink-0"><i class="fa-solid fa-list-check"></i></div>
                                     <div class="min-w-0">
-                                        <p class="text-[9px] font-black text-slate-400 uppercase tracking-wider truncate">Total Hasil Filter</p>
-                                        <h4 class="text-xl font-black text-slate-800 truncate">{{ scrap.summary.value.totalRecords }} Data</h4>
+                                        <p class="text-[9px] font-black text-slate-400 uppercase tracking-widest truncate">Total Hasil Filter</p>
+                                        <h4 class="text-lg font-black text-slate-800 truncate">{{ scrap.summary.value.totalRecords }} <span class="text-xs font-bold text-slate-400">Baris</span></h4>
                                     </div>
                                 </div>
-                                <div class="bg-white p-5 border border-slate-200 rounded-2xl flex items-center gap-4 shadow-sm">
-                                    <div class="w-10 h-10 bg-purple-50 text-purple-600 flex items-center justify-center rounded-xl text-lg shrink-0"><i class="fa-solid fa-industry"></i></div>
+                                <div class="bg-white p-4 border border-slate-200/80 rounded-2xl flex items-center gap-4 shadow-sm hover:shadow-md transition-shadow">
+                                    <div class="w-11 h-11 bg-purple-50 border border-purple-100 text-purple-600 flex items-center justify-center rounded-xl text-md shrink-0"><i class="fa-solid fa-industry"></i></div>
                                     <div class="min-w-0">
-                                        <p class="text-[9px] font-black text-slate-400 uppercase tracking-wider truncate">Dept Terbanyak</p>
-                                        <h4 class="text-sm md:text-md font-black text-slate-800 truncate uppercase">{{ scrap.summary.value.topDept }}</h4>
+                                        <p class="text-[9px] font-black text-slate-400 uppercase tracking-widest truncate">Dept Terbanyak</p>
+                                        <h4 class="text-xs font-black text-slate-800 truncate uppercase bg-slate-100 px-2 py-1 rounded-md w-max border border-slate-200 mt-0.5">{{ scrap.summary.value.topDept || '-' }}</h4>
                                     </div>
                                 </div>
                             </div>
 
-                            <div class="w-full bg-white p-5 rounded-[2rem] border border-slate-200 shadow-sm space-y-4">
-                                <div class="flex items-center justify-between border-b border-slate-50 pb-2">
-                                    <h4 class="text-[11px] font-black uppercase tracking-widest text-slate-500 flex items-center gap-2">
-                                        <i class="fa-solid fa-filter text-teal-500"></i> Panel Filter Penyaringan Data
+                            <div class="w-full bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4">
+                                <div class="flex items-center justify-between border-b border-slate-100 pb-2.5">
+                                    <h4 class="text-[10px] font-black uppercase tracking-widest text-slate-500 flex items-center gap-2">
+                                        <i class="fa-solid fa-sliders text-teal-500"></i> Panel Filter Data
                                     </h4>
-                                    <button @click="scrap.resetFilters" class="text-[10px] font-bold uppercase tracking-wider text-rose-500 hover:text-rose-700 transition">
-                                        <i class="fa-solid fa-trash-can mr-1"></i> Bersihkan Filter
+                                    <button @click="scrap.resetFilters" class="text-[10px] font-black uppercase tracking-wider text-rose-500 hover:text-rose-700 transition flex items-center gap-1">
+                                        <i class="fa-solid fa-trash-can text-[9px]"></i> Bersihkan
                                     </button>
                                 </div>
                                 <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                                     <div>
-                                        <label class="block text-[9px] font-black text-slate-400 uppercase mb-1 tracking-wider">Cari Nama Barang</label>
-                                        <input v-model="scrap.searchQuery.value" type="text" placeholder="Ketik nama barang..." 
-                                            class="w-full px-3.5 py-2.5 bg-slate-50 text-xs font-bold border border-slate-200 rounded-xl outline-none focus:border-teal-500 focus:bg-white transition">
+                                        <label class="block text-[9px] font-black text-slate-400 uppercase mb-1.5 ml-0.5 tracking-wider">Cari Nama Barang</label>
+                                        <div class="relative">
+                                            <input v-model="scrap.searchQuery.value" type="text" placeholder="Ketik nama barang..." 
+                                                class="w-full pl-8 pr-3 py-2 bg-slate-50 text-xs font-bold border border-slate-200 rounded-xl outline-none focus:border-teal-500 focus:bg-white transition shadow-inner">
+                                            <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-[10px]"></i>
+                                        </div>
                                     </div>
                                     <div>
-                                        <label class="block text-[9px] font-black text-slate-400 uppercase mb-1 tracking-wider">Filter Department</label>
-                                        <select v-model="scrap.filterDept.value" class="w-full px-3.5 py-2.5 bg-slate-50 text-xs font-bold border border-slate-200 rounded-xl outline-none focus:border-teal-500 focus:bg-white transition">
-                                            <option value="">-- Semua Dept --</option>
-                                            <option v-for="dept in scrap.departments.value" :key="dept" :value="dept">{{ dept }}</option>
-                                        </select>
+                                        <label class="block text-[9px] font-black text-slate-400 uppercase mb-1.5 ml-0.5 tracking-wider">Filter Department</label>
+                                        <div class="relative">
+                                            <select v-model="scrap.filterDept.value" class="w-full pl-3 pr-8 py-2 bg-slate-50 text-xs font-bold border border-slate-200 rounded-xl outline-none focus:border-teal-500 focus:bg-white transition appearance-none cursor-pointer shadow-inner">
+                                                <option value="">-- Semua Dept --</option>
+                                                <option v-for="dept in scrap.departments.value" :key="dept" :value="dept">{{ dept }}</option>
+                                            </select>
+                                            <i class="fa-solid fa-chevron-down absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none text-[9px]"></i>
+                                        </div>
                                     </div>
                                     <div>
-                                        <label class="block text-[9px] font-black text-slate-400 uppercase mb-1 tracking-wider">Tgl Input (Mulai)</label>
-                                        <input v-model="scrap.filterStartDate.value" type="date" class="w-full px-3.5 py-2.5 bg-slate-50 text-xs font-bold border border-slate-200 rounded-xl outline-none focus:border-teal-500 focus:bg-white transition">
+                                        <label class="block text-[9px] font-black text-slate-400 uppercase mb-1.5 ml-0.5 tracking-wider">Tgl Input (Mulai)</label>
+                                        <input v-model="scrap.filterStartDate.value" type="date" class="w-full px-3 py-1.5 bg-slate-50 text-xs font-bold border border-slate-200 rounded-xl outline-none focus:border-teal-500 focus:bg-white transition shadow-inner">
                                     </div>
                                     <div>
-                                        <label class="block text-[9px] font-black text-slate-400 uppercase mb-1 tracking-wider">Tgl Input (Selesai)</label>
-                                        <input v-model="scrap.filterEndDate.value" type="date" class="w-full px-3.5 py-2.5 bg-slate-50 text-xs font-bold border border-slate-200 rounded-xl outline-none focus:border-teal-500 focus:bg-white transition">
+                                        <label class="block text-[9px] font-black text-slate-400 uppercase mb-1.5 ml-0.5 tracking-wider">Tgl Input (Selesai)</label>
+                                        <input v-model="scrap.filterEndDate.value" type="date" class="w-full px-3 py-1.5 bg-slate-50 text-xs font-bold border border-slate-200 rounded-xl outline-none focus:border-teal-500 focus:bg-white transition shadow-inner">
                                     </div>
                                 </div>
                             </div>
 
-                            <div class="bg-white rounded-[2rem] border border-slate-200 shadow-sm overflow-hidden flex flex-col">
-                                <div class="p-5 border-b border-slate-100 bg-slate-50/50 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                                    <h3 class="font-black text-slate-800 uppercase text-xs tracking-wider">Riwayat Pengumpulan Scrap</h3>
+                            <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
+                                <div class="p-4 border-b border-slate-100 bg-slate-50/50 flex flex-row items-center justify-between gap-3">
+                                    <h3 class="font-black text-slate-800 uppercase text-xs tracking-wider flex items-center gap-1.5">
+                                        <i class="fa-solid fa-clock-rotate-left text-slate-400"></i>
+                                        <span>Riwayat Pengumpulan</span>
+                                    </h3>
                                     
-                                    <div class="flex items-center gap-2 self-end sm:self-auto">
+                                    <div class="flex items-center gap-2">
                                         <button @click="scrap.exportScrapExcel" 
-                                            class="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 border border-emerald-600 text-white rounded-xl text-[11px] font-black uppercase tracking-wider shadow-sm transition flex items-center gap-1.5 active:scale-95">
-                                            <i class="fa-solid fa-file-excel text-xs"></i>
-                                            <span>Export Excel</span>
+                                            class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 border border-emerald-600 text-white rounded-xl text-[10px] font-black uppercase tracking-wider shadow-sm transition flex items-center gap-1.5 active:scale-95">
+                                            <i class="fa-solid fa-file-excel"></i>
+                                            <span class="hidden sm:inline">Export</span>
                                         </button>
 
                                         <button @click="scrap.loadScrapData" :disabled="scrap.loading.value"
-                                            class="px-3 py-1.5 bg-white border border-slate-200 text-slate-600 rounded-xl text-[11px] font-black uppercase tracking-wider hover:bg-slate-50 shadow-sm transition flex items-center gap-1.5 active:scale-95">
+                                            class="px-3 py-1.5 bg-white border border-slate-200 text-slate-600 rounded-xl text-[10px] font-black uppercase tracking-wider hover:bg-slate-50 shadow-sm transition flex items-center gap-1.5 active:scale-95">
                                             <i class="fa-solid fa-rotate-right" :class="scrap.loading.value ? 'animate-spin' : ''"></i> 
-                                            <span>Refresh</span>
+                                            <span class="hidden sm:inline">Refresh</span>
                                         </button>
                                     </div>
                                 </div>
                                 
-                                <div class="overflow-x-auto max-h-[500px] custom-scrollbar">
-                                    <table class="w-full text-left border-collapse whitespace-nowrap">
-                                        <thead class="bg-slate-900 text-white sticky top-0 z-10">
+                                <div class="overflow-x-auto max-h-[480px] custom-scrollbar">
+                                    <table class="w-full text-left border-collapse whitespace-nowrap min-w-[800px]">
+                                        <thead class="bg-slate-900 text-white sticky top-0 z-10 shadow-sm">
                                             <tr>
-                                                <th class="px-6 py-4 text-[9px] font-black uppercase tracking-widest">Tanggal Input Data</th>
-                                                <th class="px-6 py-4 text-[9px] font-black uppercase tracking-widest">Nama Barang</th>
-                                                <th class="px-6 py-4 text-[9px] font-black uppercase tracking-widest">Periode Pakai</th>
-                                                <th class="px-6 py-4 text-[9px] font-black uppercase tracking-widest">Tgl Tukar</th>
-                                                <th class="px-6 py-4 text-[9px] font-black uppercase tracking-widest text-center">Department</th>
-                                                <th class="px-4 py-4 text-[9px] font-black uppercase tracking-widest text-center">Qty</th>
-                                                <th class="px-6 py-4 text-[9px] font-black uppercase tracking-widest">User</th>
-                                                <th v-if="userData.role === 'ADMIN'" class="px-6 py-4 text-[9px] font-black uppercase tracking-widest text-center">Aksi</th>
+                                                <th class="px-5 py-3.5 text-[9px] font-black uppercase tracking-widest w-40">Tanggal Input Data</th>
+                                                <th class="px-5 py-3.5 text-[9px] font-black uppercase tracking-widest">Nama Barang</th>
+                                                <th class="px-5 py-3.5 text-[9px] font-black uppercase tracking-widest w-44">Periode Pakai</th>
+                                                <th class="px-5 py-3.5 text-[9px] font-black uppercase tracking-widest w-32">Tgl Tukar</th>
+                                                <th class="px-5 py-3.5 text-[9px] font-black uppercase tracking-widest text-center w-28">Department</th>
+                                                <th class="px-4 py-3.5 text-[9px] font-black uppercase tracking-widest text-center w-20">Qty</th>
+                                                <th class="px-5 py-3.5 text-[9px] font-black uppercase tracking-widest w-32">User</th>
+                                                <th v-if="userData.role === 'ADMIN'" class="px-5 py-3.5 text-[9px] font-black uppercase tracking-widest text-center w-24">Aksi</th>
                                             </tr>
                                         </thead>
                                         <tbody class="divide-y divide-slate-100 text-xs font-bold text-slate-600">
-                                            <tr v-for="row in scrap.filteredScrapList.value" :key="row.id" class="hover:bg-slate-50/80 transition-colors">
-                                                <td class="px-6 py-4 font-mono text-[11px] text-indigo-500">
+                                            <tr v-for="row in scrap.filteredScrapList.value" :key="row.id" class="hover:bg-slate-50/60 transition-colors">
+                                                <td class="px-5 py-3.5 font-mono text-[11px] text-indigo-500">
                                                     {{ row.created_at ? new Date(row.created_at).toLocaleString("id-ID") : '-' }}
                                                 </td>
-                                                <td class="px-6 py-4 font-black text-slate-800 uppercase">{{ row.nama_barang }}</td>
-                                                <td class="px-6 py-4 text-[11px] font-medium text-slate-500">
-                                                    <span v-if="row.tgl_awal_pakai && row.tgl_akhir_pakai">
-                                                        {{ row.tgl_awal_pakai }} s/d {{ row.tgl_akhir_pakai }}
+                                                <td class="px-5 py-3.5 font-bold text-slate-800 uppercase whitespace-normal break-words max-w-xs">
+                                                    {{ row.nama_barang }}
+                                                </td>
+                                                <td class="px-5 py-3.5 text-[11px] font-medium text-slate-500">
+                                                    <span v-if="row.tgl_awal_pakai && row.tgl_akhir_pakai" class="flex items-center gap-1">
+                                                        <i class="fa-regular fa-calendar-check text-slate-400"></i>
+                                                        <span>{{ row.tgl_awal_pakai }} <span class="text-slate-300">→</span> {{ row.tgl_akhir_pakai }}</span>
                                                     </span>
                                                     <span v-else class="text-slate-300 font-normal italic">Tidak Ada Periode</span>
                                                 </td>
-                                                <td class="px-6 py-4">
-                                                    <span class="bg-teal-50 text-teal-700 px-2 py-1 rounded-md text-[11px] font-mono">{{ row.tgl_penukaran }}</span>
+                                                <td class="px-5 py-3.5">
+                                                    <span class="bg-teal-50 border border-teal-100 text-teal-700 px-2 py-0.5 rounded-md text-[11px] font-mono">{{ row.tgl_penukaran }}</span>
                                                 </td>
-                                                <td class="px-6 py-4 text-center uppercase">
-                                                    <span class="bg-slate-100 px-2 py-0.5 rounded text-[10px] font-black">{{ row.department }}</span>
+                                                <td class="px-5 py-3.5 text-center uppercase">
+                                                    <span class="bg-slate-100 px-2 py-0.5 border border-slate-200 rounded text-[10px] font-black text-slate-700">{{ row.department }}</span>
                                                 </td>
-                                                <td class="px-4 py-4 text-center font-black text-indigo-600">{{ row.qty }}</td>
-                                                <td class="px-6 py-4 text-[10px] font-black uppercase tracking-wide text-slate-400">{{ row.created_by }}</td>
+                                                <td class="px-4 py-3.5 text-center font-black text-indigo-600 text-sm">{{ row.qty }}</td>
+                                                <td class="px-5 py-3.5 text-[10px] font-black uppercase tracking-wide text-slate-400">{{ row.created_by }}</td>
                                                 
-                                                <td v-if="userData.role === 'ADMIN'" class="px-6 py-3 text-center space-x-1">
+                                                <td v-if="userData.role === 'ADMIN'" class="px-5 py-3 text-center space-x-1.5">
                                                     <button @click="showScrapInput = true; scrap.editRow(row)" 
-                                                        class="p-2 bg-amber-50 text-amber-600 hover:bg-amber-500 hover:text-white rounded-lg text-xs transition duration-200" title="Edit">
+                                                        class="p-1.5 bg-amber-50 text-amber-600 border border-amber-200 hover:bg-amber-500 hover:text-white rounded-lg text-xs transition active:scale-90" title="Edit">
                                                         <i class="fa-solid fa-pen-to-square"></i>
                                                     </button>
                                                     <button @click="scrap.deleteRow(row.id, row.nama_barang)" 
-                                                        class="p-2 bg-rose-50 text-rose-600 hover:bg-rose-600 hover:text-white rounded-lg text-xs transition duration-200" title="Hapus">
+                                                        class="p-1.5 bg-rose-50 text-rose-600 border border-rose-200 hover:bg-rose-600 hover:text-white rounded-lg text-xs transition active:scale-90" title="Hapus">
                                                         <i class="fa-solid fa-trash"></i>
                                                     </button>
                                                 </td>
                                             </tr>
                                             <tr v-if="scrap.filteredScrapList.value.length === 0">
-                                                <td :colspan="userData.role === 'ADMIN' ? 8 : 7" class="text-center py-12 text-slate-400 uppercase tracking-widest text-xs">
-                                                    Tidak ada data rekap scrap yang cocok dengan filter
+                                                <td :colspan="userData.role === 'ADMIN' ? 8 : 7" class="text-center py-16 text-slate-400 uppercase tracking-widest text-[11px] font-black bg-slate-50/30">
+                                                    <div class="flex flex-col items-center justify-center gap-2">
+                                                        <i class="fa-solid fa-folder-open text-slate-300 text-xl"></i>
+                                                        <span>Data Tidak Ditemukan</span>
+                                                    </div>
                                                 </td>
                                             </tr>
                                         </tbody>
@@ -3515,6 +3805,39 @@
 
             </div>
         </transition>
+
+        <div v-if="showAddFolderModal" class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+            <div class="bg-white rounded-3xl shadow-xl w-full max-w-sm p-6 border border-slate-100">
+                <h3 class="text-base font-semibold text-slate-800 mb-4 flex items-center gap-2">
+                    <i class="fa-solid fa-folder-plus text-blue-600"></i> Folder Baru
+                </h3>
+                <input v-model="newFolderName" type="text" placeholder="Nama Folder"
+                    class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium outline-none focus:bg-white focus:border-blue-600 mb-6 transition-all">
+                <div class="flex justify-end gap-2">
+                    <button @click="showAddFolderModal = false" class="px-4 py-2 text-slate-500 hover:bg-slate-100 rounded-full text-xs font-semibold transition-colors">Batal</button>
+                    <button @click="handleCreateFolder" class="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-full text-xs font-semibold shadow-sm transition-colors">Buat</button>
+                </div>
+            </div>
+        </div>
+
+        <div v-if="showAssignModal" class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+            <div class="bg-white rounded-3xl shadow-xl w-full max-w-md p-6 border border-slate-100">
+                <h3 class="text-base font-semibold text-slate-800 mb-1">Pindahkan Folder</h3>
+                <p class="text-xs text-slate-500 mb-4" v-if="selectedItemForFolder">
+                    Item: <strong class="text-slate-700 font-semibold">{{ selectedItemForFolder.nama }}</strong> ({{ selectedItemForFolder.kode }})
+                </p>
+
+                <select v-model="selectedTargetFolderId" class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium outline-none focus:bg-white focus:border-blue-600 mb-6">
+                    <option value="">-- Tanpa Folder (Unassigned) --</option>
+                    <option v-for="f in catalog.folders.value" :key="f.id" :value="f.id">{{ f.nama }}</option>
+                </select>
+
+                <div class="flex justify-end gap-2">
+                    <button @click="showAssignModal = false" class="px-4 py-2 text-slate-500 hover:bg-slate-100 rounded-full text-xs font-semibold transition-colors">Batal</button>
+                    <button @click="executeAssignFolder" class="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-full text-xs font-semibold shadow-sm transition-colors">Simpan</button>
+                </div>
+            </div>
+        </div>
 
     </div>   
 
