@@ -39,10 +39,12 @@ export const addPhoto = async (kode, photoUrl, driveFileId) => {
 };
 
 export const deletePhoto = async (id) => {
-    const { error } = await supabaseClient
+    const { data, error } = await supabaseClient
         .from("inventory_photos")
         .delete()
-        .eq("id", id);
+        .eq("id", id)
+        .select()
+        .single();
 
     if (error) throw error;
     return true;
