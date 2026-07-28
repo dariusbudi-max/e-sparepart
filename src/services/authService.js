@@ -55,7 +55,7 @@ export const register = async (payload, deviceInfo) => {
             password: payload.password,
             role: "VIEWER",
             status: "PENDING",
-            can_preview_photo: false,
+            permissions:{},
             device_id: deviceInfo.device_id,
             device_name: deviceInfo.device_name
         }])
@@ -92,7 +92,7 @@ export const validateSession = async (username) => {
             nama,
             role,
             status,
-            can_preview_photo,
+            permissions,
             session_token,
             device_id,
             device_name,
