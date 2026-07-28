@@ -7,13 +7,15 @@ import {
 	approveUser,
 	toggleUserStatus,
 	updateUserRole,
-	togglePhotoAccess,
+	updateUserPermission
 } from "../services/userService.js";
 
 export function useUsers({ userData, loading, showToast, closeUserModal }) {
 	const adminUsers = ref([]);
 	const isSubmitting = ref(false);
 	const userSearchQuery = ref("");
+	const selectedPermissionUser = ref(null);
+	const showPermissionModal = ref(false);
 
 	/* ================= LOAD USERS ================= */
 
@@ -40,6 +42,7 @@ export function useUsers({ userData, loading, showToast, closeUserModal }) {
 				username: newUser.username,
 				password: newUser.password,
 				role: newUser.role,
+				permissions: {}
 			};
 
 			const createdUser = await createUser(payload);
@@ -106,35 +109,33 @@ export function useUsers({ userData, loading, showToast, closeUserModal }) {
 		}
 	};
 
-	/* ================= PHOTO ACCESS ================= */
-
-	const handleTogglePhotoAccess = async (user, value) => {
-
-		const oldValue = user.can_preview_photo;
+	const handleTogglePermission = async (user, permission, value) => {
+		const oldPermissions = { ...(user.permissions || {}) };
 
 		try {
+			user.permissions = {
+				...oldPermissions,
+				[permission]: value
+			};
 
-			user.can_preview_photo = value;
+			const updated = await updateUserPermission(user.username, permission, value);
 
-			await togglePhotoAccess(
-				user.username,
-				value
-			);
+			user.permissions = { ...(updated.permissions || {}) };
 
-			showToast(
-				"Akses foto berhasil diubah",
-				"success"
-			);
-
+			showToast("Permission berhasil diperbarui", "success");
 		} catch (err) {
-
-			user.can_preview_photo = oldValue;
-
-			showToast(
-				err.message,
-				"error"
-			);
+			user.permissions = oldPermissions;
+			showToast(err.message, "error");
 		}
+	};
+
+	const openPermissionModal = (user) => {
+		if (!user.permissions) {
+			user.permissions = {};
+		}
+
+		selectedPermissionUser.value = user;
+		showPermissionModal.value = true;
 	};
 
 	/* ================= FILTER & COMPUTED ================= */
@@ -168,6 +169,9 @@ export function useUsers({ userData, loading, showToast, closeUserModal }) {
 		toggleUser,
 		handleUpdateUserRole,
 		approveWithRole,
-		handleTogglePhotoAccess,
+		handleTogglePermission,
+		selectedPermissionUser,
+		showPermissionModal,
+		openPermissionModal
 	};
 }
