@@ -38,7 +38,7 @@ export function useAuth({
 				username: user.username,
 				nama: user.nama,
 				role: user.role,
-				can_preview_photo: user.can_preview_photo,
+				permissions:user.permissions || {},
 				session_token: sessionToken,
 			};
 
@@ -161,7 +161,7 @@ export function useAuth({
 				username: freshUser.username,
 				nama: freshUser.nama,
 				role: freshUser.role,
-				can_preview_photo: freshUser.can_preview_photo,
+				permissions:freshUser.permissions || {},
 				device_id: deviceId,
 				device_name: deviceName,
 				session_token: parsed.session_token
@@ -197,7 +197,7 @@ export function useAuth({
 			username: "",
 			nama: "",
 			role: "",
-			can_preview_photo: false
+			permissions:{}
 		};
 
 		localStorage.removeItem("wms_user");
