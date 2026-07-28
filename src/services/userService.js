@@ -83,22 +83,22 @@ export const updateUserRole = async (username, role) => {
     return handleResponse(res);
 };
 
-export const togglePhotoAccess = async (username, value) => {
-
+export const updateUserPermission = async (username, permission, value) => {
     const user = await getUserByUsername(username);
 
-    if (user.role === "ADMIN") {
-        throw new Error("Akses foto ADMIN tidak boleh diubah");
-    }
+    const permissions = {
+        ...(user.permissions || {}),
+        [permission]: value,
+    };
 
-    const res = await supabaseClient
+    const { data, error } = await supabaseClient
         .from("users")
-        .update({
-            can_preview_photo: value
-        })
+        .update({ permissions })
         .eq("username", username)
         .select()
         .single();
 
-    return handleResponse(res);
+    if (error) throw error;
+
+    return data;
 };
