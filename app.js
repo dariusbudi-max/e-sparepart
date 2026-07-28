@@ -1,6 +1,43 @@
+import { supabaseClient } from "./api/supabase.js";
+import { callAPI } from "./api/gas.js";
+
+import { useAuth } from "./composables/useAuth.js";
+import { useUsers } from "./composables/useUsers.js";
+import { useAcl } from "./composables/useAcl.js";
+import { PERMISSION } from "./constants/permissions.js";
+import { ACCESS_PERMISSIONS } from "./constants/accessPermissions.js";
+import { canAccessPage } from "./constants/pagePermissions.js";
+
+import { useInventory } from "./composables/useInventory.js";
+import { searchInventory } from "./services/inventoryService.js";
+import { fetchPhotos, deletePhoto, setCoverPhoto, updatePhotoOrder } from "./services/inventoryPhotoService.js";
+import { useCatalog } from "./composables/useCatalog.js";
+
+import { useScrapMonitoring } from "./composables/useScrapMonitoring.js";
+
+import { createWatermarkedImage } from "./utils/photoProcessor.js";
+import { fixDriveUrl } from "./utils/imageUtils.js";
+import { useUploadPhoto } from "./composables/useUploadPhoto.js";
+import { useCamera } from "./composables/useCamera.js";
+import { deleteFromDrive } from "./services/driveService.js";
+
+import { useTransaction } from "./composables/useTransaction.js";
+import { useImportTx } from "./composables/useImportTx.js";
+import { useScanner } from "./composables/useScanner.js";
+import { processTransaction } from "./services/transactionService.js";
+import { isStockInsufficient, getMasterStock } from "./utils/inventoryHelper.js";
+import { validateRows } from "./utils/validator.js";
+import { cleanKode } from "./utils/cleaner.js";
+import { useCancelTransaction } from "./composables/useCancelTransaction.js";
+
+import { useSafeFetch } from "./composables/useSafeFetch.js";
+import { useAnalytics } from "./composables/useAnalytics.js";
+import { useOpname } from "./composables/useOpname.js";
+import { useDashboard } from "./composables/useDashboard.js";
+import { exportDashboardExcel, exportInventoryExcel, exportLowStockExcel, exportOpnameExcel, exportScrapExcel } from "./exports/excelExport.js";
+
 
 const { createApp, ref, computed, onMounted, watch, reactive, nextTick } = Vue;
-const GAS_URL = "https://script.google.com/macros/s/AKfycbxgLvu6EiCVv6Kw9XkPcClC-oxj9ASvbgWAAPA52SPVszfJPgvpntGobcmz3gKq360IdA/exec"; // Ganti dengan URL GAS Anda
 
 createApp({
     setup() {
@@ -14,30 +51,39 @@ createApp({
         const loading = ref(false);
         const page = ref('dashboard');
         const sidebarOpen = ref(false);
+        const toast = ref({ show: false, message: '', type: 'success' });
+        const showToast = (msg, type) => {
+            toast.value = { show: true, message: msg, type: type };
+            setTimeout(() => { toast.value.show = false; }, 3000);
+        };
 
         const showUserModal = ref(false);
-        const isSubmitting = ref(false);
+
         const loginData = ref({ username: '', password: '' });
         const userData = ref({ username: '', nama: '', role: '', canPreviewPhoto: false });
-        const userToken = ref('');
-        const adminUsers = ref([]);
-        const userSearchQuery = ref('');
+        const isAdminView = ref(false);
         const newUser = reactive({ nama: '', username: '', password: '', role: 'VIEWER' });
         const showRegisterModal = ref(false);
-        const regData = ref({ nama: '', username: '', password: '' });
+        const regData = reactive({ nama: '', username: '', password: '' });
         const showProfileModal = ref(false);
         const loadingProfile = ref(false);
         const profileForm = reactive({ nama: '', password: '' });
 
-        const inventory = ref([]);
-        const inventorySearch = ref('');
-        const categoryFilter = ref('all');
-        const stockFilter = ref('available');
-        const departments = ref([]);
+        const lastQuery = ref('');
+        const searchCache = ref({});
+        const isExporting = ref(false);
 
-        const lowStockItems = ref([]);
+        const isServerMode = ref(false);
+        const selectedRow = ref(null);
+
+        const isCameraActive = ref(false);
+        const videoFeed = ref(null);
+
+        const historySearch = ref('');
+
         const showLowStock = ref(false);
         const summarySppItems = ref([]);
+        const catatanSpp = ref([]);
         const inputKodeManual = ref('');
         const noSPP = ref("SPT-" + new Date().getTime());
         const sppSign = ref({
@@ -47,15 +93,22 @@ createApp({
             disetujui: 'Asyiriah'
         });
 
-        const previewImage = ref(null);
-        const scannerActive = ref(false);
+        const photoPreview = ref(null);
+        const previewSource = ref(null);
+        const showImportMode = ref(false);
+        const previewGallery = ref({
+            show: false,
+            photos: [],
+            current: 0
+        });
+        const photoUrlInput = ref("");
+        const isDragOver = ref(false);
+        const dragCounter = ref(0);
 
-        const cart = ref([]);
-        const showCart = ref(false);
-        const txType = ref('KELUAR');
-        const txDept = ref('');
-        const txNote = ref('');
-        const inputQty = ref('');
+        const showImport = ref(false);
+        const csvPreview = ref([]);
+        const showPreview = ref(false);
+
         const reservasiItems = ref([]);
         const showPopupDetail = ref(false);
         const selectedItem = ref(null);
@@ -71,79 +124,57 @@ createApp({
 
         const qtyInputRef = ref(null);
         const searchInputRef = ref(null);
-        const cancellingId = ref(null);
+        const showScrapInput = ref(false);
 
-        const dashData = ref({ totalItem: 0, totalStok: 0, selisihOpname: 0, totalLowStock: 0 });
-        const dashFilter = ref({ startDate: '', endDate: '', dept: '', type: 'ALL' });
-        const recentTx = ref([]);
+        const isRefreshing = ref(false);
+        const pivotRawTx = ref([]);
 
         const showItemModal = ref(false);
         const isEditMode = ref(false);
         const formItem = ref({
-            kode: '',
-            nama: '',
-            satuan: '',
-            lokasi: '',
-            kategori: '',
-            foto: '',
-            minStok: 0,
-            status: 'AKTIF'
+            kode: "",
+            nama: "",
+            satuan: "",
+            lokasi: "",
+            category: "",
+            photos: [],
+            selectedPhoto: null,
+            min_stok: 0,
+            status: "AKTIF"
         });
         const showLocationModal = ref(false);
-        const locationForm = ref({ kode: '', nama: '', foto: '', lokasi: '' });
+        const locationForm = ref({ kode: '', nama: '', lokasi: '' });
+        const showImportModal = ref(false);
+        const importStep = ref(1);
+        const rawExcelInput = ref("");
+        const parsedItems = ref([]);
+        const isImporting = ref(false);
+
         const fileInput = ref(null);
-        const isCameraActive = ref(false);
-        const videoFeed = ref(null);
         const isUploading = ref(false);
         const showPhotoModal = ref(false);
-        let streamInstance = null;
 
-        const searchQuery = ref('');
         const userRole = ref('ADMIN');
-        const toast = ref({
-            show: false,
-            message: '',
-            type: 'success'
-        });
-        const filterLocation = ref('');
+
+        const showAddFolderModal = ref(false);
+        const newFolderName = ref("");
+        const showAssignModal = ref(false);
+        const selectedItemForFolder = ref(null);
+        const selectedTargetFolderId = ref("");
+        const showFolderMenu = ref(false);
+
         const sortKey = ref('');
         const sortOrder = ref(1);
         const showPass = ref(false);
         const showPassword = ref(false);
-
         const showScanner = ref(false);
         let html5QrCode = null;
-        let dashboardInterval = null;
-        let inventoryInterval = null;
+        let isScanning = false;
+        let searchTimer = null;
 
-        const callAPI = async (action, payload = {}, overrideToken = null) => {
-            loading.value = true;
-            try {
-                const response = await fetch(GAS_URL, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'text/plain' },
-                    body: JSON.stringify({
-                        action,
-                        token: overrideToken || localStorage.getItem('token'),
-                        payload
-                    })
-                });
-
-                const res = await response.json();
-
-                if (res.status === 'error' && res.message === 'INVALID_SESSION') {
-                    alert("Sesi Anda berakhir karena Anda telah login di perangkat lain.");
-                    handleLogout(); // Otomatis tendang ke halaman login
-                    return res;
-                }
-
-                return res;
-            } catch (e) {
-                console.error("API Error", e);
-                return { status: 'error', message: 'Koneksi gagal' };
-            } finally {
-                loading.value = false;
-            }
+        const navigate = (target) => {
+            page.value = target
+            sidebarOpen.value = false
         };
 
         const openUserModal = () => {
@@ -158,919 +189,120 @@ createApp({
             showUserModal.value = false;
         };
 
-        const submitNewUser = async () => {
-            if (!newUser.nama || !newUser.username || !newUser.password) {
-                alert('Harap isi Nama, Username, dan Password!');
-                return;
-            }
+        const openEditProfile = () => {
+            showPass.value = false;
 
-            isSubmitting.value = true;
+            profileForm.nama = userData.value.nama;
+            profileForm.password = "";
 
-            try {
-                // Struktur payload ini harus sesuai dengan case 'ADMIN_MANAGE_USER' di doPost
-                const requestPayload = {
-                    targetUser: newUser.username,
-                    manageAction: 'ADD',
-                    payload: {
-                        nama: newUser.nama,
-                        password: newUser.password,
-                        role: newUser.role
-                    }
-                };
-
-                // Menggunakan callAPI (Pastikan callAPI mengirimkan token di level atas JSON)
-                const res = await callAPI('ADMIN_MANAGE_USER', requestPayload);
-
-                if (res && res.status === 'success') {
-                    // Update tabel secara lokal (Optimistic)
-                    adminUsers.value.unshift({
-                        nama: newUser.nama,
-                        username: newUser.username,
-                        role: newUser.role,
-                        status: 'AKTIF',
-                        canPreviewPhoto: false,
-                        deviceInfo: ''
-                    });
-
-                    closeUserModal();
-                    alert('User berhasil ditambahkan!');
-                } else {
-                    alert('Gagal: ' + (res?.message || 'Server Error'));
-                }
-            } catch (error) {
-                console.error(error);
-                alert('Terjadi kesalahan koneksi.');
-            } finally {
-                isSubmitting.value = false;
-            }
+            showProfileModal.value = true;
         };
 
-        const handleRegister = async () => {
-            // 1. Validasi Input Kosong
-            if (!regData.value.nama || !regData.value.username || !regData.value.password) {
-                showToast("Harap isi semua bidang pendaftaran!", "error");
-                return;
-            }
-
-            // 2. Validasi Minimal 6 Digit Password
-            if (regData.value.password.length < 6) {
-                showToast("Password minimal harus 6 karakter!", "error");
-                return;
-            }
-
-            loading.value = true;
-
-            try {
-                // Membersihkan input (opsional tapi sangat disarankan)
-                const payload = {
-                    nama: regData.value.nama.trim(),
-                    username: regData.value.username.trim().toLowerCase(), // Username dipaksa huruf kecil
-                    password: regData.value.password
-                };
-
-                const res = await callAPI('REGISTER', payload);
-
-                if (res.status === 'success') {
-                    showToast("Pendaftaran berhasil! Tunggu approval Vickey.", "success");
-
-                    // Tutup modal dan reset form
-                    showRegisterModal.value = false;
-                    regData.value = { nama: '', username: '', password: '' };
-                } else {
-                    // Misal: Username sudah ada
-                    showToast(res.message || "Pendaftaran gagal.", "error");
-                }
-            } catch (err) {
-                console.error("Reg Error:", err);
-                showToast("Terjadi kesalahan koneksi. Silakan coba lagi.", "error");
-            } finally {
-                loading.value = false;
-            }
+        const openAddModal = () => {
+            isEditMode.value = false;
+            formItem.value = { kode: '', nama: '', satuan: '', lokasi: '', category: '', photos: [], selectedPhoto: null, min_stok: 0, status: 'AKTIF' };
+            showItemModal.value = true;
         };
 
-        const handleLogin = async () => {
-            if (!loginData.value.username || !loginData.value.password) {
-                showToast("Username dan password harus diisi!", "error");
-                return;
-            }
-
-            loading.value = true;
-
-            try {
-                const deviceInfo = getDeviceInfo();
-                const res = await callAPI('LOGIN', {
-                    ...loginData.value,
-                    deviceInfo: deviceInfo
-                });
-
-                if (res.status === 'success') {
-                    // 1. Simpan Token & Update State Global
-                    localStorage.setItem('token', res.token);
-                    userToken.value = res.token;
-
-                    userData.value = {
-                        nama: res.nama,
-                        role: res.role,
-                        canPreviewPhoto: String(res.canPreviewPhoto).toUpperCase() === 'TRUE'
-                    };
-
-                    await fetchAllData(res.token);
-
-                    isLoggedIn.value = true;
-                    page.value = ROLE_LANDING_PAGE[res.role] || 'inventory';
-
-                    showToast(`Selamat datang, ${res.nama}!`, "success");
-
-                    loginData.value = { username: '', password: '' };
-
-                } else {
-                    showToast(res.message, "error");
-                }
-            } catch (err) {
-                console.error("Login Error:", err);
-                showToast("Terjadi kesalahan koneksi saat login.", "error");
-            } finally {
-                loading.value = false;
-            }
-        };
-
-        const getDeviceInfo = () => {
-            const ua = navigator.userAgent;
-            let device = "Unknown Device";
-
-            // 1. Deteksi Android & Versinya
-            if (/android/i.test(ua)) {
-                const match = ua.match(/Android\s([0-9\.]+)/);
-                const version = match ? match[1] : "";
-                device = `Android ${version}`;
-            }
-            // 2. Deteksi iOS (iPhone/iPad)
-            else if (/iPhone|iPad|iPod/i.test(ua)) {
-                const match = ua.match(/OS\s([0-9\_]+)/);
-                const version = match ? match[1].replace(/_/g, '.') : "";
-                const model = /iPhone/.test(ua) ? "iPhone" : "iPad";
-                device = `${model} (iOS ${version})`;
-            }
-            // 3. Deteksi PC (Windows/Mac/Linux)
-            else if (/Windows/i.test(ua)) {
-                const match = ua.match(/Windows\sNT\s([0-9\.]+)/);
-                let winVer = match ? match[1] : "";
-                // Mapping versi Windows NT ke versi publik
-                const winMap = { "10.0": "10/11", "6.3": "8.1", "6.2": "8", "6.1": "7" };
-                device = `Windows ${winMap[winVer] || winVer}`;
-            }
-            else if (/Macintosh/i.test(ua)) device = "Mac OS";
-            else if (/Linux/i.test(ua)) device = "Linux PC";
-
-            // 4. Deteksi Browser
-            const browser = /Edg/i.test(ua) ? "Edge" :
-                /Chrome/i.test(ua) ? "Chrome" :
-                    /Safari/i.test(ua) ? "Safari" :
-                        /Firefox/i.test(ua) ? "Firefox" : "Browser";
-
-            return `${device} - ${browser}`;
-        };
-
-        const fetchAllData = async (silent = false) => {
-            if (!silent) loading.value = true;
-            try {
-                const [resBase, resInventory, resDash, resLow] = await Promise.all([
-                    callAPI('GET_INITIAL_DATA'),
-                    callAPI('ADMIN_GET_ITEMS'),
-                    callAPI('GET_DASHBOARD', {
-                        filterType: dashFilter.value.type,
-                        dateStart: dashFilter.value.start,
-                        dateEnd: dashFilter.value.end,
-                        dept: dashFilter.value.dept
-                    }),
-                    callAPI('GET_LOW_STOCK_PR', {}) // Panggil di sini agar data standby
-                ]);
-
-                // 1. Metadata
-                if (resBase?.status === 'success') {
-                    departments.value = resBase.departments || [];
-                    categoryOptions.value = resBase.categories || [];
-                }
-
-                // 2. Inventory
-                if (resInventory?.status === 'success') {
-                    inventory.value = (resInventory.data || []).map(i => ({
-                        ...i,
-                        stok: Number(i.stok) || 0,
-                        minStok: Number(i.minStok) || 0,
-                        imgFailed: false
-                    }));
-                }
-
-                // 3. Dashboard & Recent Transactions
-                if (resDash) {
-                    dashData.value = {
-                        totalItem: resDash.totalItem,
-                        totalStok: resDash.totalStok,
-                        totalLowStock: resDash.totalLowStock,
-                        selisihOpname: resDash.selisihOpname
-                    };
-                    recentTx.value = resDash.recentTx || [];
-                }
-
-                // 4. Low Stock PR (SIMPAN DI SINI)
-                if (resLow) {
-                    // Langsung filter data aktif agar modal tinggal pakai
-                    const rawData = Array.isArray(resLow) ? resLow : (resLow.data || []);
-                    lowStockItems.value = rawData.filter(i =>
-                        (i.status || 'AKTIF').toUpperCase() === 'AKTIF'
-                    );
-                }
-
-            } catch (err) {
-                console.error("FetchAllData error:", err);
-            }
-        };
-
-        const fetchInventory = async () => {
-            try {
-                const res = await callAPI('ADMIN_GET_ITEMS');
-
-                if (res && res.status === 'success' && Array.isArray(res.data)) {
-                    inventory.value = res.data.map(i => ({
-                        ...i,
-                        stok: Number(i.stok) || 0,
-                        minStok: Number(i.minStok) || 0,
-                        imgFailed: false
-                    }));
-                } else {
-                    console.error("Gagal load inventory:", res?.message || "Format data salah");
-                }
-            } catch (err) {
-                console.error("Inventory error:", err);
-            }
-        };
-
-        const fetchDashboard = async () => {
-            try {
-                const res = await callAPI('GET_DASHBOARD', {
-                    filterType: dashFilter.value.type,
-                    dateStart: dashFilter.value.start,
-                    dateEnd: dashFilter.value.end,
-                    dept: dashFilter.value.dept
-                });
-
-                if (!res) return;
-
-                dashData.value = {
-                    totalItem: res.totalItem,
-                    totalStok: res.totalStok,
-                    totalLowStock: res.totalLowStock,
-                    selisihOpname: res.selisihOpname
-                };
-
-                // update hanya jika berubah
-                if (JSON.stringify(recentTx.value) !== JSON.stringify(res.recentTx)) {
-                    recentTx.value = res.recentTx;
-                }
-
-            } catch (err) {
-                console.error("Dashboard error:", err);
-            }
-        };
-
-        const fetchLowStock = async () => {
-            showLowStock.value = true;
-        };
-
-        const stockRules = {
-            available: qty => qty > 0,
-            empty: qty => qty === 0,
-            all: () => true
-        };
-
-        const openUpdateFoto = (item) => {
+        const editItem = (item) => {
+            isEditMode.value = true;
             formItem.value = {
                 kode: item.kode,
                 nama: item.nama,
-                foto: item.foto
+                satuan: item.satuan,
+                lokasi: item.lokasi,
+                category: item.category,
+                min_stok: item.min_stok,
+                status: item.status,
+
+                photos: item.inventory_photos
+                    ? [...item.inventory_photos]
+                    : [],
+
+                selectedPhoto: item.inventory_photos?.find(x => x.is_cover)
+                    || item.inventory_photos?.[0]
+                    || null
+
             };
-            showPhotoModal.value = true;
+            showItemModal.value = true;
         };
 
-        const closePhotoModal = () => {
-            stopCamera();
-            showPhotoModal.value = false;
-            loading.value = false;
-        };
-
-        const savePhotoOnly = async () => {
-            loading.value = true;
-            try {
-                // Sesuaikan dengan struktur doPost Anda: { action, payload, token }
-                const res = await callAPI('STAFF_SAVE_PHOTO', {
-                    kode: formItem.value.kode,
-                    foto: formItem.value.foto,
-                    nama: formItem.value.nama // Optional hanya untuk log
-                });
-
-                if (res.status === 'success') {
-                    alert(res.message);
-                    showPhotoModal.value = false;
-
-                    // Refresh data agar foto langsung muncul di tabel utama
-                    // Gunakan action yang sudah ada di doPost Anda
-                    const result = await callAPI('ADMIN_GET_ITEMS');
-                    if (result) {
-                        inventory.value = result.data || result;
-                    }
-                } else {
-                    alert("Gagal: " + res.message);
-                }
-            } catch (err) {
-                console.error(err);
-                alert("Terjadi kesalahan sistem saat menyimpan foto.");
-            } finally {
-                loading.value = false;
-            }
-        };
-
-        const startLiveCamera = async () => {
-            try {
-                isCameraActive.value = true;
-
-                const constraints = {
-                    video: {
-                        facingMode: "environment", // Gunakan kamera belakang
-                        width: { ideal: 1280 },    // Resolusi ideal agar detail
-                        height: { ideal: 720 }
-                    },
-                    audio: false
-                };
-
-                streamInstance = await navigator.mediaDevices.getUserMedia(constraints);
-
-                if (videoFeed.value) {
-                    videoFeed.value.srcObject = streamInstance;
-
-                    // --- LOGIKA AUTO FOCUS ---
-                    const track = streamInstance.getVideoTracks()[0];
-                    const capabilities = track.getCapabilities();
-
-                    // Cek apakah perangkat mendukung Focus Mode
-                    if (capabilities.focusMode && capabilities.focusMode.includes('continuous')) {
-                        await track.applyConstraints({
-                            advanced: [{ focusMode: 'continuous' }]
-                        });
-                        console.log("Auto-focus kontinu diaktifkan");
-                    }
-                }
-            } catch (err) {
-                console.error("Kamera Error:", err);
-                alert("Izin kamera ditolak browser.");
-                isCameraActive.value = false;
-            }
-        };
-
-        const stopCamera = () => {
-            if (streamInstance) {
-                streamInstance.getTracks().forEach(track => track.stop());
-                streamInstance = null;
-            }
-            isCameraActive.value = false;
-        };
-
-        const takeSnapshot = () => {
-            const video = videoFeed.value;
-            if (!video) return;
-
-            const canvas = document.createElement('canvas');
-            canvas.width = video.videoWidth;
-            canvas.height = video.videoHeight;
-            const ctx = canvas.getContext('2d');
-            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-
-            stopCamera();
-            const base64Murni = canvas.toDataURL('image/jpeg', 0.8).split(',')[1];
-            processAndUpload(base64Murni);
-        };
-
-        const processAndUpload = async (base64Clean) => {
-            isUploading.value = true; // Aktifkan Overlay
-            try {
-                const res = await callAPI('UPLOAD_TO_DRIVE', {
-                    file: base64Clean,
-                    filename: `IMG_${formItem.value.kode || 'NEW'}_${Date.now()}.jpg`,
-                    mimeType: 'image/jpeg'
-                });
-
-                if (res.status === 'success') {
-                    formItem.value.foto = res.url;
-                    console.log("Upload Berhasil:", res.url);
-                } else {
-                    alert("Gagal: " + res.message);
-                }
-            } catch (err) {
-                console.error(err);
-                alert("Koneksi ke GAS terputus.");
-            } finally {
-                isUploading.value = false; // Matikan Overlay
-            }
-        };
-
-        const handleFileUpload = async (event) => {
-            const file = event.target.files[0];
-            if (!file) return;
-
-            isUploading.value = true;
-            const reader = new FileReader();
-
-            reader.onload = async (e) => {
-                const img = new Image();
-                img.src = e.target.result;
-
-                img.onload = async () => {
-                    // --- LOGIKA KOMPRESI GAMBAR ---
-                    const canvas = document.createElement('canvas');
-                    let width = img.width;
-                    let height = img.height;
-
-                    // Batasi maksimal resolusi 1024px agar upload ringan
-                    const MAX_SIZE = 1024;
-                    if (width > height) {
-                        if (width > MAX_SIZE) {
-                            height *= MAX_SIZE / width;
-                            width = MAX_SIZE;
-                        }
-                    } else {
-                        if (height > MAX_SIZE) {
-                            width *= MAX_SIZE / height;
-                            height = MAX_SIZE;
-                        }
-                    }
-
-                    canvas.width = width;
-                    canvas.height = height;
-                    const ctx = canvas.getContext('2d');
-                    ctx.drawImage(img, 0, 0, width, height);
-
-                    // Convert ke Base64 dengan kualitas 0.7 (70%)
-                    const compressedBase64 = canvas.toDataURL('image/jpeg', 0.7).split(',')[1];
-                    // --- END KOMPRESI ---
-
-                    try {
-                        console.log("Memulai upload ke GAS...");
-                        const res = await callAPI('UPLOAD_TO_DRIVE', {
-                            file: compressedBase64,
-                            filename: `IMG_${formItem.value.kode || 'NEW'}_${Date.now()}.jpg`,
-                            mimeType: 'image/jpeg'
-                        });
-
-                        if (res.status === 'success') {
-                            // Update link foto di form
-                            formItem.value.foto = res.url;
-                            console.log("Upload Sukses:", res.url);
-                        } else {
-                            alert("Gagal upload ke Drive: " + res.message);
-                        }
-                    } catch (err) {
-                        console.error("Fetch Error:", err);
-                        alert("Terjadi kesalahan koneksi ke server GAS.");
-                    } finally {
-                        isUploading.value = false;
-                        // Penting: Reset input file agar bisa pilih file yang sama lagi
-                        event.target.value = '';
-                    }
-                };
+        const openUpdateLocation = (item) => {
+            locationForm.value = {
+                kode: item.kode,
+                nama: item.nama,
+                lokasi: item.lokasi
             };
-            reader.readAsDataURL(file);
+            showLocationModal.value = true;
         };
 
-        const launchGallery = () => {
-            if (fileInput.value) {
-                fileInput.value.click();
+        const paginatedItems = computed(() => {
+            const items = reservasiItems.value || [];
+
+            const pages = [];
+            for (let i = 0; i < items.length; i += itemsPerPage) {
+                pages.push(items.slice(i, i + itemsPerPage));
             }
-        };
 
-        const closeModal = () => {
-            if (isCameraActive.value) stopCamera();
-            isUploading.value = false;
-            showItemModal.value = false;
-        };
-
-        const removePhoto = () => {
-            if (confirm("Hapus foto produk ini?")) {
-                formItem.value.foto = '';
-            }
-        };
-
-        const fixDriveUrl = (url) => {
-            if (!url) return "https://placehold.co/400x400?text=No+Image";
-            const strUrl = String(url);
-            let fileId = "";
-            if (strUrl.includes("drive.google.com")) {
-                if (strUrl.includes("/d/")) {
-                    fileId = strUrl.split("/d/")[1].split("/")[0];
-                } else if (strUrl.includes("id=")) {
-                    fileId = strUrl.split("id=")[1].split("&")[0];
-                }
-                if (fileId) return "https://lh3.googleusercontent.com/d/" + fileId;
-            }
-            return strUrl;
-        };
-
-        const togglePhotoAccess = async (user, isChecked) => {
-            const original = user.canPreviewPhoto;
-            user.canPreviewPhoto = isChecked;
-            const res = await callAPI('ADMIN_UPDATE_PHOTO_ACCESS', {
-                targetUser: user.username,
-                canPreviewPhoto: isChecked
-            });
-            if (res.status !== 'success') {
-                user.canPreviewPhoto = original;
-                alert(res.message);
-            }
-        };
-
-        watch(page, (newPage) => {
-            if (newPage === 'transaksi') {
-                nextTick(() => {
-                    setTimeout(() => {
-                        if (qtyInputRef.value) qtyInputRef.value.focus();
-                    }, 300); // Beri jeda sedikit agar transisi halaman selesai
-                });
-            }
+            return pages.length ? pages : [[]];
         });
 
-        watch(showLowStock, (val) => {
-            if (val === true) {
-                fetchLowStock()
-            }
+        const reservasiMeta = reactive({
+            department: userData.value?.department || '',
+            tanggal: new Date().toISOString().substr(0, 10) // Default tanggal hari ini (YYYY-MM-DD)
         });
 
-        const showToast = (msg, type = 'success') => {
-            // Reset jika toast sedang tampil agar animasi terulang
-            toast.value.show = false;
-
-            setTimeout(() => {
-                toast.value = {
-                    show: true,
-                    message: msg,
-                    type: type
-                };
-            }, 10);
-
-            // Otomatis tutup setelah 3 detik
-            setTimeout(() => {
-                toast.value.show = false;
-            }, 3000);
+        const bukaPopUpReservasi = (item) => {
+            selectedItem.value = item;
+            // Reset form ke default
+            formInput.qty = 1;
+            formInput.noMesin = '';
+            formInput.keterangan = '';
+            showPopupDetail.value = true;
         };
 
-        const navigate = (target) => {
-            page.value = target
-            sidebarOpen.value = false
-        };
+        const tambahkanKeForm = () => {
+            const item = selectedItem.value;
+            const exist = reservasiItems.value.find(i => i.kode === item.kode);
 
-        const setDefaultPageByRole = () => {
-            const role = userData.value.role
-
-            if (role === 'VIEWER') {
-                page.value = 'inventory'
+            if (exist) {
+                // Jika barang sudah ada di list, update nilainya
+                exist.qty += formInput.qty;
+                showToast(`Jumlah ${item.nama} berhasil diperbarui`, 'success');
             } else {
-                page.value = 'dashboard'
-            }
-        };
-
-        const calculateOrderQty = (item) => {
-            const min = Number(item.minStok) || 0;
-            const stok = Number(item.stok) || 0;
-            const target = min * 2;
-
-            return Math.max(target - stok, 0);
-        };
-
-        const processTx = async () => {
-            // 1. Validasi Dasar & Guard Clauses
-            if (cart.value.length === 0) return alert("Keranjang masih kosong!");
-
-            // Validasi Departemen hanya jika tipe adalah KELUAR, MASUK, atau RETURN (sesuaikan kebutuhan)
-            // OPNAME biasanya tidak butuh departemen
-            if (txType.value !== 'OPNAME' && (!txDept.value || !isDeptValid.value)) {
-                return alert("Departemen tujuan tidak valid atau belum dipilih!");
-            }
-
-            // 2. Validasi Stok (khusus KELUAR)
-            if (txType.value === 'KELUAR') {
-                const invalid = cart.value
-                    .map(cartItem => {
-                        const master = inventory.value.find(i => i.kode === cartItem.kode);
-                        const currentStock = master ? Number(master.stok) : 0;
-                        return Number(cartItem.qty) > currentStock
-                            ? `${cartItem.nama} (Stok: ${currentStock})`
-                            : null;
-                    })
-                    .filter(msg => msg !== null);
-
-                if (invalid.length) {
-                    return alert("Stok tidak mencukupi:\n\n" + invalid.join('\n'));
-                }
-            }
-
-            if (!confirm(`Proses ${txType.value} ${cart.value.length} item?`)) return;
-
-            // 3. Eksekusi API
-            loading.value = true; // Aktifkan UI Loading One UI Anda
-
-            try {
-                const payload = {
-                    jenis: txType.value,
-                    dept: txDept.value || '-',
-                    user: userData.value.nama || 'System',
-                    ket: txNote.value || '-',
-                    items: cart.value.map(i => ({
-                        kode: i.kode,
-                        nama: i.nama,
-                        qty: Number(i.qty)
-                    }))
-                };
-
-                const res = await callAPI('PROSES_TRANSAKSI_MULTI', payload);
-
-                if (res.status === 'success') {
-                    // 🔥 UPDATE STOK LOKAL (Optimistic Update)
-                    // Ini membuat aplikasi terasa instan tanpa menunggu fetch inventory selesai
-                    cart.value.forEach(item => {
-                        const inv = inventory.value.find(i => i.kode === item.kode);
-                        if (inv) {
-                            const qty = Number(item.qty);
-                            const current = Number(inv.stok);
-                            if (txType.value === 'KELUAR') inv.stok = current - qty;
-                            else if (txType.value === 'OPNAME') inv.stok = qty;
-                            else inv.stok = current + qty; // MASUK & RETURN
-                        }
-                    });
-
-                    showToast("Transaksi Berhasil!", "success");
-                    resetTransactionForm(); // Menutup modal keranjang
-
-                    await fetchAllData(true);
-
-                } else {
-                    showToast(res.message, "error");
-                }
-            } catch (err) {
-                console.error("Tx Error:", err);
-                showToast("Koneksi bermasalah", "error");
-            } finally {
-                loading.value = false; // Matikan loading screen
-            }
-        };
-
-        const openScanner = () => {
-            scannerActive.value = true;
-
-            nextTick(() => {
-                const readerElement = document.getElementById('reader');
-                if (!readerElement) {
-                    console.error("Elemen 'reader' belum siap di DOM.");
-                    return;
-                }
-
-                if (!html5QrCode) {
-                    html5QrCode = new Html5Qrcode("reader");
-                }
-
-                html5QrCode.start(
-                    { facingMode: "environment" },
-                    { fps: 15, qrbox: 250 },
-                    (txt) => {
-                        const item = inventory.value.find(i => i.kode === txt);
-
-                        if (item) {
-                            addToCartWithQty(item);
-                            closeScanner();
-                            console.log("Scan Berhasil: " + item.nama);
-                        } else {
-                            alert("Item Tidak Terdaftar: " + txt);
-                        }
-                    }
-                ).catch(err => {
-                    console.error("Gagal memulai kamera:", err);
-                    alert("Kamera tidak dapat diakses. Pastikan izin diberikan.");
-                });
-            });
-        };
-
-        const closeScanner = async () => {
-            if (html5QrCode) {
-                try {
-                    await html5QrCode.stop(); // Hentikan stream kamera
-                    scannerActive.value = false;
-                } catch (err) {
-                    console.error("Gagal menghentikan kamera:", err);
-                    scannerActive.value = false; // Tetap tutup modal jika error
-                }
-            } else {
-                scannerActive.value = false;
-            }
-        };
-
-        const focusSearch = () => {
-            if (inputQty.value > 0 && searchInputRef.value) searchInputRef.value.focus();
-        };
-
-        const addToCart = (item) => {
-            const exist = cart.value.find(c => c.kode === item.kode);
-            if (exist) { exist.qty += 1; }
-            else { cart.value.push({ ...item, qty: 1 }); }
-            showCart.value = false;
-        };
-
-        const addToCartWithQty = (item, customQty = null) => {
-            // 1. Tangkap jumlah input: prioritas argumen customQty, lalu inputQty, default 1
-            const rawInput = customQty !== null ? customQty : inputQty.value;
-            const jumlahInput = (rawInput === '' || rawInput <= 0) ? 1 : Number(rawInput);
-
-            const existingIndex = cart.value.findIndex(c => c.kode === item.kode);
-
-            if (existingIndex !== -1) {
-                // Jika sudah ada, tambahkan quantity-nya (Math addition, bukan string concatenation)
-                cart.value[existingIndex].qty += jumlahInput;
-            } else {
-                // Jika belum ada, buat entri baru
-                cart.value.push({
+                // Jika belum ada, push data baru
+                reservasiItems.value.push({
                     kode: item.kode,
                     nama: item.nama,
-                    stok: item.stok,
                     satuan: item.satuan,
-                    qty: jumlahInput
+                    qty: formInput.qty,
+                    noMesin: formInput.noMesin.toUpperCase(),
+                    keterangan: formInput.keterangan
                 });
+                showToast("Berhasil ditambahkan ke form permintaan", 'success');
             }
 
-            showCart.value = false; // Munculkan cart jika disembunyikan
-
-            // 2. Sentralisasi Reset Form
-            searchQuery.value = '';
-            inputQty.value = ''; // Reset kosong agar dihitung 1 pada scan berikutnya
-
-            // 3. Kembalikan kursor dengan aman
-            nextTick(() => {
-                if (qtyInputRef.value) qtyInputRef.value.focus();
-            });
+            showPopupDetail.value = false;
         };
 
-        const handleScan = () => {
-            const query = searchQuery.value?.toString().trim().toLowerCase();
-            if (!query) return;
-
-            const item = inventory.value.find(i => {
-                if (i.status !== 'AKTIF') return false;
-
-                const kode = i.kode?.toString().trim().toLowerCase();
-                const nama = i.nama?.toString().trim().toLowerCase();
-
-                return kode === query || nama === query;
-            });
-
-            if (!item) {
-                alert("Barang tidak ditemukan atau sudah dinonaktifkan!");
-                searchQuery.value = '';
+        const handlePrint = () => {
+            if (reservasiItems.value.length === 0) {
+                alert("Daftar permintaan masih kosong!");
                 return;
             }
-
-            addToCartWithQty(item);
+            window.print();
         };
 
-        const isStockInsufficient = (item) => {
-            if (txType.value !== 'KELUAR') return false;
-            const master = inventory.value.find(i => i.kode === item.kode);
-            return master ? item.qty > master.stok : true;
-        };
+        const chunkedSppItems = computed(() => {
+            const chunks = [];
+            const items = summarySppItems.value || [];
 
-        const getMasterStock = (kode) => {
-            const item = inventory.value.find(i => i.kode === kode);
-            return item ? item.stok : 0;
-        };
-
-        const removeFromCart = (kode) => {
-            cart.value = cart.value.filter(item => item.kode !== kode)
-        };
-
-        const resetTransactionForm = () => {
-            cart.value = [];
-            txNote.value = '';
-            searchQuery.value = '';
-            inputQty.value = '';
-
-            if (departments.value?.length > 0) {
-                txDept.value = departments.value[0];
-            } else {
-                txDept.value = '';
+            for (let i = 0; i < items.length; i += 17) {
+                chunks.push(items.slice(i, i + 17));
             }
 
-            txType.value = 'KELUAR';
-
-            if (typeof isDeptValid !== 'undefined') {
-                isDeptValid.value = true;
-            }
-        };
-
-        const startScanner = () => {
-            showScanner.value = true;
-
-            // Gunakan nextTick agar elemen #reader sudah ada di DOM sebelum diakses
-            nextTick(() => {
-                const readerElement = document.getElementById('reader');
-                if (!readerElement) {
-                    console.error("Elemen 'reader' tidak ditemukan.");
-                    return;
-                }
-
-                if (!html5QrCode) {
-                    html5QrCode = new Html5Qrcode("reader");
-                }
-
-                html5QrCode.start(
-                    { facingMode: "environment" },
-                    {
-                        fps: 15,
-                        qrbox: { width: 250, height: 150 }
-                    },
-                    (decodedText) => {
-                        // Masukkan hasil scan ke v-model inventorySearch
-                        inventorySearch.value = decodedText.trim();
-
-                        // Tutup scanner setelah berhasil
-                        stopScanner();
-
-                        // Getar singkat sebagai feedback
-                        if (navigator.vibrate) navigator.vibrate(100);
-                    }
-                ).catch(err => {
-                    console.error("Gagal kamera:", err);
-                    alert("Kamera tidak aktif. Pastikan izin diberikan.");
-                    showScanner.value = false;
-                });
-            });
-        };
-
-        const stopScanner = async () => {
-            if (html5QrCode && html5QrCode.isScanning) {
-                try {
-                    await html5QrCode.stop();
-                    html5QrCode.clear();
-                } catch (err) {
-                    console.warn("Gagal menghentikan stream:", err);
-                }
-            }
-            showScanner.value = false;
-        };
-
-        const getJenisClass = (jenis) => {
-            switch (jenis) {
-                case 'MASUK': return 'bg-emerald-50 text-emerald-700 border-emerald-100';
-                case 'KELUAR': return 'bg-rose-50 text-rose-700 border-rose-100';
-                case 'OPNAME': return 'bg-amber-50 text-amber-700 border-amber-100';
-                default: return 'bg-slate-50 text-slate-600 border-slate-100';
-            }
-        };
-
-        const tambahItemManualByKode = () => {
-            const kodeCari = inputKodeManual.value.trim().toUpperCase();
-            if (!kodeCari) return;
-
-            // 1. Cari di data master inventory (VLOOKUP)
-            const masterItem = inventory.value.find(i => i.kode.toUpperCase() === kodeCari);
-
-            if (masterItem) {
-                // 2. Cek Duplikasi (Jangan sampai barang yang sama masuk 2x)
-                const exists = summarySppItems.value.find(s => s.kode === masterItem.kode);
-
-                if (exists) {
-                    showToast("Barang ini sudah ada di dalam list SPP!");
-                    inputKodeManual.value = '';
-                    return;
-                }
-
-                // 3. Logika Perhitungan Qty (Sama dengan logika stok kritis)
-                const stokSekarang = Number(masterItem.stok || 0);
-                const batasMinimal = Number(masterItem.minStok || 0);
-                let saranQty = (batasMinimal * 2) - stokSekarang;
-                if (saranQty <= 0) saranQty = 1;
-
-                // 4. Masukkan ke list SPP
-                summarySppItems.value.push({
-                    kode: masterItem.kode || '-',
-                    nama: masterItem.nama || '-',
-                    satuan: masterItem.satuan || 'Pcs',
-                    stok: stokSekarang,
-                    qtyDiminta: saranQty,
-                    jmlPakai: 0,
-                    keterangan: ''
-                });
-
-                // 5. Bersihkan Input
-                inputKodeManual.value = '';
-
-            } else {
-                showToast("Kode Barang [" + kodeCari + "] tidak ditemukan di database!");
-            }
-        };
+            return chunks.length ? chunks : [[]];
+        });
 
         const tambahSemuaKeSpp = () => {
             if (lowStockItems.value.length === 0) {
@@ -1082,34 +314,31 @@ createApp({
             let duplicateCount = 0;
 
             lowStockItems.value.forEach(item => {
-                // 1. Cek Duplikasi
                 const exists = summarySppItems.value.find(s => s.kode === item.kode);
 
                 if (!exists) {
                     const stokSekarang = Number(item.stok || 0);
-                    const batasMinimal = Number(item.minStok || 0);
+                    const batasMinimal = Number(item.min_stok || 0);
 
-                    // 2. Hitung Saran Qty
                     let saranQty = (batasMinimal * 2) - stokSekarang;
                     if (saranQty <= 0) saranQty = 1;
 
-                    // 3. Push ke Summary
                     summarySppItems.value.push({
-                        kode: item.kode || '-',
-                        nama: item.nama || '-',
-                        satuan: item.satuan || 'Pcs',
+                        kode: item.kode,
+                        nama: item.nama,
+                        satuan: item.satuan,
                         stok: stokSekarang,
                         qtyDiminta: saranQty,
-                        jmlPakai: 0,
+                        jmlPakai: usageMap.value[item.kode] || 0,
                         keterangan: ''
                     });
+
                     count++;
                 } else {
                     duplicateCount++;
                 }
             });
 
-            // 4. Feedback & Navigasi menggunakan Toast
             if (count > 0) {
                 showToast(`Berhasil menambah ${count} item ke SPP`, "success");
                 showLowStock.value = false;
@@ -1119,15 +348,42 @@ createApp({
             }
         };
 
-        const chunkedSppItems = computed(() => {
-            const chunks = [];
-            const items = [...summarySppItems.value];
-            while (items.length > 0) {
-                chunks.push(items.splice(0, 17));
+        const tambahItemManualByKode = () => {
+            const kodeCari = inputKodeManual.value.trim().toUpperCase();
+            if (!kodeCari) return;
+
+            const masterItem = pivotData.value.find(i => i.kode.toUpperCase() === kodeCari);
+
+            if (masterItem) {
+                const exists = summarySppItems.value.find(s => s.kode === masterItem.kode);
+
+                if (exists) {
+                    showToast("Barang ini sudah ada di dalam list SPP!");
+                    inputKodeManual.value = '';
+                    return;
+                }
+
+                const stokSekarang = Number(masterItem.closing || 0);
+                const batasMinimal = Number(masterItem.min_stok || 0);
+
+                let saranQty = (batasMinimal * 2) - stokSekarang;
+                if (saranQty <= 0) saranQty = 1;
+
+                summarySppItems.value.push({
+                    kode: masterItem.kode,
+                    nama: masterItem.nama,
+                    satuan: masterItem.satuan || 'Pcs',
+                    stok: stokSekarang,
+                    qtyDiminta: saranQty,
+                    jmlPakai: usageMap.value[masterItem.kode] || 0,
+                    keterangan: ''
+                });
+
+                inputKodeManual.value = '';
+            } else {
+                showToast("Kode tidak ditemukan di data pivot!");
             }
-            // Jika benar-benar kosong, kasih array kosong agar minimal 1 kertas muncul
-            return chunks.length > 0 ? chunks : [[]];
-        });
+        };
 
         const removeItemSpp = (actualIndex) => {
             summarySppItems.value.splice(actualIndex, 1);
@@ -1145,9 +401,982 @@ createApp({
             }
         };
 
+
+        // MIGRASI KE SUPABASE
+        const {
+            adminUsers, isSubmitting, userSearchQuery, filteredAdminUsers,
+            pendingUsers, loadUsers, submitNewUser, handleDeleteUser,
+            toggleUser, handleUpdateUserRole, approveWithRole, handleTogglePermission, selectedPermissionUser,
+            showPermissionModal, openPermissionModal
+        } = useUsers({ userData, loading, showToast, closeUserModal });
+
+        ///====AUTH====///
+        const {
+            handleLogin, handleRegister, handleUpdateProfile, refreshSession, handleLogout
+        } = useAuth({
+            loading, loadingProfile, userData, isLoggedIn, page, showToast, refreshAllData, ROLE_LANDING_PAGE, showRegisterModal
+        });
+
+        const acl = useAcl(userData);
+        const { permissions, can, cannot, hasRole, canAny, canAll } = acl;
+
+        const previewPhoto = (item) => {
+            if (!can(PERMISSION.PHOTO_PREVIEW)) return;
+
+            openPreviewGallery(
+                item.inventory_photos || [],
+                item.kode
+            );
+        };
+
+        ///===INVENTORY===///
+        const inventory = useInventory({
+            showToast,
+            userRole,
+            userData
+        });
+
+        const saveItem = async () => {
+            try {
+                const data = await inventory.saveItem(formItem.value, isEditMode.value);
+
+                if (!isEditMode.value && data) {
+                    isEditMode.value = true;
+                    formItem.value.kode = data.kode;
+                    showToast("Barang berhasil dibuat. Sekarang Anda dapat menambahkan foto.", "success");
+                    return;
+                }
+
+                showItemModal.value = false;
+            } catch (err) {
+                console.error(err);
+            }
+        };
+
+        const saveNewLocation = async () => {
+            try {
+                await inventory.saveNewLocation({
+                    kode: locationForm.value.kode,
+                    lokasi: locationForm.value.lokasi
+                });
+                showLocationModal.value = false;
+            } catch (err) {
+                console.error(err);
+            }
+        };
+
+        const toggleStatus = async (item) => {
+            try {
+                await inventory.toggleStatus(item);
+            } catch (err) {
+                console.error("APP TOGGLE STATUS ERROR:", err);
+            }
+        };
+
+        const openImportExcelModal = () => {
+            rawExcelInput.value = "";
+            parsedItems.value = [];
+            importStep.value = 1;
+            isImporting.value = false;
+            showImportModal.value = true;
+        };
+
+        const processExcelRawInput = async () => {
+            const lines = rawExcelInput.value.split("\n");
+            const temporaryList = [];
+
+            for (let line of lines) {
+                if (!line.trim()) continue;
+
+                const columns = line.split("\t");
+
+                const kode = columns[0] ? columns[0].trim().toUpperCase() : "";
+                const nama = columns[1] ? columns[1].trim() : "";
+                const category = columns[2] ? columns[2].trim().toUpperCase() : "UNSET";
+                const satuan = columns[3] ? columns[3].trim().toUpperCase() : "PCS";
+                const lokasi = columns[4] ? columns[4].trim().toUpperCase() : "-";
+
+                if (kode && nama) {
+                    temporaryList.push({
+                        kode,
+                        nama,
+                        category,
+                        satuan,
+                        lokasi,
+                        stok: 0,
+                        min_stok: 0,
+                        status: "AKTIF"
+                    });
+                }
+            }
+
+            if (temporaryList.length === 0) {
+                showToast("Format data Excel tidak valid atau kosong!", "error");
+                return;
+            }
+
+            try {
+                inventory.loading.value = true;
+
+                const targetKodes = temporaryList.map(item => item.kode);
+                const existingKodes = await inventory.checkExistingCodes(targetKodes);
+
+                parsedItems.value = temporaryList.map(item => ({
+                    ...item,
+                    isDuplicate: existingKodes.includes(item.kode)
+                }));
+
+                importStep.value = 2;
+            } catch (err) {
+                showToast("Gagal melakukan pengecekan data ke database", "error");
+            } finally {
+                inventory.loading.value = false;
+            }
+        };
+
+        const validCount = computed(() => parsedItems.value.filter(i => !i.isDuplicate).length);
+        const duplicateCount = computed(() => parsedItems.value.filter(i => i.isDuplicate).length);
+
+        const executeBatchInsert = async () => {
+            const dataToSave = parsedItems.value.filter(item => !item.isDuplicate);
+            if (dataToSave.length === 0) return;
+
+            isImporting.value = true;
+            try {
+                const cleanData = dataToSave.map(({ isDuplicate, ...rest }) => rest);
+                const savedData = await inventory.saveBatchItem(cleanData);
+
+                showToast(`Berhasil menyimpan ${savedData.length} item baru!`, "success");
+                showImportModal.value = false;
+
+                inventory.loadInventory(true);
+            } catch (err) {
+                showToast(err.message || "Gagal menyimpan batch import", "error");
+            } finally {
+                isImporting.value = false;
+            }
+        };
+
+        const {
+            inventory: inventoryData,
+            isInventoryReady,
+            isSearching,
+            inventorySearch,
+            filterLocation,
+            categoryFilter,
+            stockFilter,
+            loadInventory,
+            handleSearch,
+            resetAllFilters,
+            sortBy,
+            hasMore,
+            finalInventory,
+            publicInventory,
+            categoryOptions,
+            locations,
+            loadLocations,
+            getExportInventory,
+            deleteItem
+        } = inventory;
+
+        const handleTableScroll = async (event) => {
+            const target = event.target;
+            const reachedBottom = target.scrollTop + target.clientHeight >= target.scrollHeight - 150;
+            if (!reachedBottom) return;
+
+            if (page.value === "catalog_menu") {
+                if (catalog.loading.value || !catalog.hasMore.value) return;
+                await catalog.loadItems(true);
+                return;
+            }
+
+            if (["master_barang", "inventory"].includes(page.value)) {
+                if (inventory.isServerMode.value) {
+                    if (inventory.loading.value || inventory.isSearching.value || !inventory.hasMoreSearch.value) return;
+                    await inventory.handleSearch(inventorySearch.value, true);
+                } else {
+                    if (inventory.loading.value || !inventory.hasMore.value) return;
+                    await inventory.loadInventory();
+                }
+                return;
+            }
+        };
+
+        const removeItem = async (item) => {
+            await inventory.deleteItem(item.kode, item.nama);
+        };
+
+        watch(inventorySearch, (newVal) => {
+            clearTimeout(searchTimer);
+
+            if (!newVal || newVal.trim() === "") {
+                inventory.handleSearch(newVal);
+                return;
+            }
+
+            searchTimer = setTimeout(() => {
+                inventory.handleSearch(newVal);
+            }, 500);
+        });
+
+        const startScanner = () => {
+            showScanner.value = true;
+
+            nextTick(() => {
+                const readerElement = document.getElementById('reader');
+                if (!readerElement) return;
+
+                if (html5QrCode) html5QrCode.clear();
+
+                html5QrCode = new Html5Qrcode("reader");
+
+                html5QrCode.start(
+                    { facingMode: "environment" },
+                    {
+                        fps: 15,
+                        qrbox: { width: 250, height: 150 }
+                    },
+                    (decodedText) => {
+                        inventorySearch.value = decodedText.trim();
+                        stopScanner();
+                        if (navigator.vibrate) navigator.vibrate(100);
+                    }
+                ).catch(() => {
+                    showScanner.value = false;
+                });
+            });
+        };
+
+        const stopScanner = async () => {
+            if (html5QrCode) {
+                try {
+                    if (html5QrCode.isScanning) {
+                        await html5QrCode.stop();
+                    }
+                    html5QrCode.clear();
+                } catch (err) {
+                    console.warn(err);
+                }
+            }
+            showScanner.value = false;
+        };
+
+        const catalog = useCatalog({
+            showToast,
+            inventory
+        });
+
+        const getItemCoverPhoto = (item) => {
+            if (item.inventory_photos && item.inventory_photos.length > 0) {
+                const cover = item.inventory_photos.find(p => p.is_cover);
+                return cover ? cover.photo_url : item.inventory_photos[0].photo_url;
+            }
+            return item.foto || "";
+        };
+
+        const handleCreateFolder = async () => {
+            if (!newFolderName.value.trim()) return;
+            await catalog.addFolder(newFolderName.value);
+            newFolderName.value = "";
+            showAddFolderModal.value = false;
+        };
+
+        const openAssignFolderModal = (item) => {
+            selectedItemForFolder.value = item;
+            selectedTargetFolderId.value = item.folder_id || "";
+            showAssignModal.value = true;
+        };
+
+        const executeAssignFolder = async () => {
+            if (!selectedItemForFolder.value) return;
+            const target = selectedTargetFolderId.value === "" ? null : selectedTargetFolderId.value;
+            await catalog.moveItemsToFolder([selectedItemForFolder.value.kode], target);
+            showAssignModal.value = false;
+        };
+
+        const openCatalogMenu = async () => {
+            page.value = "catalog_menu";
+            await catalog.loadFolders();
+            if (catalog.catalogItems.value.length === 0) {
+                await catalog.loadFolderContent(null);
+            }
+        };
+
+        watch(page, async (newPage) => {
+            if (newPage !== "catalog_menu") return;
+
+            await catalog.loadFolders();
+            await catalog.loadFolderContent(
+                catalog.activeFolderId?.value || null,
+                true
+            );
+        });
+
+
+
+        //===TRANSAKSI===//
+        const tx = useTransaction(inventory, userData, showToast, {
+            refreshInventory: async () => {
+                await inventory.loadInventory(true);
+            },
+            refreshDashboard: refreshAllData,
+            qtyInputRef,
+            searchInputRef,
+            loading
+        });
+
+        const importer = useImportTx(inventory, async (rows) => {
+            await processTransaction({
+                cart: rows.map(r => ({
+                    ...r,
+                    jenis: r.jenis || "KELUAR",
+                    dept: r.dept || "-",
+                    keterangan: r.keterangan || "-"
+                })),
+                username: userData.value.nama,
+                mode: "STRICT"
+            });
+            await inventory.loadInventory();
+        });
+
+        const scanner = useScanner(async (txt) => {
+            const query = cleanKode(txt);
+            let item = inventory.inventory.value.find(i => cleanKode(i.kode) === query);
+
+            if (!item) {
+                try {
+                    const { data = [] } = await searchInventory(query);
+
+                    item = data.find(
+                        i => cleanKode(i.kode) === query
+                    );
+                } catch (err) {
+                    console.error(err);
+                }
+            }
+
+            if (!item) return showToast("Item tidak ditemukan", "error");
+            if (item.status !== "AKTIF") return showToast("Barang NONAKTIF", "error");
+
+            tx.addToCartWithQty(item);
+
+            nextTick(() => {
+                setTimeout(() => qtyInputRef.value?.focus(), 150);
+            });
+        });
+
+        const openScanner = async () => {
+            scannerActive.value = true;
+            await nextTick();
+            const el = document.getElementById("reader");
+            if (!el) return;
+            await scanner.start();
+        };
+
+        const closeScanner = async () => {
+            await scanner.stop();
+            scannerActive.value = false;
+        };
+
+        const {
+            cart, processing, searchQuery, searchResults, showCart,
+            txType, txDept, txNote, inputQty, isSearchingServer, getMasterStockUI,
+            addToCart, addToCartWithQty, removeFromCart, isStockInsufficientUI,
+            processTx, resetTransactionForm
+        } = tx;
+
+        const importLoading = importer.loading;
+        const previewData = importer.preview;
+        const pasteData = ref("");
+        const resetImport = importer.reset;
+        const scannerActive = ref(false);
+
+        const handleCSVUpload = async (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            await importer.handleFile(file);
+        };
+
+        const parsePaste = async () => {
+            try {
+                await importer.handlePaste(pasteData.value);
+            } catch (err) {
+                showToast(err.message, "error");
+            }
+        };
+
+        const submitImport = async () => {
+            try {
+                await importer.submit();
+                showToast("Import sukses", "success");
+                pasteData.value = "";
+                await inventory.loadInventory(true);
+            } catch (err) {
+                showToast(err.message, "error");
+            }
+        };
+
+        const handleScan = async () => {
+            const rawQuery = searchQuery.value;
+            const query = cleanKode(rawQuery);
+
+            if (!query) return;
+
+            let item = inventory.inventory.value.find(i =>
+                i.status === 'AKTIF' && cleanKode(i.kode) === query
+            );
+
+            if (!item) {
+                try {
+                    const { data = [] } = await searchInventory(rawQuery);
+
+                    item = data.find(
+                        i =>
+                            cleanKode(i.kode) === query &&
+                            i.status === "AKTIF"
+                    );
+                } catch (err) {
+                    console.error("Search server error:", err);
+                }
+            }
+
+            if (!item) {
+                showToast("Barang tidak ditemukan atau Nonaktif", "error");
+                searchQuery.value = "";
+                return;
+            }
+
+            addToCartWithQty(item);
+            searchQuery.value = "";
+
+            nextTick(() => {
+                setTimeout(() => {
+                    qtyInputRef.value?.focus();
+                    qtyInputRef.value?.select?.();
+                }, 150);
+            });
+        };
+
+        const focusSearch = () => {
+            searchInputRef.value?.focus();
+        };
+
+        const isDeptValid = computed(() => {
+            if (txType.value === 'OPNAME') return true;
+            const depts = (typeof departments !== 'undefined' ? departments.value : []) || [];
+            return depts.map(d => String(d).toLowerCase())
+                .includes(String(txDept.value || '').trim().toLowerCase());
+        });
+
+        const revalidatePreview = async () => {
+            previewData.value = await validateRows(previewData.value, inventory.inventory.value);
+        };
+
+        async function refreshAllData() {
+            if (isRefreshing.value) return;
+            isRefreshing.value = true;
+            try {
+                await Promise.allSettled([
+                    loadInventory(),
+                    loadUsers(),
+                    fetchDashboardAll()
+                ]);
+            } finally {
+                isRefreshing.value = false;
+            }
+        }
+
+        ///===DASHBOARD===///
+        const { safeFetch } = useSafeFetch(showToast);
+
+        const analytics = useAnalytics(safeFetch);
+
+        const opname = useOpname();
+
+        const dashboard = useDashboard(safeFetch, searchQuery);
+
+        const {
+            recentTx, dashData, dashboardTx, lowStockItems, departments,
+            dashFilter, loadLowStock, loadDepartments, exportHistory,
+            loadHistory, fetchDashboardAll, resetFilter, filteredHistory
+        } = dashboard;
+
+        const { pivotData, filter: analyticsFilter, isLoading: isPivotLoading, isPivotLoaded, loadPivot } = analytics;
+        const { opnameDetail, filteredOpnameDetail, loadingOpname, showOpnameModal, loadOpnameDetail } = opname;
+
+        const usageMap = computed(() => {
+            if (!pivotData.value || pivotData.value.length === 0) return {};
+            return pivotData.value.reduce((acc, item) => {
+                acc[item.kode] = item.keluar;
+                return acc;
+            }, {});
+        });
+
+
+        ///===CANCEL TRANSAKSI===///
+        const {
+            cancellingId,
+            handleCancelTx,
+            isVoided
+        } = useCancelTransaction({
+            refreshHistory: loadHistory,
+            refreshInventory: inventory.loadInventory,
+            showToast
+        });
+
+
+        //===Photo Sparepart===//
+        const {
+            startCamera,
+            stopCamera: stopCameraCore
+        } = useCamera(videoFeed);
+
+        const {
+            saveUploadedPhoto,
+            readFilePreview,
+            refreshPhotoList
+        } = useUploadPhoto({
+            isUploading,
+            formItem,
+            loadInventory: inventory.loadInventory,
+            showToast
+        });
+
+        const canUploadPhoto = computed(() => {
+            return isEditMode.value && !!formItem.value.kode;
+        });
+
+        const launchGallery = () => {
+            if (fileInput.value) {
+                fileInput.value.value = "";
+                fileInput.value.click();
+            }
+        };
+
+        const handleGallerySelected = async (event) => {
+            const file = event.target.files?.[0];
+            if (!file) return;
+
+            if (!file.type.startsWith("image/")) {
+                showToast("File harus berupa gambar.", "error");
+                return;
+            }
+
+            await processImageFile(file);
+        };
+
+        const handleUrlSelected = async () => {
+            let url = photoUrlInput.value.trim();
+
+            if (!url) {
+                showToast("Masukkan URL gambar yang valid", "error");
+                return;
+            }
+
+            try {
+                showToast("Sedang memuat gambar dari URL...", "info");
+                url = url.includes("drive.google.com") ? fixDriveUrl(url) : `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`;
+
+                const response = await fetch(url);
+                if (!response.ok) throw new Error("Gagal mengambil file gambar dari server asal.");
+
+                const blob = await response.blob();
+                if (!blob.type.startsWith("image/")) throw new Error("URL tidak mengarah ke file gambar.");
+
+                const rawBase64 = await readFilePreview(blob);
+                const img = new Image();
+                img.src = rawBase64;
+
+                img.onload = async () => {
+                    try {
+                        photoPreview.value = await createWatermarkedImage(img, formItem.value.kode);
+                        previewSource.value = "url";
+                        photoUrlInput.value = "";
+                        showToast("Gambar URL berhasil dimuat dengan watermark", "success");
+                    } catch (err) {
+                        showToast(err.message, "error");
+                    }
+                };
+
+                img.onerror = () => {
+                    showToast("Gagal merender file gambar.", "error");
+                };
+            } catch (err) {
+                showToast("Gagal memproses gambar URL: " + err.message, "error");
+            }
+        };
+
+        const handleTakePhoto = async () => {
+            if (!videoFeed.value || videoFeed.value.readyState !== 4) {
+                showToast("Kamera belum siap", "error");
+                return;
+            }
+
+            try {
+                photoPreview.value = await createWatermarkedImage(videoFeed.value, formItem.value.kode);
+                previewSource.value = "camera";
+                stopCamera();
+                showToast("Foto berhasil diambil! Silakan tinjau.", "success");
+            } catch (err) {
+                showToast("Gagal memproses gambar: " + err.message, "error");
+            }
+        };
+
+        const removePhoto = async (photo) => {
+            if (!confirm("Hapus foto ini?")) return;
+            try {
+                if (photo.drive_file_id) await deleteFromDrive(photo.drive_file_id);
+                await deletePhoto(photo.id);
+                await refreshPhotos(formItem.value.kode);
+                showToast("Foto berhasil dihapus", "success");
+            } catch (err) {
+                console.error("DELETE PHOTO ERROR:", err);
+                showToast(err.message, "error");
+            }
+        };
+
+        const openUpdateFoto = async (item) => {
+
+            const photos = await fetchPhotos(item.kode);
+
+            formItem.value = {
+
+                kode: item.kode,
+                nama: item.nama,
+                satuan: item.satuan || "",
+                lokasi: item.lokasi || "",
+                category: item.category || "",
+                min_stok: item.min_stok || 0,
+                status: item.status || "AKTIF",
+
+                photos,
+
+                selectedPhoto:
+                    photos.find(p => p.is_cover) ||
+                    photos[0] ||
+                    null
+
+            };
+
+            showPhotoModal.value = true;
+
+        };
+
+        const handleDrop = async (e) => {
+            e.preventDefault();
+
+            dragCounter.value = 0;
+            isDragOver.value = false;
+
+            const file = e.dataTransfer.files?.[0];
+
+            if (!file) return;
+
+            await processImageFile(file);
+        };
+
+        const handleDragOver = (e) => {
+            e.preventDefault();
+        };
+
+        const handleDragEnter = (e) => {
+            e.preventDefault();
+
+            dragCounter.value++;
+
+            isDragOver.value = true;
+        };
+
+        const handleDragLeave = (e) => {
+            e.preventDefault();
+
+            dragCounter.value--;
+
+            if (dragCounter.value <= 0) {
+                dragCounter.value = 0;
+                isDragOver.value = false;
+            }
+        };
+
+        const processImageFile = async (file) => {
+            try {
+                const rawBase64 = await readFilePreview(file);
+                const img = new Image();
+                img.src = rawBase64;
+
+                img.onload = async () => {
+                    try {
+                        photoPreview.value = await createWatermarkedImage(img, formItem.value.kode);
+                        previewSource.value = "gallery";
+                        showToast("Gambar berhasil diproses", "success");
+                    } catch (err) {
+                        showToast(err.message, "error");
+                    }
+                };
+
+                img.onerror = () => {
+                    showToast("Gagal membaca gambar.", "error");
+                };
+            } catch (err) {
+                showToast("Gagal memproses file: " + err.message, "error");
+            }
+        };
+
+        const confirmAndUploadPhoto = async () => {
+            if (isUploading.value) return;
+
+            if (!photoPreview.value) {
+                showToast("Belum ada foto yang akan diupload.", "error");
+                return;
+            }
+
+            try {
+                const base64Clean = photoPreview.value.includes(",")
+                    ? photoPreview.value.split(",")[1]
+                    : photoPreview.value;
+
+                const latest = await saveUploadedPhoto({
+                    base64: base64Clean
+                });
+
+                await refreshPhotos(formItem.value.kode);
+
+                photoPreview.value = null;
+                previewSource.value = null;
+                photoUrlInput.value = "";
+
+                if (fileInput.value) {
+                    fileInput.value.value = "";
+                }
+
+                stopCamera();
+            } catch (err) {
+                console.error(err);
+                showToast("Proses upload gagal.", "error");
+            }
+        };
+
+        const refreshPhotos = async (kode) => {
+            try {
+                const latest = await refreshPhotoList(kode);
+
+                const updatePhotoCache = (list) => {
+                    if (!Array.isArray(list)) return;
+
+                    const index = list.findIndex(item => item.kode === kode);
+
+                    if (index !== -1) {
+                        list[index] = {
+                            ...list[index],
+                            inventory_photos: [...latest]
+                        };
+                    }
+                };
+
+                updatePhotoCache(inventory.inventory.value);
+                updatePhotoCache(inventory.serverResults.value);
+                updatePhotoCache(catalog.catalogItems.value);
+
+                return latest;
+            } catch (err) {
+                console.error("Refresh Photos Error:", err);
+                throw err;
+            }
+        };
+
+        const resetPhotoState = () => {
+            stopCamera();
+            photoPreview.value = null;
+            previewSource.value = null;
+            photoUrlInput.value = "";
+            isUploading.value = false;
+            if (fileInput.value) fileInput.value.value = "";
+        };
+
+        const closePhotoModal = () => {
+            resetPhotoState();
+            showPhotoModal.value = false;
+        };
+
+        const closeModal = () => {
+            resetPhotoState();
+            showItemModal.value = false;
+        };
+
+        const cancelPreview = async () => {
+            photoPreview.value = null;
+            if (fileInput.value) fileInput.value.value = "";
+
+            if (previewSource.value === "camera") {
+                previewSource.value = null;
+                await nextTick();
+                await startLiveCamera();
+                return;
+            }
+
+            previewSource.value = null;
+        };
+
+        const startLiveCamera = async () => {
+            isCameraActive.value = true;
+
+            await (typeof nextTick !== 'undefined' ? nextTick() : Vue.nextTick());
+
+            try {
+                await startCamera();
+                previewSource.value = "camera";
+            } catch (err) {
+                showToast("Gagal membuka kamera", "error");
+                isCameraActive.value = false;
+            }
+        };
+
+        const stopCamera = () => {
+            stopCameraCore();
+            isCameraActive.value = false;
+
+            if (videoFeed.value) {
+                videoFeed.value.srcObject = null;
+            }
+        };
+
+        const selectPhoto = (photo) => {
+            formItem.value.selectedPhoto = photo;
+        };
+
+        const makeCover = async (photo) => {
+
+            try {
+
+                await setCoverPhoto(formItem.value.kode, photo.id);
+
+                await refreshPhotos(formItem.value.kode);
+
+                showToast("Foto utama berhasil diperbarui", "success");
+
+            } catch (err) {
+
+                showToast(err.message, "error");
+
+            }
+
+        };
+
+        const openPreviewGallery = async (photos = [], kode = null) => {
+            let list = photos;
+
+            if (kode) {
+                list = await fetchPhotos(kode);
+            }
+
+            if (!list.length) return;
+
+            previewGallery.value = {
+                show: true,
+                photos: list.map(p => ({ ...p })),
+                current: list.findIndex(p => p.is_cover) >= 0
+                    ? list.findIndex(p => p.is_cover)
+                    : 0
+            };
+        };
+
+        const closePreviewGallery = () => {
+            previewGallery.value.show = false;
+        };
+
+        const nextPreview = () => {
+            if (!previewGallery.value.photos.length) return;
+
+            previewGallery.value.current =
+                (previewGallery.value.current + 1) %
+                previewGallery.value.photos.length;
+        };
+
+        const prevPreview = () => {
+            if (!previewGallery.value.photos.length) return;
+
+            previewGallery.value.current =
+                (previewGallery.value.current - 1 +
+                    previewGallery.value.photos.length) %
+                previewGallery.value.photos.length;
+        };
+
+        const currentPreviewPhoto = computed(() => {
+            return previewGallery.value.photos[
+                previewGallery.value.current
+            ];
+        });
+
+        const scrap = useScrapMonitoring({
+            supabaseClient,
+            userData: userData,
+            showToast: showToast
+        });
+
+        watch(page, (newPage) => {
+            const saved = localStorage.getItem("wms_user");
+
+            if (!saved) return;
+
+            const parsed = JSON.parse(saved);
+
+            localStorage.setItem(
+                "wms_user",
+                JSON.stringify({
+                    ...parsed,
+                    page: newPage
+                })
+            );
+        });
+
+
+        ///===ACCESSORIS===///
+        const exportExcel = async () => {
+            try {
+                isExporting.value = true;
+                if (showOpnameModal.value) {
+                    return exportOpnameExcel({
+                        data: filteredOpnameDetail.value,
+                        showToast
+                    });
+                }
+                if (showLowStock.value) {
+                    return exportLowStockExcel({
+                        data: lowStockItems.value
+                    });
+                }
+                if (page.value === "dashboard" || page.value === "riwayat") {
+                    if (!can(PERMISSION.EXPORT_EXCEL)) {
+                        showToast("Anda tidak memiliki akses export", "error");
+                        return;
+                    }
+
+                    return await exportDashboardExcel({
+                        exportHistory,
+                        dashFilter: dashFilter.value,
+                        showToast
+                    });
+                }
+                if (page.value === "inventory" || page.value === "master_barang") {
+                    return await exportInventoryExcel({
+                        getExportInventory
+                    });
+                }
+                if (page.value === "scrap_monitoring") {
+                    const params = await scrap.exportScrapExcel();
+                    return scrap.exportScrapExcel();
+                }
+                alert("Halaman tidak support export");
+            } catch (err) {
+                console.error(err);
+                alert("Gagal export Excel");
+            } finally {
+                isExporting.value = false;
+            }
+        };
+
         const downloadSPPPDF = () => {
             const { jsPDF } = window.jspdf;
-            // Inisialisasi A4 Landscape (297mm x 210mm)
             const doc = new jsPDF('l', 'mm', 'a4');
             const totalPages = chunkedSppItems.value.length;
 
@@ -1304,408 +1533,6 @@ createApp({
             doc.save(`${noSPP.value}.pdf`);
         };
 
-        const reservasiMeta = reactive({
-            department: userData.value?.department || '',
-            tanggal: new Date().toISOString().substr(0, 10) // Default tanggal hari ini (YYYY-MM-DD)
-        });
-
-        const bukaPopUpReservasi = (item) => {
-            selectedItem.value = item;
-            // Reset form ke default
-            formInput.qty = 1;
-            formInput.noMesin = '';
-            formInput.keterangan = '';
-            showPopupDetail.value = true;
-        };
-
-        // Fungsi Konfirmasi Masuk ke Form Reservasi
-        const tambahkanKeForm = () => {
-            const item = selectedItem.value;
-            const exist = reservasiItems.value.find(i => i.kode === item.kode);
-
-            if (exist) {
-                // Jika barang sudah ada di list, update nilainya
-                exist.qty += formInput.qty;
-                showToast(`Jumlah ${item.nama} berhasil diperbarui`, 'success');
-            } else {
-                // Jika belum ada, push data baru
-                reservasiItems.value.push({
-                    kode: item.kode,
-                    nama: item.nama,
-                    satuan: item.satuan,
-                    qty: formInput.qty,
-                    noMesin: formInput.noMesin.toUpperCase(),
-                    keterangan: formInput.keterangan
-                });
-                showToast("Berhasil ditambahkan ke form permintaan", 'success');
-            }
-
-            showPopupDetail.value = false;
-        };
-
-        const paginatedItems = computed(() => {
-            const pages = [];
-            const items = reservasiItems.value;
-            for (let i = 0; i < items.length; i += itemsPerPage) {
-                pages.push(items.slice(i, i + itemsPerPage));
-            }
-            if (pages.length === 0) pages.push([]);
-            return pages;
-        });
-
-        // Fungsi Cetak (Memicu dialog print browser)
-        const handlePrint = () => {
-            if (reservasiItems.value.length === 0) {
-                alert("Daftar permintaan masih kosong!");
-                return;
-            }
-            window.print();
-        };
-
-        const handleCancelTx = async (tx) => {
-            const ketString = String(tx.ket || "").toUpperCase();
-
-            if (ketString.includes("[DIBATALKAN]")) return;
-            if (cancellingId.value === tx.rowId) return;
-
-            if (!confirm(`Batalkan transaksi ${tx.nama}?`)) return;
-
-            cancellingId.value = tx.rowId;
-
-            try {
-                const res = await callAPI('CANCEL_TX', {
-                    token: userData.value.token,
-                    rowId: tx.rowId
-                });
-
-                if (res.status === 'success') {
-                    tx.ket = "[DIBATALKAN] " + (tx.ket || "");
-                    showToast("✅ Transaksi berhasil dibatalkan!");
-
-                    await fetchAllData();
-
-                } else {
-                    showToast("❌ " + res.message);
-                }
-
-            } catch (e) {
-                showToast("🚨 Gangguan server");
-            } finally {
-                cancellingId.value = null;
-            }
-        };
-
-        const isVoided = (tx) => {
-            const ketString = String(tx.ket || '').toUpperCase();
-            return ketString.includes('[DIBATALKAN]');
-        };
-
-        const sortBy = (key) => {
-            if (sortKey.value === key) {
-                if (sortOrder.value === 1) {
-                    // Jika sedang Asc, ubah ke Desc
-                    sortOrder.value = -1;
-                } else {
-                    // Jika sedang Desc, matikan sortir (Reset)
-                    sortKey.value = '';
-                    sortOrder.value = 1;
-                    showToast("Urutan dikembalikan ke asli", "success");
-                }
-            } else {
-                // Klik kolom baru
-                sortKey.value = key;
-                sortOrder.value = 1;
-            }
-        };
-
-        const resetAllFilters = () => {
-            inventorySearch.value = '';
-            filterLocation.value = '';
-            sortKey.value = '';
-            sortOrder.value = 1;
-            showToast("Filter dibersihkan", "success");
-        };
-
-        const openAddModal = () => {
-            isEditMode.value = false;
-            formItem.value = { kode: '', nama: '', satuan: '', lokasi: '', foto: '', minStok: 0, status: 'AKTIF' };
-            showItemModal.value = true;
-        };
-
-        const editItem = (item) => {
-            isEditMode.value = true;
-            formItem.value = {
-                kode: item.kode || '',
-                nama: item.nama || '',
-                satuan: item.satuan || '',
-                lokasi: item.lokasi || '',
-                category: item.category || '',
-                minStok: item.minStok || 0,
-                foto: item.foto || '',
-                status: item.status || 'AKTIF'
-            };
-            showItemModal.value = true;
-        };
-
-        const openUpdateLocation = (item) => {
-            locationForm.value = {
-                kode: item.kode,
-                nama: item.nama,
-                lokasi: item.lokasi
-            };
-            showLocationModal.value = true;
-        };
-
-        const saveNewLocation = async () => {
-            if (!locationForm.value.lokasi.trim()) return alert("Lokasi tidak boleh kosong");
-
-            loading.value = true;
-            try {
-                const res = await callAPI('UPDATE_LOCATION', {
-                    kode: locationForm.value.kode,
-                    lokasiBaru: locationForm.value.lokasi,
-                    userNama: userData.value.nama
-                });
-
-                if (res.status === 'success') {
-                    // Update di UI lokal
-                    const targetItem = inventory.value.find(i => i.kode === locationForm.value.kode);
-                    if (targetItem) targetItem.lokasi = locationForm.value.lokasi;
-
-                    showLocationModal.value = false;
-                    // Opsional: tambahkan toast/notifikasi sukses kecil di sini
-                } else {
-                    alert("Gagal: " + res.message);
-                }
-            } finally {
-                loading.value = false;
-            }
-        };
-
-        const saveItem = async () => {
-            loading.value = true;
-            try {
-                const res = await callAPI('ADMIN_SAVE_ITEM', formItem.value);
-                if (res.status === 'success') {
-                    alert(res.message);
-                    showItemModal.value = false;
-
-                    // Refresh Data Barang agar tabel terupdate secara real-time
-                    const result = await callAPI('ADMIN_GET_ITEMS');
-                    if (result.status === 'success' && Array.isArray(result.data)) {
-                        inventory.value = result.data;
-                    } else if (Array.isArray(result)) {
-                        inventory.value = result;
-                    }
-
-                    // Reset form setelah simpan sukses
-                    formItem.value = { kode: '', nama: '', category: '', minStok: 0, foto: '' };
-                } else {
-                    alert("Error: " + res.message);
-                }
-            } catch (err) {
-                alert("Gagal terhubung ke Database GAS");
-            } finally {
-                loading.value = false;
-            }
-        };
-
-        const toggleStatus = async (item) => {
-            const action = item.status === 'AKTIF' ? 'menonaktifkan' : 'mengaktifkan';
-            if (!confirm(`Apakah Anda yakin ingin ${action} barang "${item.nama}"?`)) return;
-
-            loading.value = true;
-            try {
-                // 2. Hitung status baru
-                const newStatus = item.status === 'AKTIF' ? 'NONAKTIF' : 'AKTIF';
-
-                // 3. Panggil API (Menggunakan parameter kode dan status baru)
-                const res = await callAPI('ADMIN_TOGGLE_STATUS', {
-                    kode: item.kode,
-                    status: newStatus
-                });
-
-                if (res.status === 'success') {
-                    // 4. Update langsung di UI agar tidak perlu reload seluruh data
-                    item.status = newStatus;
-
-                    // Opsional: Jika ingin sinkronasi total, panggil refresh data
-                    // const updatedItems = await callAPI('ADMIN_GET_ITEMS');
-                    // inventory.value = updatedItems;
-
-                    console.log(res.message);
-                } else {
-                    alert("Gagal mengubah status: " + res.message);
-                }
-            } catch (error) {
-                console.error(error);
-                alert("Terjadi kesalahan sistem saat mengubah status.");
-            } finally {
-                loading.value = false;
-            }
-        };
-
-        const fetchUsers = async () => {
-            if (userData.value.role !== 'ADMIN') return;
-            const res = await callAPI('GET_USERS');
-            // code.gs Anda mengembalikan { status: 'success', data: [...] } atau langsung array? 
-            // Berdasarkan baris: return data.slice(1).map(...) di code.gs anda:
-            if (Array.isArray(res)) {
-                adminUsers.value = res;
-            } else if (res.status === 'success') {
-                adminUsers.value = res.users || res.data; // Menyesuaikan jika ada pembungkus status
-            } else {
-                console.error("Gagal load user:", res.message);
-            }
-        };
-
-        const approveWithRole = async (user, selectedRole) => {
-            user.role = selectedRole;
-            user.status = 'AKTIF';
-
-            try {
-                const res = await callAPI('ADMIN_MANAGE_USER', {
-                    targetUser: user.username,
-                    manageAction: 'APPROVE',
-                    payload: selectedRole
-                });
-
-                if (res.status === 'success') {
-                    showToast(`User ${user.username} berhasil disetujui sebagai ${selectedRole}!`);
-                    if (typeof fetchUsers === 'function') fetchUsers();
-                } else {
-                    showToast("Gagal menyetujui user: " + res.message);
-                }
-            } catch (error) {
-                console.error("Error Approval:", error);
-                showToast("Terjadi kesalahan koneksi saat menyetujui user.");
-            }
-        };
-
-        const deleteUser = async (u) => {
-            if (!confirm(`Hapus user ${u.nama}?`)) return;
-            const res = await callAPI('ADMIN_MANAGE_USER', {
-                targetUser: u.username,
-                manageAction: 'DELETE'
-            });
-            if (res.status === 'success') {
-                fetchUsers();
-            } else { alert(res.message); }
-        };
-
-        const toggleUser = async (u) => {
-            const res = await callAPI('ADMIN_MANAGE_USER', {
-                targetUser: u.username,
-                manageAction: 'TOGGLE_STATUS'
-            });
-            if (res.status === 'success') {
-                fetchUsers();
-            } else { alert(res.message); }
-        };
-
-        const updateUserRole = async (u) => {
-            const res = await callAPI('ADMIN_MANAGE_USER', {
-                targetUser: u.username,
-                manageAction: 'UPDATE_ROLE',
-                payload: u.role
-            });
-            if (res.status === 'success') {
-                // Berhasil, tidak perlu alert agar user experience lancar
-            } else {
-                alert(res.message);
-                fetchUsers(); // Rollback UI jika gagal
-            }
-        };
-
-        const openEditProfile = () => {
-            showPass.value = false;
-            profileForm.nama = userData.value.nama;
-            profileForm.password = '';
-            showProfileModal.value = true;
-        };
-
-        const handleUpdateProfile = async () => {
-            if (profileForm.password && profileForm.password.length < 6) return alert("Min 6 karakter!");
-            loadingProfile.value = true;
-            const res = await callAPI('UPDATE_PROFILE', {
-                newNama: profileForm.nama,
-                newPassword: profileForm.password
-            });
-            if (res.status === 'success') {
-                userData.value.nama = profileForm.nama;
-                localStorage.setItem('user_session', JSON.stringify(userData.value));
-                showProfileModal.value = false;
-                alert("Berhasil!");
-            }
-            loadingProfile.value = false;
-        };
-
-        const exportToExcel = () => {
-            try {
-                let dataToExport = [];
-                let fileName = "";
-                const timestamp = new Date().toLocaleDateString('id-ID').replace(/\//g, '-');
-
-                // === 1. EKSPOR STOK KRITIS / LOW STOCK ===
-                if (showLowStock.value) {
-                    if (!lowStockItems.value.length) return alert("Data stok kritis kosong!");
-
-                    dataToExport = lowStockItems.value.map(item => ({
-                        "KODE BARANG": item.kode,
-                        "NAMA BARANG": item.nama,
-                        "SATUAN": item.satuan,
-                        "STOK SAAT INI": item.stok,
-                        "MINIMUM STOK": item.minStok,
-                        "SARAN ORDER (PR)": item.qtyRequest
-                    }));
-                    fileName = `Rencana_Order_PR_${timestamp}.xlsx`;
-
-                    // === 2. EKSPOR INVENTORY / MASTER BARANG ===
-                } else if (page.value === 'inventory' || page.value === 'master_barang') {
-                    if (!filteredInventory.value.length) return alert("Data stok kosong!");
-
-                    // Gunakan filteredInventory agar mengikuti filter halaman
-                    dataToExport = filteredInventory.value.map(item => ({
-                        "KODE": item.kode,
-                        "NAMA BARANG": item.nama,
-                        "CATEGORY": item.category || "-",
-                        "SATUAN": item.satuan,
-                        "LOKASI": item.lokasi || "-",
-                        "STOK": item.stok,
-                        "STATUS": item.stok <= item.minStok ? "LOW" : "AMAN"
-                    }));
-                    fileName = `Stock_Holding_${timestamp}.xlsx`;
-
-                    // === 3. EKSPOR RIWAYAT TRANSAKSI ===
-                } else if (page.value === 'riwayat') {
-                    if (!filteredHistory.value.length) return alert("Data riwayat kosong!");
-
-                    dataToExport = filteredHistory.value.map(tx => ({
-                        "TANGGAL": tx.tanggal,
-                        "USER": tx.user,
-                        "KODE": tx.kode,
-                        "NAMA BARANG": tx.nama,
-                        "JENIS": tx.jenis,
-                        "QTY": tx.qty,
-                        "DEPT": tx.dept || "-",
-                    }));
-                    fileName = `Riwayat_Transaksi_${timestamp}.xlsx`;
-                }
-
-                // === GENERATE FILE XLSX MENGGUNAKAN SHEETJS ===
-                const ws = XLSX.utils.json_to_sheet(dataToExport);
-                const wb = XLSX.utils.book_new();
-                XLSX.utils.book_append_sheet(wb, ws, "Data");
-
-                // Trigger download file
-                XLSX.writeFile(wb, fileName);
-
-            } catch (e) {
-                console.error("Gagal export:", e);
-                alert("Terjadi kesalahan saat mengekspor data.");
-            }
-        };
-
         const downloadPDF = () => {
             const { jsPDF } = window.jspdf;
             const doc = new jsPDF('p', 'mm', 'a4');
@@ -1846,217 +1673,85 @@ createApp({
             doc.setTextColor(0, 0, 0);
         };
 
-        const filteredHistory = computed(() => {
-            let data = recentTx.value || [];
-
-            // Filter berdasarkan pencarian jika ada
-            if (searchQuery.value) {
-                const q = searchQuery.value.toLowerCase();
-                data = data.filter(tx =>
-                    tx.nama.toLowerCase().includes(q) ||
-                    tx.kode.toLowerCase().includes(q) ||
-                    tx.dept?.toLowerCase().includes(q)
-                );
-            }
-
-            // Kembalikan hanya 200 data teratas
-            return data.slice(0, 200);
-        });
-
-        const categoryOptions = computed(() => {
-            if (!inventory.value) return []
-
-            const categories = inventory.value
-                .map(item => item.category)
-                .filter(cat => cat)
-
-            return [...new Set(categories)]
-        });
-
-        const uniqueLocations = computed(() => {
-            if (!inventory.value) return [];
-
-            const areas = inventory.value.map(item => {
-                const loc = String(item.lokasi || '');
-                if (loc.includes('-')) {
-                    // Ambil teks sebelum strip dan hapus spasi kosong
-                    return loc.split('-')[0].trim();
-                }
-                return loc.trim();
-            }).filter(Boolean);
-
-            // Ambil nilai unik dan urutkan
-            return [...new Set(areas)].sort();
-        });
-
-        const sortedMaster = computed(() => {
-            let data = inventory.value ? [...inventory.value] : [];
-
-            // Filter berdasarkan Pencarian Teks
-            if (inventorySearch.value) {
-                const s = inventorySearch.value.toLowerCase();
-                data = data.filter(i =>
-                    i.nama.toLowerCase().includes(s) ||
-                    i.kode.toLowerCase().includes(s) ||
-                    i.lokasi.toLowerCase().includes(s)
-                );
-            }
-
-            // Filter berdasarkan Lokasi Rak
-            if (filterLocation.value) {
-                data = data.filter(i => {
-                    const areaName = String(i.lokasi || '').split('-')[0].trim();
-                    return areaName === filterLocation.value;
-                });
-            }
-
-            // Logika Sorting (Tetap seperti sebelumnya)
-            if (sortKey.value) {
-                data.sort((a, b) => {
-                    let valA = a[sortKey.value];
-                    let valB = b[sortKey.value];
-                    if (sortKey.value === 'stok' || sortKey.value === 'minStok') {
-                        return (Number(valA) - Number(valB)) * sortOrder.value;
-                    }
-                    return String(valA).localeCompare(String(valB)) * sortOrder.value;
-                });
-            }
-            return data;
-        });
-
-        const searchResults = computed(() => {
-            if (!searchQuery.value) return [];
-            const q = searchQuery.value.toLowerCase();
-            return inventory.value.filter(i => i.nama.toLowerCase().includes(q) || i.kode.toLowerCase().includes(q)).slice(0, 12);
-        });
-
-        const isDeptValid = computed(() => {
-            if (txType.value === 'OPNAME') return true
-            return departments.value.includes(txDept.value)
-        });
-
-        const filteredInventory = computed(() => {
-
-            if (!inventory.value) return []
-
-            const query = inventorySearch.value?.toLowerCase() || ''
-            const selectedCategory = categoryFilter.value
-
-            return inventory.value.filter(item => {
-
-                if (item.status !== 'AKTIF') return false
-
-                const qty = Number(item.stok || 0)
-
-                const stockRules = {
-                    available: qty > 0,
-                    empty: qty === 0,
-                    all: true
-                }
-
-                const stockCondition = stockRules[stockFilter.value]
-
-                const categoryCondition =
-                    selectedCategory === 'all' ||
-                    (item.category && item.category === selectedCategory)
-
-                const matchesSearch =
-                    (item.nama && item.nama.toLowerCase().includes(query)) ||
-                    (item.kode && item.kode.toLowerCase().includes(query)) ||
-                    (item.lokasi && item.lokasi.toLowerCase().includes(query)) ||
-                    (item.category && item.category.toLowerCase().includes(query))
-
-                return stockCondition && categoryCondition && matchesSearch
-            })
-        });
-
-        const searchInMaster = computed(() => {
-
-            if (!inventory.value) return [];
-
-            const query = inventorySearch.value?.toLowerCase() || '';
-
-            if (!query) return inventory.value;
-
-            return inventory.value.filter(i =>
-                (i.nama && i.nama.toLowerCase().includes(query)) ||
-                (i.kode && i.kode.toLowerCase().includes(query)) ||
-                (i.lokasi && i.lokasi.toLowerCase().includes(query))
-            );
-
-        });
-
-        const filteredAdminUsers = computed(() => {
-            if (!userSearchQuery.value) return adminUsers.value;
-
-            const q = userSearchQuery.value.toLowerCase();
-
-            return adminUsers.value.filter(u => {
-                const nama = (u.nama || '').toString().toLowerCase();
-                const username = (u.username || '').toString().toLowerCase();
-
-                return nama.includes(q) || username.includes(q);
-            });
-        });
-
-        const handleLogout = () => {
-            // 1. Hapus data dari LocalStorage
-            localStorage.removeItem('token');
-
-            // 2. Reset semua State Reaktif ke awal
-            isLoggedIn.value = false;
-            userToken.value = '';
-            userData.value = { username: '', nama: '', role: '', canPreviewPhoto: false };
-            location.reload();
-
-            // 3. Bersihkan data sensitif dari memori
-            inventory.value = [];
-            adminUsers.value = [];
-            cart.value = [];
-
-            // 4. Hentikan semua interval (jika ada auto-refresh dashboard)
-            if (dashboardInterval) clearInterval(dashboardInterval);
-            if (inventoryInterval) clearInterval(inventoryInterval);
-
-            // 5. Arahkan ke halaman dashboard/login
-            page.value = 'dashboard';
-
-            // Opsional: Berikan notifikasi kecil
-            console.log("Sesi telah dibersihkan.");
-        };
 
         onMounted(async () => {
-            const saved = localStorage.getItem('user_session');
-            if (saved) {
-                const parsed = JSON.parse(saved);
-                userData.value = parsed;
-                userToken.value = parsed.token || "";
+            const savedUser = localStorage.getItem("wms_user");
 
-                const res = await callAPI('VALIDATE_SESSION');
-                if (res.status === 'success') {
-                    isLoggedIn.value = true;
+            if (savedUser) {
+                try {
+                    const parsed = JSON.parse(savedUser);
+                    const isExpired = Date.now() - (parsed.loginAt || 0) > 28800000;
 
-                    // Gabungkan data: Pastikan res.canPreviewPhoto masuk ke userData
-                    userData.value = {
-                        ...parsed,
-                        ...res,
-                        // Paksa konversi ke boolean agar v-if tidak bingung
-                        canPreviewPhoto: res.canPreviewPhoto === true || res.canPreviewPhoto === 1 || res.canPreviewPhoto === "TRUE"
-                    };
+                    if (!parsed.loginAt) {
+                        parsed.loginAt = Date.now();
+                        localStorage.setItem("wms_user", JSON.stringify(parsed));
+                    }
 
-                    console.log("Session Validated. Photo Access:", userData.value.canPreviewPhoto);
-                    await fetchAllData();
+                    if (isExpired) {
+                        console.warn("Session expired local");
+                        localStorage.removeItem("wms_user");
+                        isLoggedIn.value = false;
+                        return;
+                    }
 
-                } else {
-                    handleLogout();
+                    await refreshSession();
+
+                    if (isLoggedIn.value) {
+                        const saved = JSON.parse(localStorage.getItem("wms_user"));
+                        page.value = saved?.page || ROLE_LANDING_PAGE[userData.value.role];
+
+                        await refreshAllData();
+                    }
+                } catch (err) {
+                    console.warn("Session invalid:", err.message);
+                    localStorage.removeItem("wms_user");
+                    isLoggedIn.value = false;
                 }
             }
+
+            let isRefreshing = false;
+
+            const refreshSessionSafe = async () => {
+                if (isRefreshing) return;
+
+                isRefreshing = true;
+                try {
+                    await refreshSession();
+                } finally {
+                    isRefreshing = false;
+                }
+            };
+
+            setInterval(() => {
+                if (isLoggedIn.value) refreshSessionSafe();
+            }, 30000);
+
+            await Promise.all([
+                inventory.loadInventory(true),
+                inventory.loadLocations(),
+                catalog.loadFolders()
+            ]);
+
+            const today = new Date().toISOString().split("T")[0];
+            analyticsFilter.value.startDate = today;
+            analyticsFilter.value.endDate = today;
+
+            isAdminView.value = true;
+
+            nextTick(() => {
+                setTimeout(() => {
+                    qtyInputRef.value?.focus();
+                    qtyInputRef.value?.select?.();
+                }, 200);
+            });
         });
 
         return {
             // 1. CORE APP & AUTH STATE
             isLoggedIn, loading, isSubmitting, page, userRole, userData, loginData,
-            handleLogin, handleLogout, navigate, toast,
+            handleLogin, handleLogout, navigate, toast, selectedRow, handleDeleteUser, handleTogglePermission, selectedPermissionUser,
+            showPermissionModal, openPermissionModal, previewPhoto,
+            permissions, can, cannot, hasRole, canAny, canAll, canAccessPage, PERMISSION, ACCESS_PERMISSIONS,
 
             // 2. UI & NAVIGATION STATE
             sidebarOpen, showPassword, showPass, showCart, showLowStock, showRegisterModal,
@@ -2064,40 +1759,53 @@ createApp({
             showScanner, showPopupDetail, closeModal, closeUserModal, closePhotoModal,
 
             // 3. INVENTORY & MASTER DATA
-            inventory, inventorySearch, searchQuery, stockFilter, categoryOptions, categoryFilter,
-            filterLocation, uniqueLocations, resetAllFilters, sortedMaster, sortKey, sortOrder,
-            sortBy, filteredInventory, getMasterStock, searchInMaster, focusSearch,
-            searchInputRef, departments, fixDriveUrl, searchResults,
+            loadInventory, inventory, inventorySearch, searchQuery, stockFilter, categoryOptions, categoryFilter,
+            filterLocation, locations, loadLocations, resetAllFilters, sortKey, sortOrder, isInventoryReady, searchCache,
+            finalInventory, isSearching, lastQuery, sortBy, handleTableScroll, getExportInventory, hasMore, removeItem,
+            searchInputRef, departments, fixDriveUrl, searchResults, handleSearch, publicInventory,
 
             // 4. ITEM CRUD & MODALS
-            formItem, isEditMode, openAddModal, editItem, saveItem, toggleStatus,
-            selectedItem, formInput, saveNewLocation, openUpdateLocation,
+            formItem, isEditMode, formInput, selectedItem, openAddModal, editItem, saveItem, toggleStatus, getItemCoverPhoto,
+            saveNewLocation, openUpdateLocation, catalog, showAddFolderModal, newFolderName, handleCreateFolder, openCatalogMenu, showFolderMenu,
+            showAssignModal, selectedItemForFolder, selectedTargetFolderId, openAssignFolderModal, executeAssignFolder,
+            showImportModal, importStep, rawExcelInput, parsedItems, isImporting, validCount, duplicateCount, openImportExcelModal, processExcelRawInput,
+            executeBatchInsert,
 
             // 5. TRANSACTION & CART (WMS)
-            cart, inputQty, qtyInputRef, addToCart, addToCartWithQty, removeFromCart,
-            isStockInsufficient, lowStockItems, txType, txDept, txNote, txTanggal,
-            processTx, resetTransactionForm, handleCancelTx, isVoided, cancellingId,
-            filteredHistory, getJenisClass, recentTx,
+            cart, inputQty, qtyInputRef, previewData, pasteData, tx, isSearchingServer, processing, importLoading,
+            lowStockItems, txType, txDept, txNote, txTanggal, handleCSVUpload, parsePaste, submitImport, addToCartWithQty,
+            resetTransactionForm, handleCancelTx, isVoided, cancellingId, showImportMode, addToCart, resetImport,
+            filteredHistory, removeFromCart, processTx, revalidatePreview, isDeptValid,
 
             // 6. CAMERA, SCANNER & MEDIA
-            scannerActive, isCameraActive, videoFeed, fileInput, startScanner, stopScanner,
-            handleScan, openScanner, closeScanner, startLiveCamera, stopCamera, takeSnapshot,
-            launchGallery, handleFileUpload, previewImage, openUpdateFoto, savePhotoOnly,
-            removePhoto, isUploading, togglePhotoAccess, toggleUser,
+            isStockInsufficientUI, getMasterStockUI, isCameraActive, videoFeed, fileInput, startScanner, stopScanner, handleScan,
+            openScanner, scannerActive, handleTakePhoto, scanner, importer, useTransaction, focusSearch, closeScanner,
+            launchGallery, openUpdateFoto, startLiveCamera, stopCamera, handleGallerySelected,
+            removePhoto, isUploading, toggleUser, photoPreview, confirmAndUploadPhoto, cancelPreview, selectPhoto,
+            makeCover, previewGallery, openPreviewGallery, closePreviewGallery, nextPreview, prevPreview, currentPreviewPhoto, canUploadPhoto,
+            refreshPhotos, photoUrlInput, handleUrlSelected, resetPhotoState, handleDrop, handleDragOver, handleDragLeave, isDragOver,
+            handleDragEnter, dragCounter,
+
 
             // 7. SPP (SURAT PERMOHONAN PEMBELIAN) & RESERVASI
-            summarySppItems, inputKodeManual, tambahSemuaKeSpp, tambahItemManualByKode, kosongkanSpp,
+            summarySppItems, inputKodeManual, tambahSemuaKeSpp, tambahItemManualByKode, kosongkanSpp, usageMap,
             chunkedSppItems, removeItemSpp, sppSign, noSPP, txReservasi, reservasiItems, locationForm,
             reservasiMeta, bukaPopUpReservasi, tambahkanKeForm, itemsPerPage, paginatedItems,
 
             // 8. USER MANAGEMENT & PROFILE
-            adminUsers, filteredAdminUsers, userSearchQuery, fetchUsers, updateUserRole,
-            deleteUser, newUser, openUserModal, submitNewUser, regData, handleRegister,
+            adminUsers, filteredAdminUsers, userSearchQuery, handleUpdateUserRole, loadUsers,
+            newUser, openUserModal, submitNewUser, regData, handleRegister, pendingUsers, refreshSession,
             profileForm, loadingProfile, openEditProfile, handleUpdateProfile, approveWithRole,
+            pivotData, isPivotLoaded, isPivotLoading, refreshAllData,
 
-            // 9. DASHBOARD & REPORTING
-            dashData, dashFilter, fetchDashboard, handlePrint, downloadPDF,
-            downloadSPPPDF, exportToExcel, docNumber
+            // 9. UPDATE SUPABASE
+            exportExcel, isExporting, analyticsFilter, loadPivot, safeFetch, loadHistory,
+            catatanSpp, scrap, loadScrapData: scrap.loadScrapData, showScrapInput,
+
+            // 10. DASHBOARD & REPORTING
+            dashboard, dashData, dashFilter, handlePrint, downloadPDF, historySearch, dashboardTx, recentTx, loadLowStock, exportHistory,
+            loadOpnameDetail, showOpnameModal, loadingOpname, filteredOpnameDetail, opnameDetail, resetFilter, isRefreshing, fetchDashboardAll, loadDepartments,
+            downloadSPPPDF, docNumber
         };
     }
 }).mount('#app');
