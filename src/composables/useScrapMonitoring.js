@@ -1,5 +1,7 @@
 const { ref, computed } = Vue;
 import { fetchDepartments } from "../services/analyticsService.js";
+import { exportScrapExcel } from "../exports/excelExport.js";
+
 
 export function useScrapMonitoring({ supabaseClient, userData, showToast }) {
     const scrapList = ref([]);
@@ -57,7 +59,7 @@ export function useScrapMonitoring({ supabaseClient, userData, showToast }) {
                 .select("*", { count: 'exact' })
                 .order("created_at", { ascending: false })
                 .limit(1000);
-                
+
 
             if (error) throw error;
             scrapList.value = data || [];
@@ -254,64 +256,24 @@ export function useScrapMonitoring({ supabaseClient, userData, showToast }) {
         filterEndDate.value = "";
     };
 
-    const exportScrapExcel = () => {
-        if (!filteredScrapList.value || filteredScrapList.value.length === 0) {
-            showToast("Tidak ada data hasil filter yang dapat diexport!", "error");
-            return;
-        }
+    const exportScrapExcelHandler = () => {
 
-        try {
-            const timestamp = new Date().toLocaleDateString("id-ID").replace(/\//g, "-");
+        exportScrapExcel({
+            data: filteredScrapList.value,
+            summary: summary.value,
+            filterStartDate: filterStartDate.value,
+            filterEndDate: filterEndDate.value,
+            showToast
+        });
 
-            const mappedData = filteredScrapList.value.map((row, index) => ({
-                "NO": index + 1,
-                "TANGGAL INPUT DATA": row.created_at ? new Date(row.created_at).toLocaleString("id-ID") : "-",
-                "TANGGAL TUKAR": row.tgl_penukaran ? new Date(row.tgl_penukaran).toLocaleDateString("id-ID") : "-",
-                "NAMA BARANG": row.nama_barang ? row.nama_barang.toUpperCase() : "-",
-                "TGL AWAL PAKAI": row.tgl_awal_pakai ? new Date(row.tgl_awal_pakai).toLocaleDateString("id-ID") : "-",
-                "TGL AKHIR PAKAI": row.tgl_akhir_pakai ? new Date(row.tgl_akhir_pakai).toLocaleDateString("id-ID") : "-",
-                "DEPARTMENT": row.department ? row.department.toUpperCase() : "-",
-                "QTY (PCS)": Number(row.qty || 0),
-                "OPERATOR / CREATED BY": row.created_by ? row.created_by.toUpperCase() : "-"
-            }));
-
-            const ws = XLSX.utils.json_to_sheet(mappedData, { origin: "A7" });
-
-            XLSX.utils.sheet_add_aoa(ws, [
-                ["LAPORAN REKAPITULASI MONITORING SCRAP SUKU CADANG"],
-                [`Tanggal Unduh Dokumen : ${new Date().toLocaleString("id-ID")}`],
-                [`Rentang Filter Tanggal Input : ${filterStartDate.value || 'Semua'} s/d ${filterEndDate.value || 'Semua'}`],
-                [`Total Hasil Filter Transaksi : ${summary.value.totalRecords} Baris Data (Maks Batasan: 1000)`],
-                [`Total Akumulasi Qty Scrap : ${summary.value.totalQty} PCS`],
-                [`Departemen Penyumbang Terbanyak : ${(summary.value.topDept || '-').toUpperCase()}`]
-            ], { origin: "A1" });
-
-            ws["!cols"] = [
-                { wch: 6 },
-                { wch: 22 },
-                { wch: 18 },
-                { wch: 35 },
-                { wch: 18 },
-                { wch: 18 },
-                { wch: 16 },
-                { wch: 12 },
-                { wch: 25 }
-            ];
-
-            const wb = XLSX.utils.book_new();
-            XLSX.utils.book_append_sheet(wb, ws, "Rekap Scrap");
-            XLSX.writeFile(wb, `Rekap_Scrap_Filtered_${timestamp}.xlsx`);
-
-            showToast(`Berhasil mengeksport ${filteredScrapList.value.length} data scrap!`, "success");
-        } catch (err) {
-            console.error("EXCEL EXPORT ERROR:", err);
-            showToast("Sistem gagal menyusun file spreadsheet excel", "error");
-        }
     };
+
+
+
 
     return {
         form, scrapList, filteredScrapList, departments, loading, summary, itemOptions, selectedItemType, isDateRangeRequired, isFormInvalid, isEditing,
         searchQuery, filterDept, filterStartDate, filterEndDate, resetFilters,
-        loadScrapData, submitScrap, editRow, deleteRow, cancelEdit: resetForm, exportScrapExcel
+        loadScrapData, submitScrap, editRow, deleteRow, cancelEdit: resetForm, exportScrapExcel: exportScrapExcelHandler
     };
 }
