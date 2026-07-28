@@ -20,7 +20,6 @@ export const PERMISSION = Object.freeze({
     SCRAP_DELETE: "scrap_delete",
     VIEW_STOCK: "view_stock",
     VIEW_ACTION: "view_action",
-    DASHBOARD_VIEW: "dashboard_view",
     VIEW_STOCK: "view_stock",
     VIEW_OPNAME: "view_opname",
     VIEW_LOW_STOCK: "view_low_stock",
