@@ -3,6 +3,10 @@ import { callAPI } from "./api/gas.js";
 
 import { useAuth } from "./composables/useAuth.js";
 import { useUsers } from "./composables/useUsers.js";
+import { useAcl } from "./composables/useAcl.js";
+import { PERMISSION } from "./constants/permissions.js";
+import { ACCESS_PERMISSIONS } from "./constants/accessPermissions.js";
+import { canAccessPage } from "./constants/pagePermissions.js";
 
 import { useInventory } from "./composables/useInventory.js";
 import { searchInventory } from "./services/inventoryService.js";
@@ -30,6 +34,8 @@ import { useSafeFetch } from "./composables/useSafeFetch.js";
 import { useAnalytics } from "./composables/useAnalytics.js";
 import { useOpname } from "./composables/useOpname.js";
 import { useDashboard } from "./composables/useDashboard.js";
+import { exportDashboardExcel, exportInventoryExcel, exportLowStockExcel, exportOpnameExcel, exportScrapExcel } from "./exports/excelExport.js";
+
 
 const { createApp, ref, computed, onMounted, watch, reactive, nextTick } = Vue;
 
@@ -400,7 +406,8 @@ createApp({
         const {
             adminUsers, isSubmitting, userSearchQuery, filteredAdminUsers,
             pendingUsers, loadUsers, submitNewUser, handleDeleteUser,
-            toggleUser, handleUpdateUserRole, approveWithRole, handleTogglePhotoAccess
+            toggleUser, handleUpdateUserRole, approveWithRole, handleTogglePermission, selectedPermissionUser,
+            showPermissionModal, openPermissionModal
         } = useUsers({ userData, loading, showToast, closeUserModal });
 
         ///====AUTH====///
@@ -409,6 +416,18 @@ createApp({
         } = useAuth({
             loading, loadingProfile, userData, isLoggedIn, page, showToast, refreshAllData, ROLE_LANDING_PAGE, showRegisterModal
         });
+
+        const acl = useAcl(userData);
+        const { permissions, can, cannot, hasRole, canAny, canAll } = acl;
+
+        const previewPhoto = (item) => {
+            if (!can(PERMISSION.PHOTO_PREVIEW)) return;
+
+            openPreviewGallery(
+                item.inventory_photos || [],
+                item.kode
+            );
+        };
 
         ///===INVENTORY===///
         const inventory = useInventory({
@@ -1244,30 +1263,21 @@ createApp({
         };
 
         const openPreviewGallery = async (photos = [], kode = null) => {
-
             let list = photos;
 
             if (kode) {
-
                 list = await fetchPhotos(kode);
-
             }
 
             if (!list.length) return;
 
             previewGallery.value = {
-
                 show: true,
-
                 photos: list.map(p => ({ ...p })),
-
-                current:
-                    list.findIndex(p => p.is_cover) >= 0
-                        ? list.findIndex(p => p.is_cover)
-                        : 0
-
+                current: list.findIndex(p => p.is_cover) >= 0
+                    ? list.findIndex(p => p.is_cover)
+                    : 0
             };
-
         };
 
         const closePreviewGallery = () => {
@@ -1321,6 +1331,50 @@ createApp({
 
 
         ///===ACCESSORIS===///
+        const exportExcel = async () => {
+            try {
+                isExporting.value = true;
+                if (showOpnameModal.value) {
+                    return exportOpnameExcel({
+                        data: filteredOpnameDetail.value,
+                        showToast
+                    });
+                }
+                if (showLowStock.value) {
+                    return exportLowStockExcel({
+                        data: lowStockItems.value
+                    });
+                }
+                if (page.value === "dashboard" || page.value === "riwayat") {
+                    if (!can(PERMISSION.EXPORT_EXCEL)) {
+                        showToast("Anda tidak memiliki akses export", "error");
+                        return;
+                    }
+
+                    return await exportDashboardExcel({
+                        exportHistory,
+                        dashFilter: dashFilter.value,
+                        showToast
+                    });
+                }
+                if (page.value === "inventory" || page.value === "master_barang") {
+                    return await exportInventoryExcel({
+                        getExportInventory
+                    });
+                }
+                if (page.value === "scrap_monitoring") {
+                    const params = await scrap.exportScrapExcel();
+                    return scrap.exportScrapExcel();
+                }
+                alert("Halaman tidak support export");
+            } catch (err) {
+                console.error(err);
+                alert("Gagal export Excel");
+            } finally {
+                isExporting.value = false;
+            }
+        };
+
         const downloadSPPPDF = () => {
             const { jsPDF } = window.jspdf;
             const doc = new jsPDF('l', 'mm', 'a4');
@@ -1477,177 +1531,6 @@ createApp({
 
             // Simpan PDF
             doc.save(`${noSPP.value}.pdf`);
-        };
-
-        const exportExcel = () => {
-            if (showOpnameModal.value) {
-                exportOpnameExcel();
-            } else if (showLowStock.value) {
-                exportLowStockExcel();
-            } else if (page.value === 'dashboard') {
-                exportDashboardExcel();
-            } else if (page.value === 'inventory' || page.value === 'master_barang') {
-                exportInventoryExcel();
-            } else if (page.value === 'riwayat') {
-                exportDashboardExcel();
-            } else if (page.value === 'scrap_monitoring') {
-                scrap.exportScrapExcel();
-            }
-            else {
-                alert("Halaman tidak support export");
-            }
-        };
-
-        const exportOpnameExcel = () => {
-            const dataOpname = filteredOpnameDetail.value;
-
-            if (!dataOpname || dataOpname.length === 0) {
-                alert("Data selisih opname kosong atau sudah kedaluwarsa!");
-                return;
-            }
-
-            const timestamp = new Date().toLocaleDateString("id-ID").replace(/\//g, "-");
-
-            const dataMapped = dataOpname.map(item => ({
-                "TANGGAL OPNAME": item.tanggal ? new Date(item.tanggal).toLocaleString("id-ID") : "-",
-                "KODE BARANG": item.barang_kode,
-                "NAMA BARANG": item.barang_nama,
-                "STOK SISTEM (SEBELUM)": item.stok_sebelum,
-                "STOK NYATA (OPNAME)": item.stok_opname,
-                "SELISIH STOK": item.selisih
-            }));
-
-            const ws = XLSX.utils.json_to_sheet(dataMapped, { origin: "A5" });
-
-            XLSX.utils.sheet_add_aoa(ws, [
-                ["LAPORAN DETAIL SELISIH OPNAME (7 HARI TERAKHIR)"],
-                [`Tanggal Unduh : ${new Date().toLocaleString("id-ID")}`],
-                [`Total Item Selisih : ${dataOpname.length}`]
-            ], { origin: "A1" });
-
-            ws["!cols"] = [
-                { wch: 22 },
-                { wch: 15 },
-                { wch: 35 },
-                { wch: 22 },
-                { wch: 22 },
-                { wch: 15 }
-            ];
-
-            const wb = XLSX.utils.book_new();
-            XLSX.utils.book_append_sheet(wb, ws, "Selisih Opname");
-
-            XLSX.writeFile(wb, `Detail_Selisih_Opname_${timestamp}.xlsx`);
-            showToast(`Export Berhasil (${dataOpname.length} data)`, "success");
-        };
-
-        const exportDashboardExcel = async () => {
-            isExporting.value = true;
-            try {
-                const rows = await exportHistory();
-                if (!rows || rows.length === 0) {
-                    alert("Data kosong!");
-                    return;
-                }
-                const timestamp = new Date().toLocaleDateString("id-ID").replace(/\//g, "-");
-                const data = rows.map(tx => ({
-                    "TANGGAL": tx.tanggal,
-                    "USER": tx.user,
-                    "KODE": tx.kode,
-                    "NAMA BARANG": tx.nama,
-                    "JENIS": tx.jenis,
-                    "QTY": tx.qty,
-                    "STOK AKHIR": tx.stokAkhir,
-                    "DEPT": tx.dept || "-",
-                    "KETERANGAN": tx.ket || "-"
-                }));
-                const ws = XLSX.utils.json_to_sheet(data, { origin: "A5" });
-                XLSX.utils.sheet_add_aoa(ws, [
-                    ["LAPORAN LOG AKTIVITAS"],
-                    [`Tanggal Export : ${new Date().toLocaleString("id-ID")}`],
-                    [`Filter : ${dashFilter.value.startDate || "-"} s/d ${dashFilter.value.endDate || "-"}`],
-                    [`Total Data : ${rows.length}`]
-                ], { origin: "A1" });
-                ws["!cols"] = [{ wch: 20 }, { wch: 20 }, { wch: 15 }, { wch: 40 }, { wch: 12 }, { wch: 10 }, { wch: 15 }, { wch: 20 }, { wch: 40 }];
-                const wb = XLSX.utils.book_new();
-                XLSX.utils.book_append_sheet(wb, ws, "Riwayat");
-                XLSX.writeFile(wb, `Riwayat_${timestamp}.xlsx`);
-                showToast(`Export berhasil (${rows.length} data)`, "success");
-            } catch (err) {
-                console.error(err);
-                alert("Gagal export data");
-            } finally {
-                isExporting.value = false;
-            }
-        };
-
-        const exportInventoryExcel = async () => {
-            try {
-                isExporting.value = true;
-                await new Promise(resolve => setTimeout(resolve, 50));
-
-                const exportData = await getExportInventory();
-                if (!exportData.length) {
-                    alert("Data kosong!");
-                    return;
-                }
-                const timestamp = new Date().toLocaleDateString('id-ID').replace(/\//g, '-');
-                const rows = [
-                    ["KODE", "NAMA BARANG", "CATEGORY", "STOK", "STATUS"]
-                ];
-                exportData.forEach(item => {
-                    rows.push([
-                        item.kode,
-                        item.nama,
-                        item.category || "-",
-                        item.stok,
-                        item.lokasi
-                    ]);
-                });
-                const ws = XLSX.utils.aoa_to_sheet(rows);
-                ws["!cols"] = [{ wch: 18 }, { wch: 40 }, { wch: 20 }, { wch: 10 }, { wch: 12 }];
-                const wb = XLSX.utils.book_new();
-                XLSX.utils.book_append_sheet(wb, ws, "Inventory");
-                XLSX.writeFile(wb, `Inventory_${timestamp}.xlsx`);
-            } catch (err) {
-                console.error(err);
-                alert("Gagal export excel");
-            } finally {
-                isExporting.value = false;
-            }
-        };
-
-        const exportLowStockExcel = () => {
-            if (!lowStockItems.value.length) {
-                alert("Data stok kritis kosong!");
-                return;
-            }
-
-            const timestamp = new Date().toLocaleDateString('id-ID').replace(/\//g, '-');
-
-            const data = lowStockItems.value.map(item => ({
-                "KODE BARANG": item.kode,
-                "NAMA BARANG": item.nama,
-                "SATUAN": item.satuan,
-                "STOK SAAT INI": item.stok,
-                "MINIMUM STOK": item.min_stok,
-                "KEKURANGAN": item.min_stok - item.stok,
-                "SARAN ORDER (PR)": (item.min_stok) * 2
-            }));
-
-            const ws = XLSX.utils.json_to_sheet(data, { origin: "A5" });
-
-            // Header ala report
-            XLSX.utils.sheet_add_aoa(ws, [
-                ["LAPORAN STOK KRITIS (LOW STOCK)"],
-                [`Tanggal Export : ${new Date().toLocaleString('id-ID')}`],
-                [`Total Item : ${lowStockItems.value.length}`],
-            ], { origin: "A1" });
-
-            const wb = XLSX.utils.book_new();
-            XLSX.utils.book_append_sheet(wb, ws, "Low Stock");
-
-            XLSX.writeFile(wb, `Low_Stock_${timestamp}.xlsx`);
         };
 
         const downloadPDF = () => {
@@ -1866,7 +1749,9 @@ createApp({
         return {
             // 1. CORE APP & AUTH STATE
             isLoggedIn, loading, isSubmitting, page, userRole, userData, loginData,
-            handleLogin, handleLogout, navigate, toast, selectedRow, handleDeleteUser,
+            handleLogin, handleLogout, navigate, toast, selectedRow, handleDeleteUser, handleTogglePermission, selectedPermissionUser,
+            showPermissionModal, openPermissionModal, previewPhoto,
+            permissions, can, cannot, hasRole, canAny, canAll, canAccessPage, PERMISSION, ACCESS_PERMISSIONS,
 
             // 2. UI & NAVIGATION STATE
             sidebarOpen, showPassword, showPass, showCart, showLowStock, showRegisterModal,
@@ -1880,28 +1765,11 @@ createApp({
             searchInputRef, departments, fixDriveUrl, searchResults, handleSearch, publicInventory,
 
             // 4. ITEM CRUD & MODALS
-            formItem, isEditMode, openAddModal, editItem, saveItem, toggleStatus,
-            selectedItem, formInput, saveNewLocation, openUpdateLocation, showImportModal,
-            importStep,
-            rawExcelInput,
-            parsedItems,
-            isImporting,
-            openImportExcelModal,
-            processExcelRawInput,
+            formItem, isEditMode, formInput, selectedItem, openAddModal, editItem, saveItem, toggleStatus, getItemCoverPhoto,
+            saveNewLocation, openUpdateLocation, catalog, showAddFolderModal, newFolderName, handleCreateFolder, openCatalogMenu, showFolderMenu,
+            showAssignModal, selectedItemForFolder, selectedTargetFolderId, openAssignFolderModal, executeAssignFolder,
+            showImportModal, importStep, rawExcelInput, parsedItems, isImporting, validCount, duplicateCount, openImportExcelModal, processExcelRawInput,
             executeBatchInsert,
-            validCount,
-            duplicateCount,
-            catalog,
-            showAddFolderModal,
-            newFolderName,
-            showAssignModal,
-            selectedItemForFolder,
-            selectedTargetFolderId,
-            getItemCoverPhoto,
-            handleCreateFolder,
-            openAssignFolderModal,
-            executeAssignFolder,
-            openCatalogMenu, showFolderMenu,
 
             // 5. TRANSACTION & CART (WMS)
             cart, inputQty, qtyInputRef, previewData, pasteData, tx, isSearchingServer, processing, importLoading,
@@ -1925,13 +1793,13 @@ createApp({
             reservasiMeta, bukaPopUpReservasi, tambahkanKeForm, itemsPerPage, paginatedItems,
 
             // 8. USER MANAGEMENT & PROFILE
-            adminUsers, filteredAdminUsers, userSearchQuery, handleUpdateUserRole, handleTogglePhotoAccess, loadUsers,
+            adminUsers, filteredAdminUsers, userSearchQuery, handleUpdateUserRole, loadUsers,
             newUser, openUserModal, submitNewUser, regData, handleRegister, pendingUsers, refreshSession,
             profileForm, loadingProfile, openEditProfile, handleUpdateProfile, approveWithRole,
             pivotData, isPivotLoaded, isPivotLoading, refreshAllData,
 
             // 9. UPDATE SUPABASE
-            exportExcel, exportDashboardExcel, exportInventoryExcel, exportLowStockExcel, exportOpnameExcel, isExporting, analyticsFilter, loadPivot, safeFetch, loadHistory,
+            exportExcel, isExporting, analyticsFilter, loadPivot, safeFetch, loadHistory,
             catatanSpp, scrap, loadScrapData: scrap.loadScrapData, showScrapInput,
 
             // 10. DASHBOARD & REPORTING
