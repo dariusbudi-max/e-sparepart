@@ -9,7 +9,7 @@ export const useUploadPhoto = (deps) => {
 
     const refreshPhotoList = async (kode) => {
         const latest = await fetchPhotos(kode);
-        formItem.value.photos = latest;
+        formItem.value.photos = [...latest];
         formItem.value.selectedPhoto = latest.find(p => p.is_cover) || latest[0] || null;
         return latest;
     };
@@ -25,34 +25,24 @@ export const useUploadPhoto = (deps) => {
     };
 
     const saveUploadedPhoto = async ({ file = null, base64 = null }) => {
-        if (isUploading.value) return;
-        isUploading.value = true;
-
         try {
             const kode = formItem.value.kode;
             if (!kode) throw new Error("Barang harus disimpan terlebih dahulu.");
 
             let driveFile = null;
+            if (file) driveFile = await uploadFile(file, kode);
+            else if (base64) driveFile = await uploadBase64(base64, kode);
 
-            if (file) {
-                driveFile = await uploadFile(file, kode);
-            } else if (base64) {
-                driveFile = await uploadBase64(base64, kode);
-            }
-
-            if (!driveFile) {
-                throw new Error("Tidak ada gambar untuk diupload");
-            }
+            if (!driveFile) throw new Error("Tidak ada gambar untuk diupload.");
 
             await addPhoto(kode, driveFile.url, driveFile.fileId);
+
             const latest = await refreshPhotoList(kode);
-            showToast("Foto berhasil ditambahkan", "success");
             return latest;
         } catch (err) {
-            showToast(err.message, "error");
+            console.error(err);
+            showToast(err?.message || "Gagal mengupload foto.", "error");
             throw err;
-        } finally {
-            isUploading.value = false;
         }
     };
 
@@ -66,8 +56,6 @@ export const useUploadPhoto = (deps) => {
     };
 
     return {
-        saveUploadedPhoto,
-        readFilePreview,
-        refreshPhotoList
+        saveUploadedPhoto, readFilePreview, refreshPhotoList
     };
 };
