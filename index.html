@@ -1821,10 +1821,16 @@
                                             <span class="truncate">{{ f.nama }}</span>
                                         </div>
 
-                                        <button v-if="can(PERMISSION.CATALOG_FOLDER_MANAGE)" @click.stop="catalog.removeFolder(f.id, f.nama)"
-                                            class="text-slate-400 hover:text-red-600 p-1 rounded-md hover:bg-slate-200/50">
-                                            <i class="fa-solid fa-trash-can text-xs"></i>
-                                        </button>
+                                        <div v-if="can(PERMISSION.CATALOG_FOLDER_MANAGE)" class="flex items-center gap-1">
+                                            <button @click.stop="catalog.renameFolder(f.id, f.nama)"
+                                                class="text-slate-400 hover:text-blue-600 p-1 rounded-md hover:bg-slate-200/50" title="Rename Folder">
+                                                <i class="fa-solid fa-pen text-xs"></i>
+                                            </button>
+                                            <button @click.stop="catalog.removeFolder(f.id, f.nama)"
+                                                class="text-slate-400 hover:text-red-600 p-1 rounded-md hover:bg-slate-200/50" title="Hapus Folder">
+                                                <i class="fa-solid fa-trash-can text-xs"></i>
+                                            </button>
+                                        </div>
                                     </div>
                                 </div>
                             </aside>
@@ -1891,10 +1897,17 @@
                                                     <i class="fa-solid fa-folder text-amber-400 text-lg md:text-xl shrink-0"></i>
                                                     <span class="text-xs md:text-sm font-semibold text-slate-700 truncate group-hover:text-blue-700">{{ f.nama }}</span>
                                                 </div>
-                                                <button v-if="can(PERMISSION.CATALOG_FOLDER_MANAGE)" @click.stop="catalog.removeFolder(f.id, f.nama)"
-                                                    class="text-slate-300 hover:text-red-600 p-1 rounded-lg hover:bg-slate-100 opacity-0 group-hover:opacity-100 transition-all">
-                                                    <i class="fa-solid fa-trash-can text-xs"></i>
-                                                </button>
+                                                <div v-if="can(PERMISSION.CATALOG_FOLDER_MANAGE)"
+                                                    class="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all">
+                                                    <button @click.stop="catalog.renameFolder(f.id, f.nama)"
+                                                        class="text-slate-300 hover:text-blue-600 p-1 rounded-lg hover:bg-slate-100" title="Rename Folder">
+                                                        <i class="fa-solid fa-pen text-xs"></i>
+                                                    </button>
+                                                    <button @click.stop="catalog.removeFolder(f.id, f.nama)"
+                                                        class="text-slate-300 hover:text-red-600 p-1 rounded-lg hover:bg-slate-100" title="Hapus Folder">
+                                                        <i class="fa-solid fa-trash-can text-xs"></i>
+                                                    </button>
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
