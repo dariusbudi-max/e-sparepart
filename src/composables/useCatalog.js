@@ -73,6 +73,36 @@ export function useCatalog({ showToast, inventory }) {
         }
     };
 
+    const renameFolder = async (id, oldName) => {
+        const nama = prompt("Nama folder baru", oldName);
+        if (nama === null) return;
+
+        const newName = nama.trim();
+        if (!newName) return showToast("Nama folder tidak boleh kosong", "error");
+        if (newName === oldName) return;
+
+        try {
+            const updated = await updateCatalogFolder(id, newName);
+
+            const folder = folders.value.find(f => f.id === id);
+            if (folder) folder.nama = updated.nama;
+
+            catalogItems.value.forEach(item => {
+                if (item.folder_id === id && item.catalog_folder) item.catalog_folder.nama = updated.nama;
+            });
+
+            const updateFolderProp = item => {
+                if (item.folder_id === id) item.catalog_folder = { ...(item.catalog_folder || {}), id, nama: updated.nama };
+            };
+            inventory.inventory.value.forEach(updateFolderProp);
+            inventory.serverResults.value.forEach(updateFolderProp);
+
+            showToast("Folder berhasil diubah", "success");
+        } catch (err) {
+            showToast(err.message || "Gagal mengubah folder", "error");
+        }
+    };
+
     const removeFolder = async (id, nama) => {
         const confirmText = `Hapus folder "${nama}"?\n\nSemua item akan dipindahkan ke Tanpa Folder.`;
         if (!confirm(confirmText)) return;
@@ -136,12 +166,9 @@ export function useCatalog({ showToast, inventory }) {
     });
 
     return {
-        folders, selectedFolderId,
-        catalogSearch, activeFolderObj, loadFolders, loading,
-        isSearching, currentPage,
-        hasMore, catalogScrollPosition,
-        catalogItems,
-        loadItems,
+        folders, selectedFolderId, catalogSearch, activeFolderObj, loadFolders, loading,
+        isSearching, currentPage, hasMore, catalogScrollPosition,
+        catalogItems, renameFolder, loadItems,
         loadFolderContent, addFolder, removeFolder, moveItemsToFolder
     };
 }
