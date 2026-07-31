@@ -2,9 +2,34 @@ import { PERMISSION } from "./permissions.js";
 
 export const ACCESS_PERMISSIONS = [
     {
-        key: PERMISSION.DASHBOARD_VIEW,
+        key: PERMISSION.DASHBOARD,
         label: "View Dashboard",
         icon: "fa-chart-line"
+    },
+    {
+        key: PERMISSION.CATALOG,
+        label: "Access Catalog",
+        icon: "fa-book"
+    },
+    {
+        key: PERMISSION.CATALOG_FOLDER_MANAGE,
+        label: "Manage Catalog Folder",
+        icon: "fa-folder-tree"
+    },
+    {
+        key: PERMISSION.SCRAP,
+        label: "Access Scrap Monitoring",
+        icon: "fa-recycle"
+    },
+    {
+        key: PERMISSION.SCRAP_EDIT,
+        label: "Edit Scrap",
+        icon: "fa-pen"
+    },
+    {
+        key: PERMISSION.SCRAP_DELETE,
+        label: "Delete Scrap",
+        icon: "fa-trash"
     },
     {
         key: PERMISSION.PHOTO_UPDATE,
