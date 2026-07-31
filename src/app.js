@@ -452,6 +452,14 @@ createApp({
             }
         };
 
+        const disableSaveItem = computed(() => {
+            return (
+                loading.value ||
+                isUploading.value ||
+                !!photoPreview.value
+            );
+        });
+
         const saveNewLocation = async () => {
             try {
                 await inventory.saveNewLocation({
@@ -1141,7 +1149,7 @@ createApp({
             saveNewLocation, openUpdateLocation, catalog, showAddFolderModal, newFolderName, handleCreateFolder, openCatalogMenu, showFolderMenu,
             showAssignModal, selectedItemForFolder, selectedTargetFolderId, openAssignFolderModal, executeAssignFolder,
             showImportModal, importStep, rawExcelInput, parsedItems, isImporting, validCount, duplicateCount, openImportExcelModal, processExcelRawInput,
-            executeBatchInsert,
+            executeBatchInsert, disableSaveItem,
 
             // 5. TRANSACTION & CART (WMS)
             cart, inputQty, qtyInputRef, previewData, pasteData, tx, isSearchingServer, processing, importLoading,
