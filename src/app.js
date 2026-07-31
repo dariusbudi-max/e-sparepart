@@ -12,6 +12,7 @@ import { useInventory } from "./composables/useInventory.js";
 import { searchInventory } from "./services/inventoryService.js";
 import { fetchPhotos, deletePhoto, setCoverPhoto, updatePhotoOrder } from "./services/inventoryPhotoService.js";
 import { useCatalog } from "./composables/useCatalog.js";
+import { usePhotoManager } from "./composables/usePhotoManager.js";
 
 import { useScrapMonitoring } from "./composables/useScrapMonitoring.js";
 
@@ -35,7 +36,7 @@ import { useAnalytics } from "./composables/useAnalytics.js";
 import { useOpname } from "./composables/useOpname.js";
 import { useDashboard } from "./composables/useDashboard.js";
 import { exportDashboardExcel, exportInventoryExcel, exportLowStockExcel, exportOpnameExcel, exportScrapExcel } from "./exports/excelExport.js";
-
+import { downloadSPPPDF, downloadBONPDF } from "./exports/pdfExport.js";
 
 const { createApp, ref, computed, onMounted, watch, reactive, nextTick } = Vue;
 
@@ -78,9 +79,7 @@ createApp({
 
         const isCameraActive = ref(false);
         const videoFeed = ref(null);
-
         const historySearch = ref('');
-
         const showLowStock = ref(false);
         const summarySppItems = ref([]);
         const catatanSpp = ref([]);
@@ -942,369 +941,20 @@ createApp({
             showToast
         });
 
-        const canUploadPhoto = computed(() => {
-            return isEditMode.value && !!formItem.value.kode;
-        });
-
-        const launchGallery = () => {
-            if (fileInput.value) {
-                fileInput.value.value = "";
-                fileInput.value.click();
-            }
-        };
-
-        const handleGallerySelected = async (event) => {
-            const file = event.target.files?.[0];
-            if (!file) return;
-
-            if (!file.type.startsWith("image/")) {
-                showToast("File harus berupa gambar.", "error");
-                return;
-            }
-
-            await processImageFile(file);
-        };
-
-        const handleUrlSelected = async () => {
-            let url = photoUrlInput.value.trim();
-
-            if (!url) {
-                showToast("Masukkan URL gambar yang valid", "error");
-                return;
-            }
-
-            try {
-                showToast("Sedang memuat gambar dari URL...", "info");
-                url = url.includes("drive.google.com") ? fixDriveUrl(url) : `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`;
-
-                const response = await fetch(url);
-                if (!response.ok) throw new Error("Gagal mengambil file gambar dari server asal.");
-
-                const blob = await response.blob();
-                if (!blob.type.startsWith("image/")) throw new Error("URL tidak mengarah ke file gambar.");
-
-                const rawBase64 = await readFilePreview(blob);
-                const img = new Image();
-                img.src = rawBase64;
-
-                img.onload = async () => {
-                    try {
-                        photoPreview.value = await createWatermarkedImage(img, formItem.value.kode);
-                        previewSource.value = "url";
-                        photoUrlInput.value = "";
-                        showToast("Gambar URL berhasil dimuat dengan watermark", "success");
-                    } catch (err) {
-                        showToast(err.message, "error");
-                    }
-                };
-
-                img.onerror = () => {
-                    showToast("Gagal merender file gambar.", "error");
-                };
-            } catch (err) {
-                showToast("Gagal memproses gambar URL: " + err.message, "error");
-            }
-        };
-
-        const handleTakePhoto = async () => {
-            if (!videoFeed.value || videoFeed.value.readyState !== 4) {
-                showToast("Kamera belum siap", "error");
-                return;
-            }
-
-            try {
-                photoPreview.value = await createWatermarkedImage(videoFeed.value, formItem.value.kode);
-                previewSource.value = "camera";
-                stopCamera();
-                showToast("Foto berhasil diambil! Silakan tinjau.", "success");
-            } catch (err) {
-                showToast("Gagal memproses gambar: " + err.message, "error");
-            }
-        };
-
-        const removePhoto = async (photo) => {
-            if (!confirm("Hapus foto ini?")) return;
-            try {
-                if (photo.drive_file_id) await deleteFromDrive(photo.drive_file_id);
-                await deletePhoto(photo.id);
-                await refreshPhotos(formItem.value.kode);
-                showToast("Foto berhasil dihapus", "success");
-            } catch (err) {
-                console.error("DELETE PHOTO ERROR:", err);
-                showToast(err.message, "error");
-            }
-        };
-
-        const openUpdateFoto = async (item) => {
-
-            const photos = await fetchPhotos(item.kode);
-
-            formItem.value = {
-
-                kode: item.kode,
-                nama: item.nama,
-                satuan: item.satuan || "",
-                lokasi: item.lokasi || "",
-                category: item.category || "",
-                min_stok: item.min_stok || 0,
-                status: item.status || "AKTIF",
-
-                photos,
-
-                selectedPhoto:
-                    photos.find(p => p.is_cover) ||
-                    photos[0] ||
-                    null
-
-            };
-
-            showPhotoModal.value = true;
-
-        };
-
-        const handleDrop = async (e) => {
-            e.preventDefault();
-
-            dragCounter.value = 0;
-            isDragOver.value = false;
-
-            const file = e.dataTransfer.files?.[0];
-
-            if (!file) return;
-
-            await processImageFile(file);
-        };
-
-        const handleDragOver = (e) => {
-            e.preventDefault();
-        };
-
-        const handleDragEnter = (e) => {
-            e.preventDefault();
-
-            dragCounter.value++;
-
-            isDragOver.value = true;
-        };
-
-        const handleDragLeave = (e) => {
-            e.preventDefault();
-
-            dragCounter.value--;
-
-            if (dragCounter.value <= 0) {
-                dragCounter.value = 0;
-                isDragOver.value = false;
-            }
-        };
-
-        const processImageFile = async (file) => {
-            try {
-                const rawBase64 = await readFilePreview(file);
-                const img = new Image();
-                img.src = rawBase64;
-
-                img.onload = async () => {
-                    try {
-                        photoPreview.value = await createWatermarkedImage(img, formItem.value.kode);
-                        previewSource.value = "gallery";
-                        showToast("Gambar berhasil diproses", "success");
-                    } catch (err) {
-                        showToast(err.message, "error");
-                    }
-                };
-
-                img.onerror = () => {
-                    showToast("Gagal membaca gambar.", "error");
-                };
-            } catch (err) {
-                showToast("Gagal memproses file: " + err.message, "error");
-            }
-        };
-
-        const confirmAndUploadPhoto = async () => {
-            if (isUploading.value) return;
-
-            if (!photoPreview.value) {
-                showToast("Belum ada foto yang akan diupload.", "error");
-                return;
-            }
-
-            try {
-                const base64Clean = photoPreview.value.includes(",")
-                    ? photoPreview.value.split(",")[1]
-                    : photoPreview.value;
-
-                const latest = await saveUploadedPhoto({
-                    base64: base64Clean
-                });
-
-                await refreshPhotos(formItem.value.kode);
-
-                photoPreview.value = null;
-                previewSource.value = null;
-                photoUrlInput.value = "";
-
-                if (fileInput.value) {
-                    fileInput.value.value = "";
-                }
-
-                stopCamera();
-            } catch (err) {
-                console.error(err);
-                showToast("Proses upload gagal.", "error");
-            }
-        };
-
-        const refreshPhotos = async (kode) => {
-            try {
-                const latest = await refreshPhotoList(kode);
-
-                const updatePhotoCache = (list) => {
-                    if (!Array.isArray(list)) return;
-
-                    const index = list.findIndex(item => item.kode === kode);
-
-                    if (index !== -1) {
-                        list[index] = {
-                            ...list[index],
-                            inventory_photos: [...latest]
-                        };
-                    }
-                };
-
-                updatePhotoCache(inventory.inventory.value);
-                updatePhotoCache(inventory.serverResults.value);
-                updatePhotoCache(catalog.catalogItems.value);
-
-                return latest;
-            } catch (err) {
-                console.error("Refresh Photos Error:", err);
-                throw err;
-            }
-        };
-
-        const resetPhotoState = () => {
-            stopCamera();
-            photoPreview.value = null;
-            previewSource.value = null;
-            photoUrlInput.value = "";
-            isUploading.value = false;
-            if (fileInput.value) fileInput.value.value = "";
-        };
-
-        const closePhotoModal = () => {
-            resetPhotoState();
-            showPhotoModal.value = false;
-        };
-
-        const closeModal = () => {
-            resetPhotoState();
-            showItemModal.value = false;
-        };
-
-        const cancelPreview = async () => {
-            photoPreview.value = null;
-            if (fileInput.value) fileInput.value.value = "";
-
-            if (previewSource.value === "camera") {
-                previewSource.value = null;
-                await nextTick();
-                await startLiveCamera();
-                return;
-            }
-
-            previewSource.value = null;
-        };
-
-        const startLiveCamera = async () => {
-            isCameraActive.value = true;
-
-            await (typeof nextTick !== 'undefined' ? nextTick() : Vue.nextTick());
-
-            try {
-                await startCamera();
-                previewSource.value = "camera";
-            } catch (err) {
-                showToast("Gagal membuka kamera", "error");
-                isCameraActive.value = false;
-            }
-        };
-
-        const stopCamera = () => {
-            stopCameraCore();
-            isCameraActive.value = false;
-
-            if (videoFeed.value) {
-                videoFeed.value.srcObject = null;
-            }
-        };
-
-        const selectPhoto = (photo) => {
-            formItem.value.selectedPhoto = photo;
-        };
-
-        const makeCover = async (photo) => {
-
-            try {
-
-                await setCoverPhoto(formItem.value.kode, photo.id);
-
-                await refreshPhotos(formItem.value.kode);
-
-                showToast("Foto utama berhasil diperbarui", "success");
-
-            } catch (err) {
-
-                showToast(err.message, "error");
-
-            }
-
-        };
-
-        const openPreviewGallery = async (photos = [], kode = null) => {
-            let list = photos;
-
-            if (kode) {
-                list = await fetchPhotos(kode);
-            }
-
-            if (!list.length) return;
-
-            previewGallery.value = {
-                show: true,
-                photos: list.map(p => ({ ...p })),
-                current: list.findIndex(p => p.is_cover) >= 0
-                    ? list.findIndex(p => p.is_cover)
-                    : 0
-            };
-        };
-
-        const closePreviewGallery = () => {
-            previewGallery.value.show = false;
-        };
-
-        const nextPreview = () => {
-            if (!previewGallery.value.photos.length) return;
-
-            previewGallery.value.current =
-                (previewGallery.value.current + 1) %
-                previewGallery.value.photos.length;
-        };
-
-        const prevPreview = () => {
-            if (!previewGallery.value.photos.length) return;
-
-            previewGallery.value.current =
-                (previewGallery.value.current - 1 +
-                    previewGallery.value.photos.length) %
-                previewGallery.value.photos.length;
-        };
-
-        const currentPreviewPhoto = computed(() => {
-            return previewGallery.value.photos[
-                previewGallery.value.current
-            ];
+        const {
+            canUploadPhoto, launchGallery, handleGallerySelected, handleUrlSelected,
+            handleTakePhoto, removePhoto, openUpdateFoto, processImageFile,
+            handleDrop, handleDragOver, handleDragEnter, handleDragLeave,
+            confirmAndUploadPhoto, refreshPhotos, resetPhotoState, closePhotoModal,
+            closeModal, cancelPreview, startLiveCamera, stopCamera,
+            selectPhoto, makeCover, openPreviewGallery, closePreviewGallery,
+            nextPreview, prevPreview, currentPreviewPhoto
+        } = usePhotoManager({
+            Vue, videoFeed, fileInput, photoPreview,
+            previewSource, photoUrlInput, formItem, showPhotoModal, showItemModal,
+            isEditMode, isUploading, isCameraActive, dragCounter, isDragOver, previewGallery,
+            inventory, catalog, showToast, createWatermarkedImage, fixDriveUrl, readFilePreview, saveUploadedPhoto, refreshPhotoList,
+            fetchPhotos, deletePhoto, deleteFromDrive, setCoverPhoto, startCamera, stopCameraCore
         });
 
         const scrap = useScrapMonitoring({
@@ -1375,302 +1025,24 @@ createApp({
             }
         };
 
-        const downloadSPPPDF = () => {
-            const { jsPDF } = window.jspdf;
-            const doc = new jsPDF('l', 'mm', 'a4');
-            const totalPages = chunkedSppItems.value.length;
-
-            chunkedSppItems.value.forEach((pageItems, index) => {
-                if (index > 0) doc.addPage();
-
-                // --- 1. HEADER SECTION ---
-                doc.setFontSize(11);
-                doc.setFont("helvetica", "bold");
-                doc.text("PT BINTANG INDOKARYA GEMILANG", 15, 15);
-
-                doc.setFontSize(7);
-                doc.setFont("helvetica", "normal");
-                doc.text("Jl. Raya Cendrawasih No. 6 KM.20 Tengguli, Kec. Tanjung", 15, 20);
-                doc.text("Brebes - Jawa Tengah", 15, 23);
-
-                // Judul Tengah
-                doc.setFontSize(14);
-                doc.setFont("helvetica", "bold");
-                const title = "SURAT PERMOHONAN PEMBELIAN";
-                const titleWidth = doc.getTextWidth(title);
-                const centerX = 148.5;
-
-                doc.text(title, centerX, 25, { align: 'center' });
-                doc.setLineWidth(0.5);
-                doc.line(centerX - (titleWidth / 2), 26.5, centerX + (titleWidth / 2), 26.5);
-
-                const boxX = 220;
-                const boxY = 10;
-                const labelX = 223;
-                const valueX = 245;
-
-                doc.setFontSize(8);
-                doc.setLineWidth(0.2);
-                doc.rect(boxX, boxY, 65, 18);
-
-                doc.setFont("helvetica", "bold");
-
-                // Baris 1: No SPP
-                doc.text("No. Internal", labelX, 15);
-                doc.text(":", valueX, 15);
-                doc.text(noSPP.value, valueX + 2, 15);
-
-                // Baris 2: Tanggal
-                doc.text("Tanggal", labelX, 20);
-                doc.text(":", valueX, 20);
-                doc.text(`${new Date().toLocaleDateString('id-ID')}`, valueX + 2, 20);
-
-                // Baris 3: Dept
-                doc.text("Department", labelX, 25);
-                doc.text(":", valueX, 25);
-                doc.text("SPAREPART", valueX + 2, 25);
-
-                // --- 2. TABLE SECTION ---
-                const tableData = pageItems.map((item, i) => [
-                    (index * 17) + i + 1,
-                    item.kode,
-                    item.nama,
-                    item.satuan,
-                    item.qtyDiminta,
-                    item.stok,
-                    txTanggal.value || '-',
-                    item.jmlPakai,
-                    item.keterangan || '-'
-                ]);
-
-                // Tambah baris kosong jika data < 15 agar layout konsisten
-                while (tableData.length < 17) {
-                    tableData.push(["", "", "", "", "", "", "", "", ""]);
-                }
-
-                doc.autoTable({
-                    startY: 34,
-                    head: [['No', 'Kode', 'Nama & Spesifikasi Barang', 'UoM', 'Qty', 'Stock', 'Tgl Dibutuhkan', 'Jumlah Pakai', 'Keterangan']],
-                    body: tableData,
-                    theme: 'grid',
-                    headStyles: {
-                        fillColor: [30, 41, 59],
-                        fontSize: 8,
-                        halign: 'center',
-                        cellPadding: 1.5
-                    },
-                    styles: {
-                        fontSize: 7,
-                        cellPadding: 1.2,
-                        valign: 'middle',
-                        overflow: 'linebreak'
-                    },
-                    columnStyles: {
-                        0: { cellWidth: 8, halign: 'center' },
-                        1: { cellWidth: 23 },
-                        2: { cellWidth: 'auto' }, // Nama barang fleksibel
-                        3: { cellWidth: 12, halign: 'center' },
-                        4: { cellWidth: 15, halign: 'center', fontStyle: 'bold' },
-                        5: { cellWidth: 12, halign: 'center' },
-                        6: { cellWidth: 25, halign: 'center' },
-                        7: { cellWidth: 22, halign: 'center' },
-                        8: { cellWidth: 32 }
-                    },
-
-                    didDrawPage: (data) => {
-                        let finalY = data.cursor.y + 5;
-                    }
-                });
-
-                const finalY = doc.lastAutoTable.finalY + 5;
-
-                // --- 3. CATATAN SECTION ---
-                doc.setFontSize(7);
-                doc.setFont("helvetica", "bold");
-                doc.text("CATATAN PENDUKUNG:", 15, finalY);
-                doc.rect(15, finalY + 2, 130, 25);
-                doc.setFont("helvetica", "italic");
-                doc.text("-", 17, finalY + 6);
-
-                doc.setFont("helvetica", "bold");
-                doc.text("REKOMENDASI :", 152, finalY);
-                doc.rect(152, finalY + 2, 130, 25);
-
-                // --- 4. SIGNATURE SECTION ---
-                const signY = finalY + 34;
-                const colWidth = 297 / 4;
-                const signLabels = ["Dibuat Oleh,", "Diperiksa,", "Diketahui,", "Disetujui,"];
-                const signNames = [
-                    sppSign.value.pembuat,
-                    sppSign.value.pemeriksa,
-                    sppSign.value.diketahui,
-                    sppSign.value.disetujui
-                ];
-
-                signLabels.forEach((label, i) => {
-                    const xPos = (colWidth * i) + (colWidth / 2);
-
-                    doc.setFontSize(8);
-                    doc.setFont("helvetica", "bold");
-                    doc.text(label, xPos, signY, { align: 'center' });
-
-                    doc.setFontSize(8);
-                    doc.text(signNames[i], xPos, signY + 22, { align: 'center' });
-
-                    const textWidth = doc.getTextWidth(signNames[i]) + 10;
-                    doc.line(xPos - (textWidth / 2), signY + 18, xPos + (textWidth / 2), signY + 18);
-                });
-
-                // --- 5. FOOTER SECTION ---
-                doc.setFontSize(6);
-                doc.setFont("helvetica", "italic");
-                doc.text(`Dicetak: ${new Date().toLocaleString('id-ID')}`, 15, 205);
-                doc.setFont("helvetica", "bold");
-                doc.text(`Hal: ${index + 1} / ${totalPages}`, 282, 202, { align: 'right' });
+        const exportSPP = () => {
+            downloadSPPPDF({
+                chunkedSppItems: chunkedSppItems.value,
+                noSPP: noSPP.value,
+                txTanggal: txTanggal.value,
+                sppSign: sppSign.value
             });
-
-            // Simpan PDF
-            doc.save(`${noSPP.value}.pdf`);
         };
 
-        const downloadPDF = () => {
-            const { jsPDF } = window.jspdf;
-            const doc = new jsPDF('p', 'mm', 'a4');
-
-            const dept = (txDept.value || '-').toUpperCase();
-            const tgl = txTanggal.value || '-';
-            const resv = (txReservasi.value || '-').toUpperCase();
-            const noDoc = docNumber.value || new Date().getTime().toString().substring(7);
-            const userName = (userData.value?.nama || '............');
-
-            const allPages = paginatedItems.value;
-            if (allPages.length === 0) return;
-
-            // Kita melompat 2 halaman sekaligus (i += 2)
-            for (let i = 0; i < allPages.length; i += 2) {
-                // Jika bukan lembar pertama, tambah kertas baru
-                if (i > 0) doc.addPage();
-
-                // 1. Gambar Halaman UI ke-i di posisi ATAS (Y: 10)
-                drawFormToPDF(doc, allPages[i], 10, dept, tgl, resv, noDoc, i + 1, userName, allPages.length);
-
-                // --- 2. GARIS POTONG TENGAH (Simetris di 148.5mm) ---
-                doc.setDrawColor(200, 200, 200);
-                doc.setLineDashPattern([2, 2], 0);
-                doc.line(5, 148.5, 205, 148.5);
-                doc.setLineDashPattern([], 0);
-                doc.setDrawColor(0, 0, 0);
-
-                // 2. Gambar Halaman UI ke-(i+1) di posisi BAWAH (Y: 150) jika ada
-                if (allPages[i + 1]) {
-                    drawFormToPDF(doc, allPages[i + 1], 158, dept, tgl, resv, noDoc, i + 2, userName, allPages.length);
-                }
-            }
-
-            doc.save(`BON BPSC_${dept}_${noDoc}.pdf`);
-        };
-
-        const drawFormToPDF = (doc, items, startY, dept, tgl, resv, noDoc, pageNum, userName) => {
-            // --- HEADER ---
-            doc.setFont("helvetica", "bold");
-            doc.setFontSize(8);
-            doc.text("PT BINTANG INDOKARYA GEMILANG", 10, startY);
-
-            doc.rect(170, startY - 4, 30, 6);
-            doc.text(`No. Doc: #${noDoc}`, 171, startY);
-
-            doc.setFontSize(14);
-            doc.text("BUKTI PERMINTAAN SUKU CADANG", 105, startY + 8, { align: "center" });
-            doc.line(10, startY + 10, 200, startY + 10);
-
-            // --- INFO DEPT/TGL/RESV ---
-            doc.setFontSize(9);
-            doc.text(`DEPT: ${dept}`, 10, startY + 20);
-            doc.text(`TGL: ${tgl}`, 85, startY + 20);
-            doc.text(`RESV: ${resv}`, 155, startY + 20);
-
-            // --- TABLE HEADER ---
-            let currentY = startY + 25;
-            const colX = [10, 35, 93, 105, 120, 135, 165, 200]; // Koordinat X tiap garis vertikal
-
-            doc.setFillColor(240, 240, 240);
-            doc.rect(10, currentY, 190, 7, 'F'); // Background Header
-            doc.rect(10, currentY, 190, 7);     // Outline Header
-
-            // Garis Vertikal Header
-            colX.forEach(x => doc.line(x, currentY, x, currentY + 7));
-
-            doc.setFontSize(7);
-            doc.text("Kode", 12, currentY + 5);
-            doc.text("Nama Suku Cadang", 37, currentY + 5);
-            doc.text("Sat", 95, currentY + 5);
-            doc.text("Qty", 108, currentY + 5);
-            doc.text("Real", 124, currentY + 5);
-            doc.text("No. Mesin", 137, currentY + 5);
-            doc.text("Keterangan", 167, currentY + 5);
-
-            // --- TABLE BODY ---
-            doc.setFont("helvetica", "normal");
-
-            // Gabungkan data asli + baris kosong (total 8 baris)
-            const displayItems = [...items];
-            while (displayItems.length < 8) {
-                displayItems.push({}); // Tambah objek kosong untuk filler
-            }
-
-            displayItems.forEach((item) => {
-                currentY += 7;
-
-                // Draw Baris & Garis Vertikal (All Border)
-                doc.rect(10, currentY, 190, 7);
-                colX.forEach(x => doc.line(x, currentY, x, currentY + 7));
-
-                // Isi Data (jika ada)
-                if (item.kode) {
-                    doc.text(String(item.kode), 11, currentY + 5);
-                    doc.text(String(item.nama || '').substring(0, 32), 36, currentY + 5);
-                    doc.text(String(item.satuan || ''), 94, currentY + 5);
-                    doc.text(String(item.qty || '0'), 108, currentY + 5, { align: "center" });
-                    // Kolom Real kosong (untuk tulis tangan)
-                    doc.text(String(item.noMesin || ''), 136, currentY + 5);
-                    doc.text(String(item.keterangan || '').substring(0, 20), 166, currentY + 5);
-                }
+        const exportBON = () => {
+            downloadBONPDF({
+                paginatedItems: paginatedItems.value,
+                txDept: txDept.value,
+                txTanggal: txTanggal.value,
+                txReservasi: txReservasi.value,
+                docNumber: docNumber.value,
+                userData: userData.value
             });
-
-            // --- SIGNATURE SECTION ---
-            const sigY = startY + 105;
-            const roles = [
-                { l: "Diminta Oleh,", n: (userName || "...............") }, // Pakai nama dari userData
-                { l: "Diketahui Oleh,", n: "..............." },
-                { l: "Disetujui Oleh,", n: "..............." },
-                { l: "Diserahkan Oleh,", n: "..............." }
-            ];
-
-            roles.forEach((role, i) => {
-                const xPos = 15 + (i * 48);
-                doc.setFont("helvetica", "bold");
-                doc.setFontSize(8);
-                doc.text(role.l, xPos + 10, sigY, { align: "center" });
-
-                // Nama User di bawah garis
-                doc.text(role.n.toUpperCase(), xPos + 10, sigY + 22, { align: "center" });
-                doc.line(xPos, sigY + 18, xPos + 25, sigY + 18); // Garis tanda tangan
-            });
-
-            // Footer Kecil
-            doc.setFontSize(6);
-            doc.setFont("helvetica", "italic");
-            doc.setTextColor(150, 150, 150);
-
-            const footerY = startY + 132;
-
-            doc.text(`Generated by WMS - Hal ${pageNum} / ${paginatedItems.value.length}`, 10, footerY);
-
-            const now = new Date();
-            const dateStr = now.toLocaleDateString('id-ID'); // Format: DD/MM/YYYY
-            const timeStr = now.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
-            doc.text(`Dicetak pada: ${dateStr} ${timeStr}`, 200, footerY, { align: "right" });
-            doc.setTextColor(0, 0, 0);
         };
 
 
@@ -1800,12 +1172,12 @@ createApp({
 
             // 9. UPDATE SUPABASE
             exportExcel, isExporting, analyticsFilter, loadPivot, safeFetch, loadHistory,
-            catatanSpp, scrap, loadScrapData: scrap.loadScrapData, showScrapInput,
+            catatanSpp, scrap, loadScrapData: scrap.loadScrapData, showScrapInput, exportSPP, exportBON,
 
             // 10. DASHBOARD & REPORTING
-            dashboard, dashData, dashFilter, handlePrint, downloadPDF, historySearch, dashboardTx, recentTx, loadLowStock, exportHistory,
+            dashboard, dashData, dashFilter, handlePrint, historySearch, dashboardTx, recentTx, loadLowStock, exportHistory,
             loadOpnameDetail, showOpnameModal, loadingOpname, filteredOpnameDetail, opnameDetail, resetFilter, isRefreshing, fetchDashboardAll, loadDepartments,
-            downloadSPPPDF, docNumber
+            docNumber
         };
     }
 }).mount('#app');
