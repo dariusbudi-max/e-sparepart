@@ -13,6 +13,7 @@ import { searchInventory } from "./services/inventoryService.js";
 import { fetchPhotos, deletePhoto, setCoverPhoto, updatePhotoOrder } from "./services/inventoryPhotoService.js";
 import { useCatalog } from "./composables/useCatalog.js";
 import { usePhotoManager } from "./composables/usePhotoManager.js";
+import { useBarcode } from "./composables/useBarcode.js";
 
 import { useScrapMonitoring } from "./composables/useScrapMonitoring.js";
 
@@ -36,7 +37,7 @@ import { useAnalytics } from "./composables/useAnalytics.js";
 import { useOpname } from "./composables/useOpname.js";
 import { useDashboard } from "./composables/useDashboard.js";
 import { exportDashboardExcel, exportInventoryExcel, exportLowStockExcel, exportOpnameExcel, exportScrapExcel } from "./exports/excelExport.js";
-import { downloadSPPPDF, downloadBONPDF } from "./exports/pdfExport.js";
+import { downloadSPPPDF, downloadBONPDF, downloadBarcodePDF, downloadQrPDF } from "./exports/pdfExport.js";
 
 const { createApp, ref, computed, onMounted, watch, reactive, nextTick } = Vue;
 
@@ -615,15 +616,8 @@ createApp({
 
         watch(inventorySearch, (newVal) => {
             clearTimeout(searchTimer);
-
-            if (!newVal || newVal.trim() === "") {
-                inventory.handleSearch(newVal);
-                return;
-            }
-
-            searchTimer = setTimeout(() => {
-                inventory.handleSearch(newVal);
-            }, 500);
+            if (!newVal || !newVal.trim()) return inventory.handleSearch(newVal);
+            searchTimer = setTimeout(() => inventory.handleSearch(newVal), 500);
         });
 
         const startScanner = () => {
@@ -636,21 +630,15 @@ createApp({
                 if (html5QrCode) html5QrCode.clear();
 
                 html5QrCode = new Html5Qrcode("reader");
-
                 html5QrCode.start(
                     { facingMode: "environment" },
-                    {
-                        fps: 15,
-                        qrbox: { width: 250, height: 150 }
-                    },
+                    { fps: 15, qrbox: { width: 250, height: 150 } },
                     (decodedText) => {
                         inventorySearch.value = decodedText.trim();
                         stopScanner();
                         if (navigator.vibrate) navigator.vibrate(100);
                     }
-                ).catch(() => {
-                    showScanner.value = false;
-                });
+                ).catch(() => { showScanner.value = false; });
             });
         };
 
@@ -719,7 +707,7 @@ createApp({
             );
         });
 
-
+        const barcode = useBarcode({ showToast });
 
         //===TRANSAKSI===//
         const tx = useTransaction(inventory, userData, showToast, {
@@ -753,10 +741,7 @@ createApp({
             if (!item) {
                 try {
                     const { data = [] } = await searchInventory(query);
-
-                    item = data.find(
-                        i => cleanKode(i.kode) === query
-                    );
+                    item = data.find(i => cleanKode(i.kode) === query);
                 } catch (err) {
                     console.error(err);
                 }
@@ -766,10 +751,7 @@ createApp({
             if (item.status !== "AKTIF") return showToast("Barang NONAKTIF", "error");
 
             tx.addToCartWithQty(item);
-
-            nextTick(() => {
-                setTimeout(() => qtyInputRef.value?.focus(), 150);
-            });
+            nextTick(() => setTimeout(() => qtyInputRef.value?.focus(), 150));
         });
 
         const openScanner = async () => {
@@ -826,22 +808,14 @@ createApp({
         const handleScan = async () => {
             const rawQuery = searchQuery.value;
             const query = cleanKode(rawQuery);
-
             if (!query) return;
 
-            let item = inventory.inventory.value.find(i =>
-                i.status === 'AKTIF' && cleanKode(i.kode) === query
-            );
+            let item = inventory.inventory.value.find(i => i.status === 'AKTIF' && cleanKode(i.kode) === query);
 
             if (!item) {
                 try {
                     const { data = [] } = await searchInventory(rawQuery);
-
-                    item = data.find(
-                        i =>
-                            cleanKode(i.kode) === query &&
-                            i.status === "AKTIF"
-                    );
+                    item = data.find(i => cleanKode(i.kode) === query && i.status === 'AKTIF');
                 } catch (err) {
                     console.error("Search server error:", err);
                 }
@@ -1053,6 +1027,20 @@ createApp({
             });
         };
 
+        const exportBarcode = async () => {
+            if (barcode.barcodeType === "qr") {
+                await downloadQrPDF({
+                    items: barcode.printQueue.value
+                });
+                return;
+            }
+
+            await downloadBarcodePDF({
+                items: barcode.printQueue.value,
+                labelKey: barcode.selectedLabel
+            });
+        };
+
 
         onMounted(async () => {
             const savedUser = localStorage.getItem("wms_user");
@@ -1149,7 +1137,7 @@ createApp({
             saveNewLocation, openUpdateLocation, catalog, showAddFolderModal, newFolderName, handleCreateFolder, openCatalogMenu, showFolderMenu,
             showAssignModal, selectedItemForFolder, selectedTargetFolderId, openAssignFolderModal, executeAssignFolder,
             showImportModal, importStep, rawExcelInput, parsedItems, isImporting, validCount, duplicateCount, openImportExcelModal, processExcelRawInput,
-            executeBatchInsert, disableSaveItem,
+            executeBatchInsert, disableSaveItem, barcode,
 
             // 5. TRANSACTION & CART (WMS)
             cart, inputQty, qtyInputRef, previewData, pasteData, tx, isSearchingServer, processing, importLoading,
@@ -1180,7 +1168,7 @@ createApp({
 
             // 9. UPDATE SUPABASE
             exportExcel, isExporting, analyticsFilter, loadPivot, safeFetch, loadHistory,
-            catatanSpp, scrap, loadScrapData: scrap.loadScrapData, showScrapInput, exportSPP, exportBON,
+            catatanSpp, scrap, loadScrapData: scrap.loadScrapData, showScrapInput, exportSPP, exportBON, exportBarcode,
 
             // 10. DASHBOARD & REPORTING
             dashboard, dashData, dashFilter, handlePrint, historySearch, dashboardTx, recentTx, loadLowStock, exportHistory,
