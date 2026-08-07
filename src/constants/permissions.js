@@ -7,6 +7,7 @@ export const PERMISSION = Object.freeze({
     CATALOG: "catalog_menu",
     SCRAP: "scrap_monitoring",
     SPP: "spp",
+    PRINT_BARCODE: "print_barcode",
     MASTER_BARANG: "master_barang",
     CANCEL_TX: "cancel_tx",
     USER_MANAGEMENT: "user_management",
