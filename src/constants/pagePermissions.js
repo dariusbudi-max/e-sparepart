@@ -12,6 +12,7 @@ export const PAGE_PERMISSION = Object.freeze({
     master_barang: PERMISSION.MASTER_BARANG,
     cancel_tx: PERMISSION.CANCEL_TX,
     user_management: PERMISSION.USER_MANAGEMENT,
+    print_barcode: PERMISSION.PRINT_BARCODE,
 });
 
 export function canAccessPage(page, can) {
