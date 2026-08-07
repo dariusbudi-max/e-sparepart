@@ -22,6 +22,11 @@ export const ACCESS_PERMISSIONS = [
         icon: "fa-recycle"
     },
     {
+        key: PERMISSION.PRINT_BARCODE,
+        label: "Print Barcode",
+        icon: "fa-barcode"
+    },
+    {
         key: PERMISSION.SCRAP_EDIT,
         label: "Edit Scrap",
         icon: "fa-pen"
