@@ -708,6 +708,8 @@ createApp({
         });
 
         const barcode = useBarcode({ showToast });
+        const barcodeType = barcode.barcodeType;
+        const selectedLabel = barcode.selectedLabel;
 
         //===TRANSAKSI===//
         const tx = useTransaction(inventory, userData, showToast, {
@@ -1028,17 +1030,15 @@ createApp({
         };
 
         const exportBarcode = async () => {
-            if (barcode.barcodeType === "qr") {
-                await downloadQrPDF({
-                    items: barcode.printQueue.value
-                });
+            if (!barcode.printQueue.value || barcode.printQueue.value.length === 0) {
+                showToast("Antrean cetak masih kosong.", "warning");
                 return;
             }
-
-            await downloadBarcodePDF({
-                items: barcode.printQueue.value,
-                labelKey: barcode.selectedLabel
-            });
+            if (barcodeType.value === "qr") {
+                await downloadQrPDF({ items: barcode.printQueue.value });
+                return;
+            }
+            await downloadBarcodePDF({ items: barcode.printQueue.value, labelKey: selectedLabel.value });
         };
 
 
@@ -1137,7 +1137,7 @@ createApp({
             saveNewLocation, openUpdateLocation, catalog, showAddFolderModal, newFolderName, handleCreateFolder, openCatalogMenu, showFolderMenu,
             showAssignModal, selectedItemForFolder, selectedTargetFolderId, openAssignFolderModal, executeAssignFolder,
             showImportModal, importStep, rawExcelInput, parsedItems, isImporting, validCount, duplicateCount, openImportExcelModal, processExcelRawInput,
-            executeBatchInsert, disableSaveItem, barcode,
+            executeBatchInsert, disableSaveItem, barcode, barcodeType, selectedLabel,
 
             // 5. TRANSACTION & CART (WMS)
             cart, inputQty, qtyInputRef, previewData, pasteData, tx, isSearchingServer, processing, importLoading,
