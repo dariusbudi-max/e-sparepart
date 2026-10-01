@@ -1,7 +1,7 @@
 const { ref, computed, nextTick } = Vue;
 import { uploadToDrive, deleteFromDrive } from "../services/driveService.js";
 import { compressImage } from "../utils/imageUtils.js";
-import { createMonitoringWatermarkedImage, getCurrentLocation } from "../utils/photoprocessor.js";
+import { createMonitoringWatermarkedImage, getCurrentLocation } from "../utils/photoProcessor.js";
 
 export function useAuditLogs({ supabaseClient, userData, showToast, previewGallery }) {
 	const logs = ref([]);
