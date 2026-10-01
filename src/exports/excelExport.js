@@ -133,47 +133,82 @@ export const exportDashboardExcel = async ({ exportHistory, dashFilter, showToas
     showToast(`Export berhasil (${rows.length} data)`, "success");
 };
 
-export const exportScrapExcel = ({
-    data,
-    summary,
-    filterStartDate,
-    filterEndDate,
-    showToast
-}) => {
-    if (!data.length) {
+export const exportScrapExcel = ({ data, summary, filterStartDate, filterEndDate, showToast }) => {
+    if (!data?.length) {
         showToast("Tidak ada data yang dapat diexport!", "error");
         return;
     }
 
-    const ws = XLSX.utils.json_to_sheet(
-        data.map((row, index) => ({
-            "NO": index + 1,
-            "TANGGAL INPUT DATA": row.created_at
-                ? new Date(row.created_at).toLocaleString("id-ID")
-                : "-",
-            "TANGGAL TUKAR": row.tgl_penukaran,
-            "NAMA BARANG": row.nama_barang,
-            "TGL AWAL PAKAI": row.tgl_awal_pakai || "-",
-            "TGL AKHIR PAKAI": row.tgl_akhir_pakai || "-",
-            "DEPARTMENT": row.department,
-            "QTY": row.qty,
-            "CREATED BY": row.created_by
-        })),
-        { origin: "A7" }
-    );
+    const formatDate = (value) => {
+        if (!value) return "-";
+        if (typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value)) {
+            return value;
+        }
+        const date = new Date(value);
+        if (Number.isNaN(date.getTime())) {
+            return value;
+        }
+        return date.toLocaleDateString("id-ID", {
+            day: "2-digit",
+            month: "2-digit",
+            year: "numeric"
+        });
+    };
 
-    XLSX.utils.sheet_add_aoa(
-        ws,
-        [
-            ["LAPORAN REKAP MONITORING SCRAP"],
-            [`Tanggal Export : ${new Date().toLocaleString("id-ID")}`],
-            [`Filter : ${filterStartDate || "Semua"} s/d ${filterEndDate || "Semua"}`],
-            [`Total Data : ${summary.totalRecords}`],
-            [`Total Qty : ${summary.totalQty}`],
-            [`Dept Terbanyak : ${summary.topDept}`]
-        ],
-        { origin: "A1" }
-    );
+    const formatDateTime = (value) => {
+        if (!value) return "-";
+        const date = new Date(value);
+        if (Number.isNaN(date.getTime())) {
+            return value;
+        }
+        return date.toLocaleString("id-ID", {
+            day: "2-digit",
+            month: "2-digit",
+            year: "numeric",
+            hour: "2-digit",
+            minute: "2-digit"
+        });
+    };
+
+    const headers = [
+        "NO",
+        "TANGGAL INPUT DATA",
+        "TANGGAL TUKAR",
+        "NAMA BARANG",
+        "TGL AWAL PAKAI",
+        "TGL AKHIR PAKAI",
+        "DEPARTMENT",
+        "QTY",
+        "CREATED BY"
+    ];
+
+    const rows = data.map((row, index) => [
+        index + 1,
+        formatDateTime(row.created_at),
+        formatDate(row.tgl_penukaran),
+        row.nama_barang || "-",
+        formatDate(row.tgl_awal_pakai),
+        formatDate(row.tgl_akhir_pakai),
+        row.department || "-",
+        Number(row.qty || 0),
+        row.created_by || "-"
+    ]);
+
+    const worksheetData = [
+        ["LAPORAN REKAP MONITORING SCRAP"],
+        [`Tanggal Export : ${formatDateTime(new Date())}`],
+        [`Periode Filter : ${filterStartDate ? formatDate(filterStartDate) : "Semua"} s/d ${filterEndDate ? formatDate(filterEndDate) : "Semua"}`],
+        [`Total Data : ${summary?.totalRecords ?? data.length}`],
+        [`Total Qty : ${summary?.totalQty ?? 0} PCS`],
+        [`Department Terbanyak : ${summary?.topDept || "-"}`],
+        [],
+        headers,
+        ...rows
+    ];
+
+    const ws = XLSX.utils.aoa_to_sheet(worksheetData);
+
+    ws["!merges"] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: 8 } }];
 
     ws["!cols"] = [
         { wch: 6 },
@@ -182,16 +217,54 @@ export const exportScrapExcel = ({
         { wch: 35 },
         { wch: 18 },
         { wch: 18 },
-        { wch: 16 },
-        { wch: 12 },
+        { wch: 18 },
+        { wch: 10 },
         { wch: 25 }
     ];
 
-    createWorkbook(
-        ws,
-        "Rekap Scrap",
-        `Rekap_Scrap_${getTimestamp()}.xlsx`
-    );
+    ws["!rows"] = [
+        { hpt: 28 },
+        { hpt: 20 },
+        { hpt: 20 },
+        { hpt: 20 },
+        { hpt: 20 },
+        { hpt: 20 },
+        { hpt: 8 },
+        { hpt: 24 }
+    ];
 
-    showToast(`Berhasil export ${data.length} data`, "success");
+    const headerRow = 8;
+    const firstDataRow = 9;
+    const lastDataRow = firstDataRow + rows.length - 1;
+
+    ws["!autofilter"] = { ref: `A${headerRow}:I${lastDataRow}` };
+
+    ws["!pageSetup"] = {
+        orientation: "landscape",
+        paperSize: 9,
+        fitToWidth: 1,
+        fitToHeight: 0
+    };
+
+    for (let row = firstDataRow; row <= lastDataRow; row++) {
+        const qtyCell = `H${row}`;
+        if (ws[qtyCell]) {
+            ws[qtyCell].t = "n";
+            ws[qtyCell].z = "#,##0";
+        }
+    }
+
+    for (let row = firstDataRow; row <= lastDataRow; row++) {
+        const nameCell = `D${row}`;
+        if (ws[nameCell]) {
+            ws[nameCell].s = {
+                alignment: {
+                    wrapText: true
+                }
+            };
+        }
+    }
+
+    createWorkbook(ws, "Rekap Scrap", `Rekap_Scrap_${getTimestamp()}.xlsx`);
+    showToast(`Berhasil export ${data.length} data scrap`, "success");
 };
