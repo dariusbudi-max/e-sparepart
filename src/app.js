@@ -1,5 +1,4 @@
 import { supabaseClient } from "./api/supabase.js";
-import { callAPI } from "./api/gas.js";
 
 import { useAuth } from "./composables/useAuth.js";
 import { useUsers } from "./composables/useUsers.js";
@@ -10,12 +9,16 @@ import { canAccessPage } from "./constants/pagePermissions.js";
 
 import { useInventory } from "./composables/useInventory.js";
 import { searchInventory } from "./services/inventoryService.js";
-import { fetchPhotos, deletePhoto, setCoverPhoto, updatePhotoOrder } from "./services/inventoryPhotoService.js";
+import { fetchPhotos, deletePhoto, setCoverPhoto } from "./services/inventoryPhotoService.js";
 import { useCatalog } from "./composables/useCatalog.js";
 import { usePhotoManager } from "./composables/usePhotoManager.js";
 import { useBarcode } from "./composables/useBarcode.js";
 
+import { useReservasi } from "./composables/useReservasi.js";
+import { useReservasiBarcode } from "./composables/useReservasiBarcode.js";
+
 import { useScrapMonitoring } from "./composables/useScrapMonitoring.js";
+import { useAuditLogs } from "./composables/useAudit.js";
 
 import { createWatermarkedImage } from "./utils/photoProcessor.js";
 import { fixDriveUrl } from "./utils/imageUtils.js";
@@ -27,7 +30,6 @@ import { useTransaction } from "./composables/useTransaction.js";
 import { useImportTx } from "./composables/useImportTx.js";
 import { useScanner } from "./composables/useScanner.js";
 import { processTransaction } from "./services/transactionService.js";
-import { isStockInsufficient, getMasterStock } from "./utils/inventoryHelper.js";
 import { validateRows } from "./utils/validator.js";
 import { cleanKode } from "./utils/cleaner.js";
 import { useCancelTransaction } from "./composables/useCancelTransaction.js";
@@ -36,7 +38,7 @@ import { useSafeFetch } from "./composables/useSafeFetch.js";
 import { useAnalytics } from "./composables/useAnalytics.js";
 import { useOpname } from "./composables/useOpname.js";
 import { useDashboard } from "./composables/useDashboard.js";
-import { exportDashboardExcel, exportInventoryExcel, exportLowStockExcel, exportOpnameExcel, exportScrapExcel } from "./exports/excelExport.js";
+import { exportDashboardExcel, exportInventoryExcel, exportLowStockExcel, exportOpnameExcel } from "./exports/excelExport.js";
 import { downloadSPPPDF, downloadBONPDF, downloadBarcodePDF, downloadQrPDF } from "./exports/pdfExport.js";
 
 const { createApp, ref, computed, onMounted, watch, reactive, nextTick } = Vue;
@@ -58,32 +60,24 @@ createApp({
             toast.value = { show: true, message: msg, type: type };
             setTimeout(() => { toast.value.show = false; }, 3000);
         };
-
         const showUserModal = ref(false);
 
         const loginData = ref({ username: '', password: '' });
         const userData = ref({ username: '', nama: '', role: '', canPreviewPhoto: false });
-        const isAdminView = ref(false);
         const newUser = reactive({ nama: '', username: '', password: '', role: 'VIEWER' });
         const showRegisterModal = ref(false);
         const regData = reactive({ nama: '', username: '', password: '' });
         const showProfileModal = ref(false);
         const loadingProfile = ref(false);
         const profileForm = reactive({ nama: '', password: '' });
-
-        const lastQuery = ref('');
-        const searchCache = ref({});
         const isExporting = ref(false);
-
-        const isServerMode = ref(false);
         const selectedRow = ref(null);
 
         const isCameraActive = ref(false);
         const videoFeed = ref(null);
-        const historySearch = ref('');
         const showLowStock = ref(false);
         const summarySppItems = ref([]);
-        const catatanSpp = ref([]);
+        const catatanSpp = ref("");
         const inputKodeManual = ref('');
         const noSPP = ref("SPT-" + new Date().getTime());
         const sppSign = ref({
@@ -104,30 +98,20 @@ createApp({
         const photoUrlInput = ref("");
         const isDragOver = ref(false);
         const dragCounter = ref(0);
-
-        const showImport = ref(false);
-        const csvPreview = ref([]);
-        const showPreview = ref(false);
-
-        const reservasiItems = ref([]);
         const showPopupDetail = ref(false);
         const selectedItem = ref(null);
         const formInput = reactive({
             qty: 1,
             noMesin: '',
-            keterangan: ''
+            keteranganDept: "",
+            keteranganManual: ""
         });
-        const txTanggal = ref(new Date().toISOString().substr(0, 10));
-        const itemsPerPage = 10;
-        const docNumber = ref('');
-        const txReservasi = ref('');
 
         const qtyInputRef = ref(null);
         const searchInputRef = ref(null);
         const showScrapInput = ref(false);
 
         const isRefreshing = ref(false);
-        const pivotRawTx = ref([]);
 
         const showItemModal = ref(false);
         const isEditMode = ref(false);
@@ -168,8 +152,9 @@ createApp({
         const showPass = ref(false);
         const showPassword = ref(false);
         const showScanner = ref(false);
-        let html5QrCode = null;
-        let isScanning = false;
+
+        const scannerActive = ref(false);
+        const reservasiScannerActive = ref(false);
         let searchTimer = null;
 
         const navigate = (target) => {
@@ -236,60 +221,109 @@ createApp({
             showLocationModal.value = true;
         };
 
-        const paginatedItems = computed(() => {
-            const items = reservasiItems.value || [];
-
-            const pages = [];
-            for (let i = 0; i < items.length; i += itemsPerPage) {
-                pages.push(items.slice(i, i + itemsPerPage));
-            }
-
-            return pages.length ? pages : [[]];
-        });
-
-        const reservasiMeta = reactive({
-            department: userData.value?.department || '',
-            tanggal: new Date().toISOString().substr(0, 10) // Default tanggal hari ini (YYYY-MM-DD)
-        });
-
         const bukaPopUpReservasi = (item) => {
             selectedItem.value = item;
-            // Reset form ke default
+
             formInput.qty = 1;
-            formInput.noMesin = '';
-            formInput.keterangan = '';
+            formInput.noMesin = "";
+            formInput.keteranganDept = RsvDept.value || "";
+            formInput.keteranganManual = "";
+
             showPopupDetail.value = true;
         };
 
         const tambahkanKeForm = () => {
             const item = selectedItem.value;
-            const exist = reservasiItems.value.find(i => i.kode === item.kode);
+
+            if (!item) {
+                showToast("Barang belum dipilih.", "error");
+                return;
+            }
+
+            const qty = Number(formInput.qty || 0);
+
+            if (!Number.isFinite(qty) || qty <= 0) {
+                showToast("Qty harus lebih dari 0.", "error");
+                return;
+            }
+
+            const deptKeterangan = String(
+                formInput.keteranganDept || ""
+            ).trim().toUpperCase();
+
+            const keteranganManual = String(
+                formInput.keteranganManual || ""
+            ).trim().toUpperCase();
+
+            if (!deptKeterangan) {
+                showToast("Department keterangan wajib dipilih.", "error");
+                return;
+            }
+
+            if (!keteranganManual) {
+                showToast("Keterangan / tujuan wajib diisi.", "error");
+                return;
+            }
+
+            const keterangan = `${deptKeterangan} - ${keteranganManual}`;
+
+            const exist = reservasiItems.value.find(
+                i => String(i.kode).trim().toUpperCase() ===
+                    String(item.kode).trim().toUpperCase()
+            );
 
             if (exist) {
-                // Jika barang sudah ada di list, update nilainya
-                exist.qty += formInput.qty;
-                showToast(`Jumlah ${item.nama} berhasil diperbarui`, 'success');
+                exist.qty = Number(exist.qty || 0) + qty;
+
+                if (formInput.noMesin?.trim()) {
+                    exist.noMesin = formInput.noMesin
+                        .trim()
+                        .toUpperCase();
+                }
+
+                exist.keterangan = keterangan;
+
+                showToast(
+                    `Jumlah ${item.nama} berhasil diperbarui.`,
+                    "success"
+                );
             } else {
-                // Jika belum ada, push data baru
                 reservasiItems.value.push({
                     kode: item.kode,
                     nama: item.nama,
-                    satuan: item.satuan,
-                    qty: formInput.qty,
-                    noMesin: formInput.noMesin.toUpperCase(),
-                    keterangan: formInput.keterangan
+                    satuan: item.satuan || "PCS",
+                    qty,
+
+                    noMesin: String(
+                        formInput.noMesin || ""
+                    ).trim().toUpperCase(),
+
+                    keterangan
                 });
-                showToast("Berhasil ditambahkan ke form permintaan", 'success');
+
+                showToast(
+                    `${item.nama} berhasil ditambahkan ke form.`,
+                    "success"
+                );
             }
 
             showPopupDetail.value = false;
         };
 
-        const handlePrint = () => {
-            if (reservasiItems.value.length === 0) {
-                alert("Daftar permintaan masih kosong!");
+        const handlePrint = async () => {
+            if (!reservasiItems.value.length) {
+                showToast("Daftar permintaan masih kosong.", "warning");
                 return;
             }
+
+            if (!docNumber.value) {
+                showToast("Simpan reservasi terlebih dahulu sebelum mencetak.", "warning");
+                return;
+            }
+
+            await renderReservasiBarcode();
+            await new Promise(resolve => setTimeout(resolve, 150));
+
             window.print();
         };
 
@@ -418,7 +452,7 @@ createApp({
         });
 
         const acl = useAcl(userData);
-        const { permissions, can, cannot, hasRole, canAny, canAll } = acl;
+        const { permissions, can, cannot, isAdmin, hasRole, canAny, canAll } = acl;
 
         const previewPhoto = (item) => {
             if (!can(PERMISSION.PHOTO_PREVIEW)) return;
@@ -566,25 +600,10 @@ createApp({
         };
 
         const {
-            inventory: inventoryData,
-            isInventoryReady,
-            isSearching,
-            inventorySearch,
-            filterLocation,
-            categoryFilter,
-            stockFilter,
-            loadInventory,
-            handleSearch,
-            resetAllFilters,
-            sortBy,
-            hasMore,
-            finalInventory,
-            publicInventory,
-            categoryOptions,
-            locations,
-            loadLocations,
-            getExportInventory,
-            deleteItem
+            isInventoryReady, isSearching, inventorySearch, filterLocation, categoryFilter,
+            stockFilter, loadInventory, handleSearch, resetAllFilters, sortBy,
+            hasMore, finalInventory, publicInventory, categoryOptions, locations,
+            loadLocations, getExportInventory, deleteItem
         } = inventory;
 
         const handleTableScroll = async (event) => {
@@ -620,40 +639,39 @@ createApp({
             searchTimer = setTimeout(() => inventory.handleSearch(newVal), 500);
         });
 
-        const startScanner = () => {
+        const inventoryScanner = useScanner(
+            "inventory-reader",
+            async (txt) => {
+                const code = txt.trim();
+                if (!code) return;
+                inventorySearch.value = code;
+                await nextTick();
+                if (navigator.vibrate) {
+                    navigator.vibrate(100);
+                }
+                await closeInventoryScanner();
+            }
+        );
+
+        const startScanner = async () => {
+            if (showScanner.value) return;
             showScanner.value = true;
-
-            nextTick(() => {
-                const readerElement = document.getElementById('reader');
-                if (!readerElement) return;
-
-                if (html5QrCode) html5QrCode.clear();
-
-                html5QrCode = new Html5Qrcode("reader");
-                html5QrCode.start(
-                    { facingMode: "environment" },
-                    { fps: 15, qrbox: { width: 250, height: 150 } },
-                    (decodedText) => {
-                        inventorySearch.value = decodedText.trim();
-                        stopScanner();
-                        if (navigator.vibrate) navigator.vibrate(100);
-                    }
-                ).catch(() => { showScanner.value = false; });
-            });
+            await nextTick();
+            try {
+                await inventoryScanner.start();
+            } catch (err) {
+                showScanner.value = false;
+                showToast(err?.message || "Kamera tidak dapat digunakan", "error");
+            }
         };
 
         const stopScanner = async () => {
-            if (html5QrCode) {
-                try {
-                    if (html5QrCode.isScanning) {
-                        await html5QrCode.stop();
-                    }
-                    html5QrCode.clear();
-                } catch (err) {
-                    console.warn(err);
-                }
-            }
+            await inventoryScanner.stop();
             showScanner.value = false;
+        };
+
+        const closeInventoryScanner = async () => {
+            await stopScanner();
         };
 
         const catalog = useCatalog({
@@ -711,16 +729,137 @@ createApp({
         const barcodeType = barcode.barcodeType;
         const selectedLabel = barcode.selectedLabel;
 
+        const reservasi = useReservasi({ showToast, userData, page, can, isAdmin });
+
+        const {
+            reservasiItems, RsvDept, txTanggal, txReservasi, docNumber, isSavingReservasi, resetReservasiForm, showReservasiModal, bukaReservasiModal, newBon,
+            reservasiList, reservasiListLoading, reservasiListSearch, reservasiListStatus, reservasiListHasMore, reservasiEditMode, editReservasiDariPreview,
+            isApprovingReservasi, canApproveReservasi, approveReservasi, canRejectReservasi, isRejectingReservasi, rejectReservasi, deleteReservasi,
+            selectedReservasi, showReservasiPreviewModal, reservasiBarcodePreview, reservasiPreviewMode, reservasiDetailLoading, loadReservasiList,
+            bukaPreviewReservasi, tutupPreviewReservasi, reservasiApprovalHistory, reservasiApprovalLoading,
+            getApprovalName, getApprovalDate, isApprovalCompleted, cariReservasi, formatApprovalDate, filterReservasiStatus, getRejectApproval, getRejectName,
+            isApproveAction, isRejectAction, getApprovalStatus, getApprovalKeterangan, getApproval, getRejectDate, getRejectReason, getRejectLevel,
+            tutupReservasiModal, paginatedItems, simpanReservasi
+        } = reservasi;
+
+        const { renderReservasiBarcode, downloadReservasiBarcode } = useReservasiBarcode({ docNumber, paginatedItems, showReservasiModal });
+
+        const resetReservasi = async () => {
+            resetReservasiForm();
+            await nextTick();
+            showToast("Form reservasi berhasil dikosongkan.", "success");
+        };
+
+        const openBon = async () => {
+            bukaReservasiModal();
+        };
+
+        const downloadReservasiBarcodePreview = async () => {
+            const noDoc = String(selectedReservasi.value?.header?.no_doc || "").trim().toUpperCase();
+            if (!noDoc) {
+                showToast("Nomor dokumen reservasi tidak tersedia.", "error");
+                return;
+            }
+            await downloadReservasiBarcode(noDoc, showToast);
+        };
+
+        const reservasiScanner = useScanner(
+            "reservasi-reader",
+            async (txt) => {
+                const code = String(txt ?? "")
+                    .replace(/\r/g, "")
+                    .replace(/\n/g, "")
+                    .trim()
+                    .toUpperCase();
+
+                if (!code) return;
+
+                if (!/^RSV-/i.test(code)) {
+                    showToast("Barcode bukan barcode BPSC / Reservasi.", "error");
+                    return;
+                }
+
+                if (navigator.vibrate) {
+                    navigator.vibrate(150);
+                }
+
+                await closeReservasiScanner();
+                await scanReservasiToCart(code);
+            },
+            {
+                fps: 20,
+                qrbox: {
+                    width: 360,
+                    height: 120
+                },
+                formatsToSupport: [
+                    Html5QrcodeSupportedFormats.CODE_128
+                ]
+            }
+        );
+
+        const openReservasiScanner = async () => {
+            if (reservasiScannerActive.value) return;
+
+            if (scannerActive.value) await closeScanner();
+
+            reservasiScannerActive.value = true;
+            await nextTick();
+
+            const reader = document.getElementById("reservasi-reader");
+            if (!reader) {
+                reservasiScannerActive.value = false;
+                console.error("Element #reservasi-reader tidak ditemukan.");
+                showToast("Area scanner reservasi belum tersedia.", "error");
+                return;
+            }
+
+            try {
+                await reservasiScanner.start();
+            } catch (err) {
+                reservasiScannerActive.value = false;
+                console.error("Gagal membuka scanner reservasi:", err);
+                showToast(err?.message || "Kamera tidak dapat digunakan.", "error");
+            }
+        };
+
+        const closeReservasiScanner = async () => {
+            try {
+                await reservasiScanner.stop();
+            } catch (err) {
+                console.warn("Gagal menghentikan scanner reservasi:", err);
+            } finally {
+                reservasiScannerActive.value = false;
+            }
+        };
+
+        watch(
+            [showReservasiModal, docNumber, paginatedItems],
+            async () => {
+                if (!showReservasiModal.value) return;
+                await renderReservasiBarcode();
+            },
+            { deep: true }
+        );
+
         //===TRANSAKSI===//
         const tx = useTransaction(inventory, userData, showToast, {
-            refreshInventory: async () => {
-                await inventory.loadInventory(true);
-            },
+            refreshInventory: async () => { await inventory.loadInventory(true); },
             refreshDashboard: refreshAllData,
             qtyInputRef,
             searchInputRef,
             loading
         });
+
+        const {
+            cart, processing, searchQuery, searchResults, showCart,
+            txType, txNote, inputQty, findMasterItem,
+            isSearchingServer, getMasterStockUI, txDept,
+            addToCart, addToCartWithQty, removeFromCart, isStockInsufficientUI,
+            processTx, resetTransactionForm, txReservasiManual, validateCartQty, incrementCartQty,
+            submitReservasiManual,
+            scanReservasiToCart, isProcessingReservasiScan, activeReservasi
+        } = tx;
 
         const importer = useImportTx(inventory, async (rows) => {
             await processTransaction({
@@ -736,51 +875,97 @@ createApp({
             await inventory.loadInventory();
         });
 
-        const scanner = useScanner(async (txt) => {
-            const query = cleanKode(txt);
-            let item = inventory.inventory.value.find(i => cleanKode(i.kode) === query);
+        const transaksiScanner = useScanner(
+            "transaksi-reader",
+            async (txt) => {
+                const raw = String(txt ?? "").replace(/\r/g, "").replace(/\n/g, "").trim();
+                if (!raw) return;
 
-            if (!item) {
-                try {
-                    const { data = [] } = await searchInventory(query);
-                    item = data.find(i => cleanKode(i.kode) === query);
-                } catch (err) {
-                    console.error(err);
+                const query = cleanKode(raw);
+                if (!query) {
+                    showToast("Barcode inventory tidak valid.", "error");
+                    return;
                 }
+
+                let item = inventory.inventory.value.find(
+                    i => String(i?.status || "").trim().toUpperCase() === "AKTIF" && cleanKode(i?.kode) === query
+                );
+
+                if (!item) {
+                    try {
+                        const result = await searchInventory(query);
+                        const results = Array.isArray(result?.data) ? result.data : [];
+                        item = results.find(
+                            i => String(i?.status || "").trim().toUpperCase() === "AKTIF" && cleanKode(i?.kode) === query
+                        ) || null;
+                    } catch (err) {
+                        console.error("Search server error:", err);
+                        showToast("Gagal mencari data inventory.", "error");
+                        return;
+                    }
+                }
+
+                if (!item) {
+                    showToast(`Barang dengan kode ${raw} tidak ditemukan atau Nonaktif.`, "error");
+                    return;
+                }
+
+                const added = addToCartWithQty(item);
+                if (added === false) return;
+
+                if (navigator.vibrate) navigator.vibrate(100);
+
+                nextTick(() => {
+                    setTimeout(() => {
+                        qtyInputRef.value?.focus?.();
+                        qtyInputRef.value?.select?.();
+                    }, 100);
+                });
+            },
+            {
+                fps: 15,
+                qrbox: { width: 320, height: 160 }
             }
-
-            if (!item) return showToast("Item tidak ditemukan", "error");
-            if (item.status !== "AKTIF") return showToast("Barang NONAKTIF", "error");
-
-            tx.addToCartWithQty(item);
-            nextTick(() => setTimeout(() => qtyInputRef.value?.focus(), 150));
-        });
+        );
 
         const openScanner = async () => {
+            if (scannerActive.value) return;
+
+            if (reservasiScannerActive.value) await closeReservasiScanner();
+
             scannerActive.value = true;
             await nextTick();
-            const el = document.getElementById("reader");
-            if (!el) return;
-            await scanner.start();
+            await new Promise(resolve => requestAnimationFrame(resolve));
+
+            const reader = document.getElementById("transaksi-reader");
+            if (!reader) {
+                scannerActive.value = false;
+                console.error("Element #transaksi-reader tidak ditemukan.");
+                showToast("Area scanner barang belum tersedia.", "error");
+                return;
+            }
+
+            try {
+                await transaksiScanner.start();
+            } catch (err) {
+                scannerActive.value = false;
+                console.error("Gagal membuka scanner transaksi:", err);
+                showToast(err?.message || "Kamera tidak dapat digunakan.", "error");
+            }
         };
 
         const closeScanner = async () => {
-            await scanner.stop();
-            scannerActive.value = false;
+            try {
+                await transaksiScanner.stop();
+            } finally {
+                scannerActive.value = false;
+            }
         };
-
-        const {
-            cart, processing, searchQuery, searchResults, showCart,
-            txType, txDept, txNote, inputQty, isSearchingServer, getMasterStockUI,
-            addToCart, addToCartWithQty, removeFromCart, isStockInsufficientUI,
-            processTx, resetTransactionForm
-        } = tx;
 
         const importLoading = importer.loading;
         const previewData = importer.preview;
         const pasteData = ref("");
         const resetImport = importer.reset;
-        const scannerActive = ref(false);
 
         const handleCSVUpload = async (e) => {
             const file = e.target.files[0];
@@ -808,16 +993,24 @@ createApp({
         };
 
         const handleScan = async () => {
-            const rawQuery = searchQuery.value;
+            const rawQuery = String(searchQuery.value || "").trim();
+            if (!rawQuery) return;
+
+            if (/^RSV-/i.test(rawQuery)) {
+                searchQuery.value = "";
+                await scanReservasiToCart(rawQuery);
+                return;
+            }
+
             const query = cleanKode(rawQuery);
             if (!query) return;
 
-            let item = inventory.inventory.value.find(i => i.status === 'AKTIF' && cleanKode(i.kode) === query);
+            let item = inventory.inventory.value.find(i => i.status === "AKTIF" && cleanKode(i.kode) === query);
 
             if (!item) {
                 try {
                     const { data = [] } = await searchInventory(rawQuery);
-                    item = data.find(i => cleanKode(i.kode) === query && i.status === 'AKTIF');
+                    item = data.find(i => cleanKode(i.kode) === query && i.status === "AKTIF");
                 } catch (err) {
                     console.error("Search server error:", err);
                 }
@@ -840,15 +1033,12 @@ createApp({
             });
         };
 
-        const focusSearch = () => {
-            searchInputRef.value?.focus();
-        };
+        const focusSearch = () => { searchInputRef.value?.focus(); };
 
         const isDeptValid = computed(() => {
             if (txType.value === 'OPNAME') return true;
             const depts = (typeof departments !== 'undefined' ? departments.value : []) || [];
-            return depts.map(d => String(d).toLowerCase())
-                .includes(String(txDept.value || '').trim().toLowerCase());
+            return depts.map(d => String(d).toLowerCase()).includes(String(txDept.value || '').trim().toLowerCase());
         });
 
         const revalidatePreview = async () => {
@@ -869,12 +1059,39 @@ createApp({
             }
         }
 
+        watch(page, async () => {
+            try {
+                await transaksiScanner.stop();
+            } catch (err) {
+                console.warn("Stop transaksi scanner:", err);
+            }
+
+            try {
+                await inventoryScanner.stop();
+            } catch (err) {
+                console.warn("Stop inventory scanner:", err);
+            }
+
+            try {
+                await reservasiScanner.stop();
+            } catch (err) {
+                console.warn("Stop reservasi scanner:", err);
+            }
+
+            scannerActive.value = false;
+            showScanner.value = false;
+            reservasiScannerActive.value = false;
+        });
+
+
         ///===DASHBOARD===///
         const { safeFetch } = useSafeFetch(showToast);
 
         const analytics = useAnalytics(safeFetch);
 
         const opname = useOpname();
+        const { opnameDetail, filteredOpnameDetail, loadingOpname, showOpnameModal, loadOpnameDetail, formatOpnameDate } = opname;
+        loadOpnameDetail(false);
 
         const dashboard = useDashboard(safeFetch, searchQuery);
 
@@ -885,8 +1102,7 @@ createApp({
         } = dashboard;
 
         const { pivotData, filter: analyticsFilter, isLoading: isPivotLoading, isPivotLoaded, loadPivot } = analytics;
-        const { opnameDetail, filteredOpnameDetail, loadingOpname, showOpnameModal, loadOpnameDetail } = opname;
-
+        
         const usageMap = computed(() => {
             if (!pivotData.value || pivotData.value.length === 0) return {};
             return pivotData.value.reduce((acc, item) => {
@@ -907,7 +1123,6 @@ createApp({
             showToast
         });
 
-
         //===Photo Sparepart===//
         const {
             startCamera,
@@ -919,9 +1134,7 @@ createApp({
             readFilePreview,
             refreshPhotoList
         } = useUploadPhoto({
-            isUploading,
             formItem,
-            loadInventory: inventory.loadInventory,
             showToast
         });
 
@@ -947,38 +1160,36 @@ createApp({
             showToast: showToast
         });
 
-        watch(page, (newPage) => {
-            const saved = localStorage.getItem("wms_user");
-
-            if (!saved) return;
-
-            const parsed = JSON.parse(saved);
-
-            localStorage.setItem(
-                "wms_user",
-                JSON.stringify({
-                    ...parsed,
-                    page: newPage
-                })
-            );
+        const monitoring = useAuditLogs({
+            supabaseClient,
+            userData,
+            showToast, previewGallery
         });
 
+        watch(page, (newPage) => {
+            if (newPage === "monitoring_logs") {
+                monitoring.loadLogs();
+            }
+        });
 
         ///===ACCESSORIS===///
         const exportExcel = async () => {
             try {
                 isExporting.value = true;
+
                 if (showOpnameModal.value) {
                     return exportOpnameExcel({
                         data: filteredOpnameDetail.value,
                         showToast
                     });
                 }
+
                 if (showLowStock.value) {
                     return exportLowStockExcel({
                         data: lowStockItems.value
                     });
                 }
+
                 if (page.value === "dashboard" || page.value === "riwayat") {
                     if (!can(PERMISSION.EXPORT_EXCEL)) {
                         showToast("Anda tidak memiliki akses export", "error");
@@ -991,16 +1202,19 @@ createApp({
                         showToast
                     });
                 }
+
                 if (page.value === "inventory" || page.value === "master_barang") {
                     return await exportInventoryExcel({
                         getExportInventory
                     });
                 }
+
                 if (page.value === "scrap_monitoring") {
-                    const params = await scrap.exportScrapExcel();
-                    return scrap.exportScrapExcel();
+                    return await scrap.exportScrapExcel();
                 }
+
                 alert("Halaman tidak support export");
+
             } catch (err) {
                 console.error(err);
                 alert("Gagal export Excel");
@@ -1019,6 +1233,18 @@ createApp({
         };
 
         const exportBON = () => {
+            if (reservasiItems.value.length === 0) {
+                alert("Daftar item masih kosong!");
+                return;
+            }
+            if (!RsvDept.value?.trim()) {
+                showToast("Mohon isi Department pemohon!", "error");
+                return;
+            }
+            if (!docNumber.value) {
+                showToast("Simpan reservasi terlebih dahulu sebelum mencetak.", "warning");
+                return;
+            }
             downloadBONPDF({
                 paginatedItems: paginatedItems.value,
                 txDept: txDept.value,
@@ -1040,7 +1266,6 @@ createApp({
             }
             await downloadBarcodePDF({ items: barcode.printQueue.value, labelKey: selectedLabel.value });
         };
-
 
         onMounted(async () => {
             const savedUser = localStorage.getItem("wms_user");
@@ -1096,15 +1321,14 @@ createApp({
 
             await Promise.all([
                 inventory.loadInventory(true),
-                inventory.loadLocations(),
+                loadLocations(),
                 catalog.loadFolders()
             ]);
+
 
             const today = new Date().toISOString().split("T")[0];
             analyticsFilter.value.startDate = today;
             analyticsFilter.value.endDate = today;
-
-            isAdminView.value = true;
 
             nextTick(() => {
                 setTimeout(() => {
@@ -1118,8 +1342,8 @@ createApp({
             // 1. CORE APP & AUTH STATE
             isLoggedIn, loading, isSubmitting, page, userRole, userData, loginData,
             handleLogin, handleLogout, navigate, toast, selectedRow, handleDeleteUser, handleTogglePermission, selectedPermissionUser,
-            showPermissionModal, openPermissionModal, previewPhoto,
-            permissions, can, cannot, hasRole, canAny, canAll, canAccessPage, PERMISSION, ACCESS_PERMISSIONS,
+            showPermissionModal, openPermissionModal, previewPhoto, monitoring,
+            permissions, can, cannot, hasRole, canAny, canAll, canAccessPage, PERMISSION, ACCESS_PERMISSIONS, isAdmin,
 
             // 2. UI & NAVIGATION STATE
             sidebarOpen, showPassword, showPass, showCart, showLowStock, showRegisterModal,
@@ -1128,27 +1352,32 @@ createApp({
 
             // 3. INVENTORY & MASTER DATA
             loadInventory, inventory, inventorySearch, searchQuery, stockFilter, categoryOptions, categoryFilter,
-            filterLocation, locations, loadLocations, resetAllFilters, sortKey, sortOrder, isInventoryReady, searchCache,
-            finalInventory, isSearching, lastQuery, sortBy, handleTableScroll, getExportInventory, hasMore, removeItem,
+            filterLocation, locations, loadLocations, resetAllFilters, sortKey, sortOrder, isInventoryReady, deleteItem,
+            finalInventory, isSearching, sortBy, handleTableScroll, getExportInventory, hasMore, removeItem,
             searchInputRef, departments, fixDriveUrl, searchResults, handleSearch, publicInventory,
 
             // 4. ITEM CRUD & MODALS
-            formItem, isEditMode, formInput, selectedItem, openAddModal, editItem, saveItem, toggleStatus, getItemCoverPhoto,
-            saveNewLocation, openUpdateLocation, catalog, showAddFolderModal, newFolderName, handleCreateFolder, openCatalogMenu, showFolderMenu,
-            showAssignModal, selectedItemForFolder, selectedTargetFolderId, openAssignFolderModal, executeAssignFolder,
-            showImportModal, importStep, rawExcelInput, parsedItems, isImporting, validCount, duplicateCount, openImportExcelModal, processExcelRawInput,
-            executeBatchInsert, disableSaveItem, barcode, barcodeType, selectedLabel,
+            formItem, isEditMode, formInput, selectedItem, openAddModal, editItem, saveItem, toggleStatus, getItemCoverPhoto, saveNewLocation, openUpdateLocation, catalog, showAddFolderModal,
+            newFolderName, handleCreateFolder, openCatalogMenu, showFolderMenu, showAssignModal, selectedItemForFolder, selectedTargetFolderId, openAssignFolderModal, executeAssignFolder, showImportModal,
+            importStep, rawExcelInput, parsedItems, isImporting, validCount, duplicateCount, openImportExcelModal, processExcelRawInput, executeBatchInsert, disableSaveItem, barcode, barcodeType,
+            selectedLabel, reservasi, simpanReservasi, renderReservasiBarcode, reservasiScannerActive, isSavingReservasi, showReservasiModal, bukaReservasiModal,
+            newBon, openBon, reservasiList, reservasiPreviewMode, isApprovingReservasi, canApproveReservasi, canRejectReservasi, isRejectingReservasi, rejectReservasi, deleteReservasi, approveReservasi,
+            reservasiDetailLoading, reservasiListLoading, reservasiListSearch, reservasiListStatus, reservasiListHasMore, selectedReservasi, isApproveAction, isRejectAction, getApprovalStatus,
+            getApprovalKeterangan, getApproval, showReservasiPreviewModal, reservasiBarcodePreview, reservasiApprovalHistory, formatApprovalDate, reservasiApprovalLoading, reservasiEditMode,
+            editReservasiDariPreview, getApprovalName, getApprovalDate, isApprovalCompleted, getRejectApproval, getRejectName, getRejectDate, getRejectReason, getRejectLevel, loadReservasiList,
+            bukaPreviewReservasi, tutupPreviewReservasi, cariReservasi, filterReservasiStatus, tutupReservasiModal, downloadReservasiBarcode, downloadReservasiBarcodePreview, openReservasiScanner, closeReservasiScanner, RsvDept,
 
             // 5. TRANSACTION & CART (WMS)
-            cart, inputQty, qtyInputRef, previewData, pasteData, tx, isSearchingServer, processing, importLoading,
-            lowStockItems, txType, txDept, txNote, txTanggal, handleCSVUpload, parsePaste, submitImport, addToCartWithQty,
-            resetTransactionForm, handleCancelTx, isVoided, cancellingId, showImportMode, addToCart, resetImport,
-            filteredHistory, removeFromCart, processTx, revalidatePreview, isDeptValid,
+            cart, inputQty, qtyInputRef, previewData, pasteData, tx, isSearchingServer, processing, importLoading, findMasterItem,
+            lowStockItems, txType, txDept, txNote, txTanggal, handleCSVUpload, parsePaste, submitImport, addToCartWithQty, validateCartQty,
+            resetTransactionForm, handleCancelTx, isVoided, cancellingId, showImportMode, addToCart, resetImport, txReservasiManual,
+            submitReservasiManual, incrementCartQty,
+            filteredHistory, removeFromCart, processTx, revalidatePreview, isDeptValid, scanReservasiToCart, isProcessingReservasiScan, activeReservasi,
 
             // 6. CAMERA, SCANNER & MEDIA
             isStockInsufficientUI, getMasterStockUI, isCameraActive, videoFeed, fileInput, startScanner, stopScanner, handleScan,
-            openScanner, scannerActive, handleTakePhoto, scanner, importer, useTransaction, focusSearch, closeScanner,
-            launchGallery, openUpdateFoto, startLiveCamera, stopCamera, handleGallerySelected,
+            openScanner, scannerActive, handleTakePhoto, importer, useTransaction, focusSearch, closeScanner,
+            launchGallery, openUpdateFoto, startLiveCamera, stopCamera, handleGallerySelected, processImageFile,
             removePhoto, isUploading, toggleUser, photoPreview, confirmAndUploadPhoto, cancelPreview, selectPhoto,
             makeCover, previewGallery, openPreviewGallery, closePreviewGallery, nextPreview, prevPreview, currentPreviewPhoto, canUploadPhoto,
             refreshPhotos, photoUrlInput, handleUrlSelected, resetPhotoState, handleDrop, handleDragOver, handleDragLeave, isDragOver,
@@ -1156,9 +1385,8 @@ createApp({
 
 
             // 7. SPP (SURAT PERMOHONAN PEMBELIAN) & RESERVASI
-            summarySppItems, inputKodeManual, tambahSemuaKeSpp, tambahItemManualByKode, kosongkanSpp, usageMap,
-            chunkedSppItems, removeItemSpp, sppSign, noSPP, txReservasi, reservasiItems, locationForm,
-            reservasiMeta, bukaPopUpReservasi, tambahkanKeForm, itemsPerPage, paginatedItems,
+            summarySppItems, inputKodeManual, tambahSemuaKeSpp, tambahItemManualByKode, kosongkanSpp, usageMap, resetReservasi,
+            chunkedSppItems, removeItemSpp, sppSign, noSPP, txReservasi, reservasiItems, locationForm, resetReservasiForm, bukaPopUpReservasi, tambahkanKeForm, paginatedItems,
 
             // 8. USER MANAGEMENT & PROFILE
             adminUsers, filteredAdminUsers, userSearchQuery, handleUpdateUserRole, loadUsers,
@@ -1167,12 +1395,12 @@ createApp({
             pivotData, isPivotLoaded, isPivotLoading, refreshAllData,
 
             // 9. UPDATE SUPABASE
-            exportExcel, isExporting, analyticsFilter, loadPivot, safeFetch, loadHistory,
+            exportExcel, isExporting, analyticsFilter, loadPivot, loadHistory,
             catatanSpp, scrap, loadScrapData: scrap.loadScrapData, showScrapInput, exportSPP, exportBON, exportBarcode,
 
             // 10. DASHBOARD & REPORTING
-            dashboard, dashData, dashFilter, handlePrint, historySearch, dashboardTx, recentTx, loadLowStock, exportHistory,
-            loadOpnameDetail, showOpnameModal, loadingOpname, filteredOpnameDetail, opnameDetail, resetFilter, isRefreshing, fetchDashboardAll, loadDepartments,
+            dashboard, dashData, dashFilter, handlePrint, dashboardTx, recentTx, loadLowStock, exportHistory,
+            loadOpnameDetail, formatOpnameDate, showOpnameModal, loadingOpname, filteredOpnameDetail, opnameDetail, resetFilter, isRefreshing, fetchDashboardAll, loadDepartments,
             docNumber
         };
     }
