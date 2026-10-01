@@ -100,7 +100,7 @@ export const fetchLowStock = async () => {
 export const fetchOpnameDetail = async () => {
     const { data, error } = await supabaseClient.rpc("get_opname_selisih_detail");
     if (error) throw error;
-    return data || [];
+    return Array.isArray(data) ? data : [];
 };
 
 export const fetchDepartments = async () => {
