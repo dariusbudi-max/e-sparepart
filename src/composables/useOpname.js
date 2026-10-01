@@ -6,31 +6,40 @@ export function useOpname() {
     const loadingOpname = ref(false);
     const showOpnameModal = ref(false);
 
-    const loadOpnameDetail = async () => {
+    const loadOpnameDetail = async (openModal = true) => {
         if (loadingOpname.value) return;
         loadingOpname.value = true;
         try {
-            opnameDetail.value = await fetchOpnameDetail();
-            showOpnameModal.value = true;
+            const data = await fetchOpnameDetail();
+            opnameDetail.value = Array.isArray(data) ? data : [];
+            if (openModal) showOpnameModal.value = true;
         } catch (err) {
-            console.error(err);
+            opnameDetail.value = [];
+            if (openModal) showOpnameModal.value = false;
         } finally {
             loadingOpname.value = false;
         }
     };
 
-    const filteredOpnameDetail = computed(() => {
-        const SEVEN_DAYS_IN_MS = 7 * 24 * 60 * 60 * 1000;
-        const now = new Date();
+    const formatOpnameDate = (date) => {
+        if (!date) return "-";
 
-        return opnameDetail.value.filter(item => {
-            const dateProperty = item.created_at || item.tanggal || new Date(); 
-            const opnameDate = new Date(dateProperty);
-            const timeDiff = now - opnameDate;
-            
-            return timeDiff <= SEVEN_DAYS_IN_MS;
+        const d = new Date(date);
+
+        if (Number.isNaN(d.getTime())) {
+            return "-";
+        }
+
+        return d.toLocaleString("id-ID", {
+            day: "2-digit",
+            month: "2-digit",
+            year: "numeric",
+            hour: "2-digit",
+            minute: "2-digit"
         });
-    });
+    };
 
-    return { opnameDetail, filteredOpnameDetail, loadingOpname, showOpnameModal, loadOpnameDetail };
+    const filteredOpnameDetail = computed(() => opnameDetail.value);
+
+    return { opnameDetail, filteredOpnameDetail, loadingOpname, showOpnameModal, loadOpnameDetail, formatOpnameDate };
 }

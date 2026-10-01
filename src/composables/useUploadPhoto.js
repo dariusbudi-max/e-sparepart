@@ -3,7 +3,7 @@ import { uploadToDrive } from "../services/driveService.js";
 import { addPhoto, fetchPhotos } from "../services/inventoryPhotoService.js";
 
 export const useUploadPhoto = (deps) => {
-    const { isUploading, formItem, showToast, loadInventory } = deps;
+    const { formItem, showToast } = deps;
 
     const generateFilename = (kode) => `IMG_${kode}_${Date.now()}.jpg`;
 
@@ -16,7 +16,7 @@ export const useUploadPhoto = (deps) => {
 
     const uploadBase64 = async (base64, kode) => {
         const filename = generateFilename(kode);
-        return await uploadToDrive(base64, filename);
+        return uploadToDrive(base64, filename, "INVENTORY");
     };
 
     const uploadFile = async (file, kode) => {
